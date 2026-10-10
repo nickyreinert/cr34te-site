@@ -20,11 +20,20 @@ else
 fi
 
 for commit in $commits; do
-  if ! git diff-tree --no-commit-id --name-only -r --root "$commit" | grep -Eq '^(index\.html|styles\.css|script\.js)$'; then
+  if ! git diff-tree --no-commit-id --name-only -r --root "$commit" | grep -Eq '^(index\.html|styles\.css|script\.js|assets/[a-z0-9][a-z0-9-]{0,47}\.(css|js))$'; then
     continue
   fi
+  rm -rf "$working/assets"
   for file in index.html styles.css script.js; do
     git show "$commit:$file" > "$working/$file"
   done
+  while IFS= read -r file; do
+    if [[ ! "$file" =~ ^assets/[a-z0-9][a-z0-9-]{0,47}\.(css|js)$ ]]; then
+      echo "Invalid site asset: $file" >&2
+      exit 1
+    fi
+    mkdir -p "$working/assets"
+    git show "$commit:$file" > "$working/$file"
+  done < <(git ls-tree -r --name-only "$commit" -- assets)
   (cd "$working" && node "$site_root/.github/scripts/create-history-snapshot.mjs" "$history_root" "$commit")
 done
