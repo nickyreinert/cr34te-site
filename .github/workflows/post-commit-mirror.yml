@@ -1,0 +1,47 @@
+name: Mirror accepted site versions
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-history
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check history configuration
+        env:
+          HISTORY_REPOSITORY: ${{ vars.HISTORY_REPOSITORY }}
+          HISTORY_REPOSITORY_TOKEN: ${{ secrets.HISTORY_REPOSITORY_TOKEN }}
+        run: test -n "$HISTORY_REPOSITORY" && test -n "$HISTORY_REPOSITORY_TOKEN"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.HISTORY_REPOSITORY }}
+          token: ${{ secrets.HISTORY_REPOSITORY_TOKEN }}
+          path: .history
+
+      - name: Create missing snapshots in commit order
+        run: bash .github/scripts/mirror-history.sh
+
+      - name: Commit snapshots
+        working-directory: .history
+        run: |
+          git config user.name "cr34te mirror"
+          git config user.email "automation@cr34te.it"
+          git add .
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "archive: mirror through ${{ github.sha }}"
+          git push
