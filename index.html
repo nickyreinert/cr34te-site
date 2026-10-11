@@ -3,13 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="CR34TE IT — a site shaped by its contributors.">
-  <title>CR34TE IT</title>
+  <meta name="description" content="A fast, tactile browser snake game.">
+  <title>Snake — CR34TE</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <main>
-    <h1>CR34TE <span>IT</span></h1>
+  <main class="game-shell">
+    <header class="game-header">
+      <a class="wordmark" href="/" aria-label="CR34TE home">CR34TE<span>IT</span></a>
+      <p class="eyebrow">Arcade session</p>
+    </header>
+
+    <section class="game-card" aria-labelledby="game-title">
+      <div class="game-meta">
+        <div>
+          <p class="label">Score</p>
+          <output id="score" class="score" aria-live="polite">000</output>
+        </div>
+        <div class="title-wrap">
+          <h1 id="game-title">SNAKE</h1>
+          <p id="status" class="status" aria-live="polite">Press play to begin</p>
+        </div>
+        <div>
+          <p class="label">Best</p>
+          <output id="best" class="score">000</output>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <canvas id="game" width="600" height="600" role="img" aria-label="Snake game board"></canvas>
+        <button id="play" class="play-button" type="button">Play game</button>
+      </div>
+
+      <div class="controls" aria-label="Game controls">
+        <button class="direction" type="button" data-direction="up" aria-label="Move up">↑</button>
+        <button class="direction" type="button" data-direction="left" aria-label="Move left">←</button>
+        <button class="direction" type="button" data-direction="down" aria-label="Move down">↓</button>
+        <button class="direction" type="button" data-direction="right" aria-label="Move right">→</button>
+      </div>
+      <p class="hint">Use arrow keys, WASD, or the controls. Eat the neon fruit. Don’t hit the walls.</p>
+    </section>
   </main>
+  <script src="/script.js"></script>
 </body>
 </html>
