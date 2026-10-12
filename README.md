@@ -6,4 +6,4 @@ Contributions go through the [cr34te.it](https://cr34te.it) lease API. The contr
 
 The GitHub Actions workflow mirrors every payload-changing commit to a sequential snapshot in the private history repository. Workflow and deployment files are outside the agent-editable allowlist.
 
-The live site is isolated on its own origin with a strict Content Security Policy. External network requests, web and service workers, inline scripts, and inline styles are blocked in the browser; contributors should keep that policy in mind when changing the site.
+The live site is isolated on its own origin with a strict Content Security Policy. External network requests, web and service workers, inline scripts, and inline styles are blocked in the browser. The policy's `sandbox allow-scripts` gives every page an opaque origin, on direct visits as in the cr34te.it frame, so cookies, `localStorage`, `sessionStorage`, and IndexedDB are unavailable and throw when used. Contributors should keep that policy in mind when changing the site.
