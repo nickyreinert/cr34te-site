@@ -1,117 +1,27 @@
-const canvas = document.querySelector('#game');
-const context = canvas.getContext('2d');
-const scoreEl = document.querySelector('#score');
-const bestEl = document.querySelector('#best');
-const statusEl = document.querySelector('#status');
-const playButton = document.querySelector('#play');
-const directions = document.querySelectorAll('[data-direction]');
-
-const cells = 20;
-const unit = canvas.width / cells;
-const keyToDirection = {
-  ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down',
-  ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right'
-};
-const moves = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-const opposite = { up: 'down', down: 'up', left: 'right', right: 'left' };
-let snake;
-let fruit;
-let direction;
-let queuedDirection;
-let score;
-let best = Number(localStorage.getItem('cr34te-snake-best')) || 0;
-let running = false;
-let timer;
-
-function reset() {
-  snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
-  direction = 'right';
-  queuedDirection = 'right';
-  score = 0;
-  fruit = placeFruit();
-  updateScore();
-  draw();
-}
-
-function placeFruit() {
-  let next;
-  do next = { x: Math.floor(Math.random() * cells), y: Math.floor(Math.random() * cells) };
-  while (snake.some(part => part.x === next.x && part.y === next.y));
-  return next;
-}
-
-function updateScore() {
-  scoreEl.textContent = String(score).padStart(3, '0');
-  bestEl.textContent = String(best).padStart(3, '0');
-}
-
-function setDirection(next) {
-  if (!running || next === opposite[direction]) return;
-  queuedDirection = next;
-}
-
-function start() {
-  clearInterval(timer);
-  reset();
-  running = true;
-  playButton.classList.add('is-hidden');
-  statusEl.textContent = 'Stay sharp.';
-  timer = setInterval(step, 120);
-}
-
-function end() {
-  running = false;
-  clearInterval(timer);
-  statusEl.textContent = `Game over — ${score} points`;
-  playButton.textContent = 'Play again';
-  playButton.classList.remove('is-hidden');
-}
-
-function step() {
-  direction = queuedDirection;
-  const [dx, dy] = moves[direction];
-  const head = { x: snake[0].x + dx, y: snake[0].y + dy };
-  const ate = head.x === fruit.x && head.y === fruit.y;
-  const body = ate ? snake : snake.slice(0, -1);
-  const collided = head.x < 0 || head.y < 0 || head.x >= cells || head.y >= cells || body.some(part => part.x === head.x && part.y === head.y);
-  if (collided) return end();
-  snake.unshift(head);
-  if (ate) {
-    score += 10;
-    if (score > best) {
-      best = score;
-      localStorage.setItem('cr34te-snake-best', String(best));
-    }
-    fruit = placeFruit();
-    updateScore();
-  } else snake.pop();
-  draw();
-}
-
-function draw() {
-  context.fillStyle = '#111a13';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.strokeStyle = 'rgba(184,239,131,.08)';
-  context.lineWidth = 1;
-  for (let i = 1; i < cells; i += 1) {
-    context.beginPath(); context.moveTo(i * unit, 0); context.lineTo(i * unit, canvas.height); context.stroke();
-    context.beginPath(); context.moveTo(0, i * unit); context.lineTo(canvas.width, i * unit); context.stroke();
-  }
-  context.fillStyle = '#ff907c';
-  context.beginPath();
-  context.arc((fruit.x + .5) * unit, (fruit.y + .5) * unit, unit * .28, 0, Math.PI * 2);
-  context.fill();
-  snake.forEach((part, index) => {
-    context.fillStyle = index === 0 ? '#d3ffab' : '#b8ef83';
-    context.fillRect(part.x * unit + 2, part.y * unit + 2, unit - 4, unit - 4);
-  });
-}
-
-document.addEventListener('keydown', event => {
-  const next = keyToDirection[event.key];
-  if (next) { event.preventDefault(); setDirection(next); }
-  if (event.key === ' ' && !running) { event.preventDefault(); start(); }
-});
-directions.forEach(button => button.addEventListener('click', () => setDirection(button.dataset.direction)));
-playButton.addEventListener('click', start);
-reset();
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),nextCanvas=document.querySelector('#next'),nctx=nextCanvas.getContext('2d');
+const scoreEl=document.querySelector('#score'),levelEl=document.querySelector('#level'),linesEl=document.querySelector('#lines'),twistsEl=document.querySelector('#twists'),statusEl=document.querySelector('#status'),ruleEl=document.querySelector('#rule'),playButton=document.querySelector('#play');
+const W=12,H=20,S=30;
+const shapes=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]]];
+const colors=['#4deeea','#ffe66d','#ff4fb3','#a78bfa','#ff875e','#8aff80','#70a1ff'];
+const rules=['Gravity is a suggestion.','Every 5 lines, gravity reverses.','The next piece may be mirrored.','The floor is now the ceiling.','Reality is running out of patience.'];
+let board,piece,nextPiece,score=0,lines=0,twists=0,level=1,gravity=1,running=false,paused=false,gameOver=false,last=0,acc=0,raf=0,chaos=0;
+function matrixCopy(m){return m.map(r=>r.slice())}
+function randomPiece(){const id=Math.floor(Math.random()*shapes.length);let m=matrixCopy(shapes[id]);if(chaos>1&&Math.random()<.35)m=m.map(r=>r.slice().reverse());return{id,m,x:Math.floor((W-m[0].length)/2),y:gravity===1?-m.length: H}}
+function reset(){board=Array.from({length:H},()=>Array(W).fill(0));score=lines=twists=0;level=1;gravity=1;chaos=0;gameOver=paused=false;piece=null;nextPiece=randomPiece();spawn();updateStats();draw();drawNext()}
+function spawn(){piece=nextPiece;piece.x=Math.floor((W-piece.m[0].length)/2);piece.y=gravity===1?-piece.m.length:H-1;nextPiece=randomPiece();if(collides(piece,0,0)){end();return}drawNext()}
+function collides(p,dx,dy,m=p.m){for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++)if(m[y][x]){const bx=p.x+x+dx,by=p.y+y+dy;if(bx<0||bx>=W||by<0||by>=H){if(by<0&&gravity===1)continue;if(by>=H&&gravity===-1)continue;return true}if(board[by][bx])return true}return false}
+function rotate(){if(!running||paused)return;const m=piece.m[0].map((_,i)=>piece.m.map(r=>r[i]).reverse());if(!collides(piece,0,0,m)){piece.m=m;twists++;updateStats();draw()}}
+function move(dx,dy){if(!running||paused)return;if(!collides(piece,dx,dy)){piece.x+=dx;piece.y+=dy;draw();return true}return false}
+function flip(){if(!running||paused)return;gravity*=-1;twists++;piece.m=piece.m.map(r=>r.slice().reverse());piece.y=Math.max(0,Math.min(H-piece.m.length,piece.y));if(collides(piece,0,0)){gravity*=-1;piece.m=piece.m.map(r=>r.slice().reverse());statusEl.textContent='No room to bend reality.';return}statusEl.textContent=gravity===1?'Down is down. For now.':'UP IS THE NEW DOWN';ruleEl.textContent=gravity===1?'Gravity points down.':'Gravity points UP. Deal with it.';draw();updateStats()}
+function lock(){for(let y=0;y<piece.m.length;y++)for(let x=0;x<piece.m[y].length;x++)if(piece.m[y][x]){const by=piece.y+y,bx=piece.x+x;if(by>=0&&by<H)board[by][bx]=piece.id+1}clearLines();spawn();draw()}
+function clearLines(){let cleared=0;if(gravity===1){for(let y=H-1;y>=0;){if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(W).fill(0));cleared++}else y--}}else{for(let y=0;y<H;){if(board[y].every(Boolean)){board.splice(y,1);board.push(Array(W).fill(0));cleared++}else y++}}if(cleared){lines+=cleared;score+=[0,100,300,500,800][Math.min(4,cleared)]*level;level=1+Math.floor(lines/5);if(Math.floor(lines/5)>chaos){chaos=Math.floor(lines/5);if(chaos%2===1)gravity*=-1;ruleEl.textContent=rules[chaos%rules.length];statusEl.textContent=gravity===1?'A line vanished. Gravity survived.':'LINE CLEAR. THE WORLD FLIPPED.';twists++}else statusEl.textContent=`${cleared} line${cleared>1?'s':''} erased. The damage remains.`;updateStats()}}
+function updateStats(){scoreEl.textContent=String(score).padStart(4,'0');linesEl.textContent=lines;twistsEl.textContent=twists;levelEl.textContent=String(level).padStart(2,'0')}
+function end(){running=false;gameOver=true;cancelAnimationFrame(raf);statusEl.textContent='Reality collapsed. Score: '+score;playButton.textContent='REBUILD REALITY';playButton.classList.remove('hidden');draw()}
+function start(){cancelAnimationFrame(raf);reset();running=true;playButton.classList.add('hidden');statusEl.textContent='Gravity is already suspicious.';last=performance.now();raf=requestAnimationFrame(loop)}
+function loop(now){if(!running)return;const dt=Math.min(100,now-last);last=now;if(!paused){acc+=dt;const speed=Math.max(80,650-(level-1)*48);if(acc>speed){acc=0;if(!move(0,gravity)){if((gravity===1&&piece.y<0)||(gravity===-1&&piece.y+piece.m.length>H))return end();lock()}}}draw();raf=requestAnimationFrame(loop)}
+function block(x,y,color,scale=1){ctx.fillStyle=color;ctx.fillRect(x*S+1,y*S+1,S-2,S-2);ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(x*S+3,y*S+3,S-6,3);ctx.fillStyle='rgba(0,0,0,.22)';ctx.fillRect(x*S+3,y*S+S-5,S-6,2)}
+function draw(){ctx.fillStyle='#100d15';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#28202f';ctx.lineWidth=1;for(let x=0;x<=W;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,canvas.height);ctx.stroke()}for(let y=0;y<=H;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(canvas.width,y*S);ctx.stroke()}for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(board[y][x])block(x,y,colors[board[y][x]-1]);if(piece)for(let y=0;y<piece.m.length;y++)for(let x=0;x<piece.m[y].length;x++)if(piece.m[y][x]){const bx=piece.x+x,by=piece.y+y;if(by>=0&&by<H)block(bx,by,colors[piece.id])}ctx.fillStyle='#ff4fb3';ctx.fillRect(0,gravity===1?canvas.height-3:0,canvas.width,3);if(paused&&running){ctx.fillStyle='rgba(10,9,13,.8)';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#d9ff43';ctx.font='bold 28px monospace';ctx.textAlign='center';ctx.fillText('PAUSED',canvas.width/2,canvas.height/2)}}
+function drawNext(){nctx.fillStyle='#100d15';nctx.fillRect(0,0,120,120);const m=nextPiece.m,unit=20,ox=(120-m[0].length*unit)/2,oy=(120-m.length*unit)/2;for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++)if(m[y][x]){nctx.fillStyle=colors[nextPiece.id];nctx.fillRect(ox+x*unit+1,oy+y*unit+1,unit-2,unit-2);nctx.fillStyle='rgba(255,255,255,.25)';nctx.fillRect(ox+x*unit+3,oy+y*unit+3,unit-6,3)}}
+function action(a){if(a==='left')move(-1,0);if(a==='right')move(1,0);if(a==='down'){if(move(0,gravity))score++,updateStats();else lock()}if(a==='rotate')rotate();if(a==='flip')flip();if(a==='drop'&&running&&!paused){let n=0;while(move(0,gravity))n++;score+=n*2;updateStats();lock()}}
+document.addEventListener('keydown',e=>{const keys=['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' ','x','X','z','Z','p','P'];if(keys.includes(e.key))e.preventDefault();if(e.key===' '){if(!running)start();else action('drop')}else if(e.key==='ArrowLeft')action('left');else if(e.key==='ArrowRight')action('right');else if(e.key==='ArrowDown')action('down');else if(e.key==='ArrowUp'||e.key==='x'||e.key==='X')action('rotate');else if(e.key==='z'||e.key==='Z')action('flip');else if((e.key==='p'||e.key==='P')&&running){paused=!paused;statusEl.textContent=paused?'Paused. Press P to resume.':'Back to the nonsense.';last=performance.now();draw()}});
+document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action)));playButton.addEventListener('click',start);reset();
