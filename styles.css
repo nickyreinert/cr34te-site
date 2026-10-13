@@ -36,3 +36,50 @@ html,body{overflow:hidden;overscroll-behavior:none}
 .stage-grid{position:absolute;left:-30%;right:-30%;bottom:-8%;height:78%;opacity:0;transform:rotateX(74deg);transform-origin:50% 100%;background:repeating-linear-gradient(90deg,rgba(217,255,67,.18) 0 1px,transparent 1px 66px),repeating-linear-gradient(0deg,rgba(217,255,67,.14) 0 1px,transparent 1px 66px),radial-gradient(ellipse at 50% 100%,rgba(217,255,67,.09),transparent 70%);animation:gridIn 2.6s ease forwards}
 @keyframes gridIn{to{opacity:1}}
 @media(max-height:640px){.game-shell{align-content:start;padding-top:8px}}
+
+/* ==== BLITZ SKIN: neon storm over the whole arcade ======================= */
+:root{--hue:190}
+body{background:#000}
+.storm,.scan{position:fixed;inset:0;z-index:8;pointer-events:none}
+.storm{opacity:0;mix-blend-mode:screen;background:radial-gradient(circle at 28% 18%,hsl(var(--hue),100%,58%),transparent 55%),radial-gradient(circle at 76% 82%,hsl(calc(var(--hue) + 150),100%,52%),transparent 60%),linear-gradient(0deg,hsl(calc(var(--hue) + 300),100%,50%),transparent 70%)}
+.scan{opacity:.22;mix-blend-mode:overlay;background:repeating-linear-gradient(0deg,rgba(255,255,255,.18) 0 1px,transparent 1px 3px)}
+.flash-warning{margin:8px 0 0;text-align:center;font-size:.58rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#ff8f8f}
+.marquee{margin:8px 0 0;overflow:hidden;white-space:nowrap;background:hsl(var(--hue),100%,55%);color:#050505;font-size:.6rem;font-weight:900;letter-spacing:.22em;text-transform:uppercase}
+.marquee span{display:inline-block;padding-left:100%;animation:marquee 7s linear infinite}
+@keyframes marquee{to{transform:translateX(-200%)}}
+.game-card{border-color:hsl(var(--hue),100%,55%);background:rgba(4,3,8,.95);box-shadow:8px 8px 0 hsl(calc(var(--hue) + 150),100%,45%),0 0 34px hsl(var(--hue),100%,50%)}
+h1{color:#fff;text-shadow:0 0 6px hsl(var(--hue),100%,65%),0 0 20px hsl(var(--hue),100%,50%),4px 0 0 hsl(calc(var(--hue) + 160),100%,55%),-4px 0 0 #ff2fd0;animation:glitch 1.7s steps(1) infinite}
+@keyframes glitch{0%,86%{transform:skew(-7deg)}87%{transform:skew(-7deg) translate(-5px,2px)}89%{transform:skew(-7deg) translate(6px,-3px)}91%{transform:skew(-7deg) translate(-3px,1px)}93%,100%{transform:skew(-7deg)}}
+.label{color:hsl(var(--hue),100%,72%);animation:flicker 1.2s steps(1) infinite}
+.score{color:#fff;text-shadow:0 0 12px hsl(var(--hue),100%,60%)}
+.status{color:hsl(calc(var(--hue) + 150),100%,68%)}
+.mini-stat{border-color:#241a2e;animation:flicker 1.5s steps(1) infinite}
+.mini-stat output{color:hsl(calc(var(--hue) + 150),100%,65%)}
+#rule{color:#fff;text-shadow:0 0 10px #ff2fd0}
+.controls button{background:#07060b;border-color:hsl(var(--hue),100%,55%);color:hsl(var(--hue),100%,65%)}
+.play-button{background:hsl(var(--hue),100%,55%);border-color:#fff;color:#050505;box-shadow:5px 5px 0 hsl(calc(var(--hue) + 160),100%,50%)}
+.fx-button{border-color:hsl(var(--hue),100%,55%);color:hsl(var(--hue),100%,70%)}
+.version-bar button{background:#07060b;border-color:hsl(var(--hue),100%,55%)}
+@keyframes flicker{0%,42%,44%,86%,88%{opacity:1}43%{opacity:.2}87%{opacity:.3}}
+/* the storm itself, only while the build asks for it */
+body.blitz .storm{animation:stormFlash .38s steps(1) infinite}
+body.blitz .scan{animation:scanRoll .55s linear infinite}
+body.blitz .game-card{animation:cardJitter .24s steps(2) infinite}
+body.blitz .controls button{animation:flicker .48s steps(1) infinite}
+body.blitz .version-bar button{animation:flicker .64s steps(1) infinite}
+body.blitz .mini-stat{animation:flicker .42s steps(1) infinite}
+body.blitz .wordmark span{animation:flicker .3s steps(1) infinite}
+body.blitz .marquee{animation:flicker .36s steps(1) infinite}
+body.blitz .arena>canvas,body.blitz .side-panel canvas{animation:outage .82s steps(1) infinite}
+body.blitz .arena>canvas{height:clamp(170px,36dvh,560px)}
+body.burst{filter:invert(1) hue-rotate(120deg) saturate(2.4)}
+body.burst .game-card{transform:translate(4px,-3px) skewX(-3deg)}
+@keyframes stormFlash{0%,49%{opacity:.9;transform:scale(1.03)}50%,100%{opacity:.05;transform:scale(1)}}
+@keyframes scanRoll{to{background-position:0 6px}}
+@keyframes cardJitter{0%{transform:translate(0,0)}50%{transform:translate(-2px,1px) rotate(-.2deg)}100%{transform:translate(2px,-1px) rotate(.2deg)}}
+@keyframes outage{0%,66%{filter:brightness(1)}67%,74%{filter:brightness(2.6) saturate(2.2) contrast(1.3)}75%,100%{filter:brightness(.55) contrast(1.2)}}
+body.kalm .storm,body.kalm .scan{display:none}
+body.kalm *,body.kalm *::before,body.kalm *::after{animation:none!important}
+body.kalm .game-card{box-shadow:8px 8px 0 #201526}
+@media(max-height:760px){.marquee,.flash-warning{display:none}}
+@media(prefers-reduced-motion:reduce){.storm,.scan{display:none}*,*::before,*::after{animation:none!important;transition:none!important}}
