@@ -83,3 +83,23 @@ body.kalm *,body.kalm *::before,body.kalm *::after{animation:none!important}
 body.kalm .game-card{box-shadow:8px 8px 0 #201526}
 @media(max-height:760px){.marquee,.flash-warning{display:none}}
 @media(prefers-reduced-motion:reduce){.storm,.scan{display:none}*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ==== NEON GARDEN: flowers and hotter colours, pure CSS, no motion ======== */
+.game-card{position:relative}
+.game-card::before,.game-card::after,body::before,body::after{pointer-events:none;white-space:nowrap;line-height:1;filter:saturate(2.6) brightness(1.15) drop-shadow(0 0 6px #ff00e6) drop-shadow(0 0 14px #00fff0)}
+.game-card::before,.game-card::after{position:absolute;left:0;right:0;z-index:2;overflow:hidden;text-align:center;font-size:clamp(1rem,3.6vmin,1.5rem);letter-spacing:.35em}
+.game-card::before{content:"🌸 🌺 🌼 🌷 🌻 🌸 🌺 🌼";content:"🌸 🌺 🌼 🌷 🌻 🌸 🌺 🌼" / "";top:-.3em}
+.game-card::after{content:"🌻 🌷 🌼 🌺 🌸 🌻 🌷 🌼";content:"🌻 🌷 🌼 🌺 🌸 🌻 🌷 🌼" / "";bottom:-.3em}
+@media(min-width:700px){
+  body::before,body::after{position:fixed;z-index:1;bottom:2vmin;font-size:clamp(2rem,9vmin,5rem)}
+  body::before{content:"🌷🌸🌺";content:"🌷🌸🌺" / "";left:1vmin}
+  body::after{content:"🌻🌼🌺";content:"🌻🌼🌺" / "";right:1vmin}
+}
+.eyebrow{color:#fff200;text-shadow:0 0 8px #fff200}
+.hint{color:#ff7af0}
+.wordmark span{color:#39ff14;text-shadow:0 0 8px #39ff14}
+.score{text-shadow:0 0 14px #00fff0,0 0 28px #ff00e6}
+.arena>canvas,.side-panel canvas{border-color:#ff00e6;box-shadow:0 0 14px #ff00e6,0 0 30px rgba(0,255,240,.45)}
+.game-card{box-shadow:8px 8px 0 #ff00e6,0 0 40px #00fff0,0 0 80px rgba(176,38,255,.5)}
+.marquee{background:linear-gradient(90deg,#ff00e6,#fff200,#39ff14,#00fff0,#b026ff)}
+.controls button{border-color:#39ff14;color:#39ff14}
