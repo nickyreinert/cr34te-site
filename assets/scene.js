@@ -1,11 +1,21 @@
 (function () {
   'use strict';
-  var W = 160, H = 100, BASE = 72, LX = 105, LY = 40, MX = 82, MY = 88;
+  var H = 100, BASE = 72, LX = 105, LY = 40, MX = 82, MY = 88;
+  var VW = window.innerWidth || 800, VH = window.innerHeight || 500, ASP = VW / VH;
+  var W = Math.max(160, Math.min(320, Math.round(100 * ASP)));
+  var OX = Math.floor((W - 160) / 2), XMIN = -OX, XMAX = 160 + OX;
   var cv = document.getElementById('scene');
   if (!cv || !cv.getContext) return;
   var ctx = cv.getContext('2d');
   cv.width = W; cv.height = H;
   ctx.imageSmoothingEnabled = false;
+  (function () {
+    var cw = VW, ch = VH, top = 0;
+    if (ASP < 1.6) { ch = VW / 1.6; top = (VH - ch) / 2; }
+    cv.style.cssText = 'position:fixed;left:0;top:' + top + 'px;width:' + cw + 'px;height:' + ch + 'px;display:block;image-rendering:pixelated;touch-action:none';
+    document.documentElement.style.cssText = 'margin:0;height:100%;overflow:hidden;background:#03040a';
+    document.body.style.cssText = 'margin:0;height:100%;overflow:hidden;background:#03040a';
+  })();
 
   var calm = false;
   try { calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
@@ -51,6 +61,7 @@
   }
 
   var hl = mk(), h = hl.getContext('2d');
+  h.translate(OX, 0);
   var palettes = ['#0d1120', '#10152a', '#0b0f1c', '#121829'];
   var wins = [];
   var houses = [];
@@ -62,8 +73,8 @@
       x += w + Math.floor(rnd() * 3);
     }
   }
-  gen(-6, 125);
-  gen(139, 164);
+  gen(XMIN - 6, 125);
+  gen(139, XMAX + 4);
 
   function drawHouse(o) {
     var x = o.x, w = o.w, hh = o.h, top = BASE - hh, r;
@@ -118,12 +129,12 @@
   R(h, TX + 4, BASE - 12, 6, 12, '#04060b');
 
   /* sidewalk, curb, wet road */
-  R(h, 0, BASE, W, 6, '#161a29');
-  for (var jx = 0; jx < W; jx += 9) { R(h, jx, BASE + 1, 1, 2, '#0d101c'); R(h, jx + 4, BASE + 3, 1, 2, '#0d101c'); }
-  R(h, 0, BASE + 5, W, 1, '#272d44');
-  R(h, 0, BASE + 6, W, H - BASE - 6, '#0a0c15');
+  R(h, XMIN, BASE, W, 6, '#161a29');
+  for (var jx = XMIN; jx < XMAX; jx += 9) { R(h, jx, BASE + 1, 1, 2, '#0d101c'); R(h, jx + 4, BASE + 3, 1, 2, '#0d101c'); }
+  R(h, XMIN, BASE + 5, W, 1, '#272d44');
+  R(h, XMIN, BASE + 6, W, H - BASE - 6, '#0a0c15');
   for (var n = 0; n < 340; n++) {
-    R(h, rnd() * W, BASE + 7 + rnd() * (H - BASE - 8), 1 + Math.floor(rnd() * 2), 1, rnd() < 0.5 ? '#0f121e' : '#06080e');
+    R(h, rnd() * W + XMIN, BASE + 7 + rnd() * (H - BASE - 8), 1 + Math.floor(rnd() * 2), 1, rnd() < 0.5 ? '#0f121e' : '#06080e');
   }
   var puddles = [
     { x: 84, y: 89, rx: 16, ry: 3 }, { x: 112, y: 88, rx: 11, ry: 3 }, { x: 38, y: 90, rx: 18, ry: 3 },
@@ -162,13 +173,13 @@
       land: near ? 80 + Math.floor(Math.random() * 19) : 73 + Math.floor(Math.random() * 7),
       near: near
     };
-    d.x = Math.random() * (W + 50);
+    d.x = Math.random() * (W + 50) + XMIN;
     d.y = init ? Math.random() * d.land : -Math.random() * 24;
     return d;
   }
   for (i0 = 0; i0 < 90; i0++) farDrops.push(spawnDrop(false, true));
   for (i0 = 0; i0 < 60; i0++) nearDrops.push(spawnDrop(true, true));
-  for (i0 = 0; i0 < 6; i0++) clouds.push({ x: rnd() * W, y: 6 + rnd() * 34, w: 30 + Math.floor(rnd() * 40), sp: 2 + rnd() * 4 });
+  for (i0 = 0; i0 < 6; i0++) clouds.push({ x: rnd() * W - OX, y: 6 + rnd() * 34, w: 30 + Math.floor(rnd() * 40), sp: 2 + rnd() * 4 });
 
   var t = 0, rippleT = 0, flickT = 0, flickTarget = 1, flick = 1;
 
@@ -177,7 +188,7 @@
       var d = arr[i];
       d.x += d.vx * dt; d.y += d.vy * dt;
       if (d.y >= d.land) {
-        if (d.x >= 0 && d.x < W && splashes.length < 80) splashes.push({ x: Math.round(d.x), y: d.land, a: 0 });
+        if (d.x >= XMIN && d.x < XMAX && splashes.length < 80) splashes.push({ x: Math.round(d.x), y: d.land, a: 0 });
         if (d.near && Math.random() < 0.3 && ripples.length < 40 && inPuddle(d.x, d.land)) ripples.push({ x: Math.round(d.x), y: d.land, a: 0 });
         arr[i] = spawnDrop(d.near, false);
       }
@@ -187,6 +198,7 @@
   function update(dt) {
     var i, k;
     t += dt;
+    moveMan(dt);
     stepDrops(farDrops, dt);
     stepDrops(nearDrops, dt);
     k = 0;
@@ -203,7 +215,7 @@
         ripples.push({ x: q.x + Math.round((Math.random() * 2 - 1) * q.rx * 0.8), y: q.y + Math.round((Math.random() * 2 - 1) * q.ry * 0.7), a: 0 });
       }
     }
-    for (i = 0; i < clouds.length; i++) { clouds[i].x -= clouds[i].sp * dt; if (clouds[i].x < -clouds[i].w) clouds[i].x = W; }
+    for (i = 0; i < clouds.length; i++) { clouds[i].x -= clouds[i].sp * dt; if (clouds[i].x < XMIN - clouds[i].w) clouds[i].x = XMAX; }
     if (!calm) {
       flickT += dt;
       if (flickT > 0.08) { flickT = 0; flickTarget = Math.random() < 0.04 ? 0.7 : 0.94 + Math.random() * 0.12; }
@@ -215,7 +227,9 @@
   var SKIN = '#d9a081', SKIN_D = '#a8705a', LIT = '#f3b27a', HAIR = '#2b1b14';
   var TR = '#c93a2e', TR_D = '#8e2620', TR_L = '#e8584a', TR_W = '#eadfce';
   function drawMan(c, fx, fy) {
-    var shiverOn = !calm && Math.sin(t * 0.9) > 0.55;
+    var wk = (moving && (Math.floor(walkT * 9) % 2)) ? 1 : 0;
+    fy -= wk;
+    var shiverOn = !calm && !moving && Math.sin(t * 0.9) > 0.55;
     var tx = fx + (shiverOn ? Math.floor(t * 18) % 2 : 0);
     var blink = (t % 3.7) > 3.58;
     /* legs and feet */
@@ -266,12 +280,12 @@
   function drawRain(arr, p) {
     for (var i = 0; i < arr.length; i++) {
       var d = arr[i], x = Math.round(d.x), y = Math.round(d.y);
-      if (x < 0 || x >= W) continue;
+      if (x < XMIN || x >= XMAX) continue;
       ctx.fillStyle = p[lvl(x, y)];
       ctx.fillRect(x, y - d.len, 1, d.len);
     }
   }
-  var vig = ctx.createRadialGradient(95, 52, 28, 95, 52, 105);
+  var vig = ctx.createRadialGradient(W * 0.6, 52, 28, W * 0.6, 52, Math.max(105, W * 0.65));
   vig.addColorStop(0, 'rgba(0,0,0,0)');
   vig.addColorStop(1, 'rgba(0,0,0,0.55)');
 
@@ -280,6 +294,8 @@
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.drawImage(sky, 0, 0);
+    ctx.save();
+    ctx.translate(OX, 0);
     ctx.fillStyle = 'rgba(26,38,66,0.55)';
     for (i = 0; i < clouds.length; i++) {
       var cl = clouds[i], cx = Math.round(cl.x), cy = Math.round(cl.y);
@@ -287,7 +303,7 @@
       ctx.fillRect(cx + 4, cy - 2, Math.round(cl.w * 0.5), 2);
       ctx.fillRect(cx + Math.round(cl.w * 0.25), cy + 3, Math.round(cl.w * 0.55), 2);
     }
-    ctx.drawImage(hl, 0, 0);
+    ctx.drawImage(hl, -OX, 0);
     for (i = 0; i < wins.length; i++) {
       var w = wins[i];
       R(ctx, w.x, w.y, 5, 6, Math.sin(t * 0.9 + w.ph) > 0.92 ? '#b87a2c' : '#dc9c3e');
@@ -353,8 +369,128 @@
     }
     ctx.globalAlpha = 1;
 
+    ctx.restore();
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ---------- controls ---------- */
+  var px = MX, py = MY, keys = {}, target = null, moving = false, walkT = 0, stepT = 0;
+  function moveMan(dt) {
+    var dx = 0, dy = 0;
+    if (keys.left) dx -= 1;
+    if (keys.right) dx += 1;
+    if (keys.up) dy -= 1;
+    if (keys.down) dy += 1;
+    if (dx || dy) { target = null; }
+    else if (target) {
+      var tx = target.x - px, ty = target.y - py, dd = Math.sqrt(tx * tx + ty * ty);
+      if (dd < 1.5) target = null; else { dx = tx / dd; dy = ty / dd; }
+    }
+    moving = !!(dx || dy);
+    if (moving) {
+      var len = Math.sqrt(dx * dx + dy * dy);
+      px += dx / len * 26 * dt; py += dy / len * 26 * dt * 0.6;
+      walkT += dt; stepT += dt;
+      if (stepT > 0.2) { stepT = 0; footstep(); }
+    }
+    px = Math.max(XMIN + 8, Math.min(XMAX - 8, px));
+    py = Math.max(80, Math.min(97, py));
+    MX = Math.round(px); MY = Math.round(py);
+    if (humGain) {
+      var ddx = MX - LX, ddy = MY - 84;
+      humGain.gain.value = muted ? 0 : 0.045 * Math.max(0, 1 - Math.sqrt(ddx * ddx + ddy * ddy) / 60) * flick;
+    }
+  }
+  function footstep() {
+    var wet = inPuddle(MX, MY);
+    if (wet) {
+      if (splashes.length < 80) { splashes.push({ x: MX - 2, y: MY, a: 0 }); splashes.push({ x: MX + 3, y: MY, a: 0 }); }
+      if (ripples.length < 40) ripples.push({ x: MX, y: MY, a: 0 });
+    }
+    stepSound(wet);
+  }
+  function keyName(k) {
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A') return 'left';
+    if (k === 'ArrowRight' || k === 'd' || k === 'D') return 'right';
+    if (k === 'ArrowUp' || k === 'w' || k === 'W') return 'up';
+    if (k === 'ArrowDown' || k === 's' || k === 'S') return 'down';
+    return null;
+  }
+  window.addEventListener('keydown', function (e) {
+    var m = keyName(e.key);
+    if (m) { keys[m] = true; e.preventDefault(); startAudio(); hideHint(); return; }
+    if (e.key === 'm' || e.key === 'M') { toggleMute(); return; }
+    startAudio();
+  });
+  window.addEventListener('keyup', function (e) { var m = keyName(e.key); if (m) keys[m] = false; });
+  window.addEventListener('blur', function () { keys = {}; });
+  cv.addEventListener('pointerdown', function (e) {
+    var r = cv.getBoundingClientRect();
+    target = {
+      x: Math.max(XMIN + 8, Math.min(XMAX - 8, (e.clientX - r.left) / r.width * W - OX)),
+      y: Math.max(80, Math.min(97, (e.clientY - r.top) / r.height * H))
+    };
+    startAudio(); hideHint();
+  });
+  var hint = document.getElementById('hint');
+  function hideHint() { if (hint) hint.style.opacity = '0'; }
+  setTimeout(hideHint, 12000);
+
+  /* ---------- rain sound (Web Audio, synthesized, no files) ---------- */
+  var au = null, master = null, humGain = null, noiseBuf = null, muted = false;
+  function startAudio() {
+    if (au) { if (au.state === 'suspended' && !muted) { try { au.resume(); } catch (e) {} } return; }
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      au = new AC();
+      master = au.createGain(); master.gain.value = muted ? 0 : 0.9; master.connect(au.destination);
+      noiseBuf = au.createBuffer(1, au.sampleRate * 2, au.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      var src = au.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      var hp = au.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
+      var lp = au.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
+      var g = au.createGain(); g.gain.value = 0.1;
+      src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master); src.start();
+      var s2 = au.createBufferSource(); s2.buffer = noiseBuf; s2.loop = true; s2.playbackRate.value = 0.5;
+      var l2 = au.createBiquadFilter(); l2.type = 'lowpass'; l2.frequency.value = 260;
+      var g2 = au.createGain(); g2.gain.value = 0.16;
+      s2.connect(l2); l2.connect(g2); g2.connect(master); s2.start();
+      var o = au.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 100;
+      var of = au.createBiquadFilter(); of.type = 'lowpass'; of.frequency.value = 240;
+      humGain = au.createGain(); humGain.gain.value = 0;
+      o.connect(of); of.connect(humGain); humGain.connect(master); o.start();
+      scheduleDrop();
+    } catch (e) { au = null; }
+  }
+  function scheduleDrop() { if (!au) return; plop(); setTimeout(scheduleDrop, 70 + Math.random() * 220); }
+  function plop() {
+    if (muted || !au || au.state !== 'running') return;
+    try {
+      var o = au.createOscillator(), g = au.createGain(), now = au.currentTime, f = 700 + Math.random() * 900;
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, now); o.frequency.exponentialRampToValueAtTime(f * 0.5, now + 0.05);
+      g.gain.setValueAtTime(0.018, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+      o.connect(g); g.connect(master); o.start(now); o.stop(now + 0.07);
+    } catch (e) {}
+  }
+  function stepSound(wet) {
+    if (!au || muted || au.state !== 'running') return;
+    try {
+      var sN = au.createBufferSource(); sN.buffer = noiseBuf;
+      var bp = au.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = wet ? 1800 : 700; bp.Q.value = 0.8;
+      var g = au.createGain(), now = au.currentTime;
+      g.gain.setValueAtTime(wet ? 0.22 : 0.1, now); g.gain.exponentialRampToValueAtTime(0.0001, now + (wet ? 0.16 : 0.09));
+      sN.connect(bp); bp.connect(g); g.connect(master); sN.start(now, Math.random()); sN.stop(now + 0.2);
+    } catch (e) {}
+  }
+  function toggleMute() {
+    muted = !muted;
+    startAudio();
+    if (master) master.gain.value = muted ? 0 : 0.9;
+    if (hint) { hint.textContent = muted ? 'Ton aus (M)' : 'Ton an (M)'; hint.style.opacity = '1'; setTimeout(hideHint, 2500); }
   }
 
   var last = 0;
