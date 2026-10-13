@@ -17,3 +17,22 @@ body{min-height:100dvh}
 .controls{margin:clamp(8px,1.2dvh,18px) 0 clamp(6px,1dvh,12px)}
 @media(max-width:540px){.arena{grid-template-columns:auto 88px;gap:9px}.game-shell{padding:10px;gap:10px}.arena>canvas{height:clamp(170px,38dvh,600px)}}
 @media(max-height:700px){.eyebrow,.hint{display:none}.side-panel>p:not(.label){min-height:0}.version-bar{margin-top:4px}h1{font-size:clamp(1.4rem,4.4vw,2.4rem)}}
+
+/* 3D exploded view: every part flies apart, then settles as draggable debris */
+.fx-button{padding:6px 10px;border:1px solid #45334d;background:#1c1522;color:var(--acid);font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.fx-button:hover,.fx-button:focus-visible{border-color:var(--pink);color:var(--pink);outline:none}
+.fx-button[aria-pressed="true"]{border-color:var(--acid);background:var(--acid);color:#17130b}
+.game-header{position:relative;z-index:9}
+html,body{overflow:hidden;overscroll-behavior:none}
+.game-shell{max-height:100dvh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.game-shell::-webkit-scrollbar{width:0;height:0}
+.stage3d{position:fixed;inset:0;z-index:5;overflow:hidden;perspective:1200px;perspective-origin:50% 44%;pointer-events:none;user-select:none;-webkit-user-select:none}
+.stage3d .shard{position:fixed;left:0;top:0;margin:0;transform-origin:50% 50%;pointer-events:auto;touch-action:none;cursor:grab;will-change:transform;backface-visibility:hidden}
+.stage3d .shard.dragged{cursor:grabbing;filter:drop-shadow(0 0 14px rgba(217,255,67,.4))}
+.stage3d .shard.plate{background:rgba(19,15,24,.9);border:1px solid #45334d;box-shadow:0 10px 26px rgba(0,0,0,.5)}
+.stage3d .shard.part:not(.play-button){background:rgba(13,11,17,.55);outline:1px solid rgba(69,51,77,.5)}
+.stage3d .shard.tile{background:#100d15;outline:1px solid rgba(69,51,77,.75);image-rendering:auto}
+.stage3d .shard canvas{display:block;width:100%;height:100%}
+.stage-grid{position:absolute;left:-30%;right:-30%;bottom:-8%;height:78%;opacity:0;transform:rotateX(74deg);transform-origin:50% 100%;background:repeating-linear-gradient(90deg,rgba(217,255,67,.18) 0 1px,transparent 1px 66px),repeating-linear-gradient(0deg,rgba(217,255,67,.14) 0 1px,transparent 1px 66px),radial-gradient(ellipse at 50% 100%,rgba(217,255,67,.09),transparent 70%);animation:gridIn 2.6s ease forwards}
+@keyframes gridIn{to{opacity:1}}
+@media(max-height:640px){.game-shell{align-content:start;padding-top:8px}}
