@@ -1,67 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>THE COSMIC MINEFIELD</title>
-<style>
-:root{color-scheme:dark;--bg:#080611;--panel:#151020;--tile:#302344;--tile2:#49305d;--pink:#ff4fc8;--cyan:#4df8e8;--acid:#d8ff48;--text:#f8edff}
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}body{background:radial-gradient(ellipse at 50% 0,#45204d,transparent 65%),var(--bg);color:var(--text);font:14px ui-monospace,monospace}button{font:inherit}
-main{height:100dvh;width:100%;padding:clamp(4px,1dvh,10px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(3px,.7dvh,7px);overflow:hidden}
-header{width:min(100%,620px);display:flex;justify-content:space-between;align-items:center;color:var(--cyan);font-size:clamp(8px,1.5vw,11px);letter-spacing:.1em}header span:last-child{color:var(--pink);border:1px solid var(--pink);padding:3px 5px}
-h1{font:1000 clamp(24px,5.8vw,43px)/.88 system-ui,sans-serif;letter-spacing:-.08em;text-align:center;margin:0;text-shadow:3px 2px var(--pink),-2px -1px var(--cyan)}.subtitle{font-size:clamp(8px,1.5vw,10px);letter-spacing:.08em;text-align:center;color:#c7b2dc}
-.panel{width:min(100%,620px);min-height:0;padding:clamp(5px,1vw,10px);border:1px solid #684579;background:rgba(15,10,25,.97);box-shadow:4px 4px 0 #35163b;display:flex;flex-direction:column;gap:clamp(3px,.65dvh,7px)}
-.stats{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:4px;color:#cbb8d8;font-size:clamp(8px,1.6vw,10px)}.stats div:nth-child(2){text-align:center}.stats div:nth-child(3){text-align:right}.stats strong{display:block;font-size:clamp(13px,2.7vw,20px);color:var(--acid)}
-#message{min-height:2em;display:grid;place-items:center;text-align:center;color:var(--pink);font-size:clamp(9px,1.8vw,12px);line-height:1.2}
-#board{width:min(100%,min(54dvh,440px));max-height:calc(100dvh - 205px);aspect-ratio:1;align-self:center;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));gap:clamp(2px,.5vw,4px);touch-action:pan-y;user-select:none}
-.tile{appearance:none;-webkit-appearance:none;padding:0;min-width:0;min-height:0;border:1px solid #72548b;background:linear-gradient(145deg,var(--tile2),var(--tile));color:var(--cyan);font:bold clamp(10px,3.2vw,20px) ui-monospace,monospace;display:grid;place-items:center;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;box-shadow:inset 1px 1px #ffffff18;touch-action:manipulation}
-.tile:hover:not(.open){background:#68417d;border-color:var(--pink)}.tile:focus-visible,.controls button:focus-visible{outline:2px solid white;outline-offset:1px}.tile.open{background:#0b0912;border-color:#30233b;box-shadow:none}.tile.flag{color:var(--acid);background:#302a19}.tile.question{color:#ff8bdb;background:#25132e}.tile.mine{background:#801344;border-color:var(--pink)}.tile.swept{outline:2px solid var(--cyan);outline-offset:-3px}.n1{color:#4df8e8}.n2{color:#91ff80}.n3{color:#ff4fc8}.n4{color:#bca5ff}.n5,.n6,.n7,.n8{color:#ffe66d}
-.controls{display:flex;justify-content:center;flex-wrap:wrap;gap:5px}.controls button{padding:7px 9px;border:1px solid #684579;background:#21172d;color:var(--acid);font-size:clamp(9px,1.6vw,11px);font-weight:bold;cursor:pointer}.controls button[aria-pressed=true]{background:var(--acid);color:#110c18;border-color:var(--acid)}.controls button:hover{border-color:var(--pink);background:#392343}
-footer{max-width:620px;text-align:center;color:#b9a4ca;font-size:clamp(8px,1.3vw,9px);line-height:1.4}.omen{position:fixed;z-index:3;pointer-events:none;font-size:clamp(25px,8vw,65px);animation:fly 1.4s ease-out forwards}@keyframes fly{to{transform:translateY(-35vh) rotate(250deg) scale(1.7);opacity:0}}.tile.boom{animation:boom .25s ease-in-out 3}@keyframes boom{50%{transform:translateX(3px);filter:hue-rotate(90deg)}}
-@media(max-height:620px){main{gap:3px;padding:3px}.subtitle,header,footer{display:none}h1{font-size:clamp(19px,4.5vh,30px)}.panel{padding:4px;gap:3px}#board{width:min(100%,min(48dvh,390px));max-height:calc(100dvh - 140px);gap:2px}.controls{gap:4px}.controls button{padding:5px 7px}#message{min-height:1.5em}.stats strong{font-size:14px}}
-@media(max-width:390px){.panel{width:100%}#board{width:min(100%,52dvh)}.controls button{padding:6px 7px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="0wn3d 8y n1cky">
+  <title>0wn3d 8y n1cky</title>
+  <link rel="stylesheet" href="assets/scene.css">
 </head>
 <body>
-<main>
-<header><span>DEPARTMENT OF IMPROBABLE EVENTS</span><span>FORM 0X-NULL</span></header>
-<h1>MINESWEEPER<br>FROM HELL</h1>
-<div class="subtitle">THE UNIVERSE HAS MISFILED YOUR EXISTENCE</div>
-<section class="panel" aria-label="Minesweeper game">
-<div class="stats"><div>UNREGISTERED BOMBS<strong id="bombs">010</strong></div><div>COSMIC DEBT<strong id="score">0000</strong></div><div>REALITY<strong id="time">0 SEC</strong></div></div>
-<div id="message" aria-live="polite">The board is innocent until proven explosive.</div>
-<div id="board" role="group" aria-label="Nine by nine minefield"></div>
-<div class="controls"><button id="mode" aria-pressed="false">MODE: REVEAL</button><button id="sweep">SWEEP ROW ↔</button><button id="weird">CONSULT SHRIMP</button><button id="restart">NEW UNIVERSE ↻</button></div>
-</section>
-<footer>TAP TO REVEAL · RIGHT-CLICK TO FLAG · MODE CYCLES REVEAL / FLAG / QUESTION<br>DRAG TO SWEEP A ROW. DOUBLE-TAP A NUMBER TO AUDIT ITS NEIGHBOURS.<br>MINES INCLUDE TAX GOBLINS, SENTIENT YOGURT AND ONE VERY SMALL BLACK HOLE.</footer>
-</main>
-<script>
-(function(){
-'use strict';
-var SIZE=9,TOTAL=81,MINES=10,board=document.getElementById('board'),message=document.getElementById('message'),bombsOut=document.getElementById('bombs'),scoreOut=document.getElementById('score'),timeOut=document.getElementById('time'),modeButton=document.getElementById('mode');
-var cells=[],gameOver=false,mode=0,firstClick=true,flags=0,opened=0,score=0,seconds=0,timer=null,lastTap=-1,lastTapAt=0,sweeping=false,swept={};
-var nonsense=['A TAX GOBLIN HAS AUDITED YOUR SOUL.','A SHRIMP KNOWS WHAT YOU DID IN 2007.','THE MOON DENIES ALL RESPONSIBILITY.','THE YOGURT HAS ACQUIRED DIPLOMATIC IMMUNITY.','YOUR SHADOW IS NOW A MIDDLE MANAGER.','THE VOID REQUESTS YOUR POSTCODE.','A TINY BLACK HOLE OWES YOU €3.50.','FOURTEEN GHOSTS HAVE UNIONISED.','AN INVISIBLE HORSE FILED AN APPEAL.','YOUR EXISTENCE HAS BEEN RECLASSIFIED AS SOUP.','A POTATO HAS BEEN APPOINTED SUPREME COURT.','YOUR TAX RETURN IS SENTIENT AND HUNGRY.'];
-var symbols=['🦐','🧾','🛸','🪱','🥛','🧿','🦷','🧌','🫀','🪤'];
-function random(n){return Math.floor(Math.random()*n)}function say(s){message.textContent=s}
-function around(i){var out=[],x=i%SIZE,y=Math.floor(i/SIZE);for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){var xx=x+dx,yy=y+dy;if((dx||dy)&&xx>=0&&xx<SIZE&&yy>=0&&yy<SIZE)out.push(yy*SIZE+xx)}return out}
-function count(i){var n=0;around(i).forEach(function(j){if(cells[j].mine)n++});return n}
-function update(){bombsOut.textContent=String(Math.max(0,MINES-flags)).padStart(3,'0');scoreOut.textContent=String(score).padStart(4,'0');timeOut.textContent=seconds+' SEC'}
-function effect(symbol){var el=document.createElement('div');el.className='omen';el.textContent=symbol;el.style.left=(10+random(80))+'%';el.style.top=(20+random(55))+'%';document.body.appendChild(el);el.addEventListener('animationend',function(){el.remove()})}
-function paint(i){var c=cells[i],b=c.el;b.className='tile';b.textContent='';if(c.flag){b.classList.add('flag');b.textContent='⚑';b.setAttribute('aria-label','Flagged square');return}if(c.question){b.classList.add('question');b.textContent='?';b.setAttribute('aria-label','Questioned square');return}if(!c.open){b.setAttribute('aria-label','Hidden square');return}b.classList.add('open');if(c.mine){b.classList.add('mine');b.textContent=symbols[i%symbols.length];b.setAttribute('aria-label','Mine');return}var n=count(i);if(n){b.textContent=String(n);b.classList.add('n'+n);b.setAttribute('aria-label',n+' nearby mines')}else b.setAttribute('aria-label','Empty square')}
-function stop(win,hit){gameOver=true;if(timer!==null){clearInterval(timer);timer=null}if(win){score+=1000;say('COSMIC AUDIT PASSED. +1000 EXISTENCE CREDITS. THE SHRIMP IS IMPRESSED.');effect('👑')}else{say('YOU DETONATED '+symbols[hit%symbols.length]+'. YOUR APPEAL HAS BEEN EATEN.');cells[hit].el.classList.add('boom');effect('💥')}update()}
-function revealSafe(i){if(gameOver||cells[i].open||cells[i].flag||cells[i].question||cells[i].mine)return;cells[i].open=true;opened++;score+=7;paint(i);if(count(i)===0)around(i).forEach(revealSafe)}
-function reveal(i){if(gameOver||cells[i].open||cells[i].flag||cells[i].question)return;if(firstClick){firstClick=false;if(cells[i].mine){cells[i].mine=false;var safe=[];for(var k=0;k<TOTAL;k++)if(!cells[k].mine&&k!==i)safe.push(k);cells[safe[random(safe.length)]].mine=true}}if(timer===null)timer=setInterval(function(){if(!gameOver){seconds++;update()}},1000);cells[i].open=true;opened++;score+=7;paint(i);if(cells[i].mine){cells.forEach(function(c,j){if(c.mine){c.open=true;paint(j)}});stop(false,i);return}if(count(i)===0)around(i).forEach(revealSafe);if(Math.random()<.24){say(nonsense[random(nonsense.length)]);effect(symbols[random(symbols.length)])}else say(['The void is statistically concerned.','A number has appeared. Lawyers are en route.','Your survival is provisionally recognised.','The stars misplaced the instructions.','One square closer to cosmic insolvency.'][random(5)]);if(opened===TOTAL-MINES)stop(true,i);update()}
-function mark(i){if(gameOver||cells[i].open)return;if(mode===0){reveal(i);return}if(mode===1){cells[i].flag=!cells[i].flag;if(cells[i].flag){cells[i].question=false;flags++}else flags--;say(cells[i].flag?'Flag submitted. The bureaucracy is pleased.':'Flag withdrawn. Your paperwork is incomplete.')}else{if(cells[i].flag){cells[i].flag=false;flags--}cells[i].question=!cells[i].question;say(cells[i].question?'Square marked “legally suspicious”.':'Suspicion withdrawn; no lawyer present.')}paint(i);update()}
-function audit(i){if(gameOver||!cells[i].open||cells[i].mine)return;var n=count(i),near=around(i),marked=near.filter(function(j){return cells[j].flag}).length;if(marked===n){near.forEach(function(j){if(!cells[j].flag&&!cells[j].open)reveal(j)});say('AUDIT COMPLETE. THE NEIGHBOURS HAVE BEEN PROCESSED.')}else{say('AUDIT: '+n+' nearby mines, '+marked+' flags. '+(marked>n?'YOU HAVE ACCUSED TOO MANY INNOCENT SQUARES.':'THE PAPERWORK DOES NOT BALANCE.'));effect('⚖️')}}
-function newGame(){if(timer!==null){clearInterval(timer);timer=null}cells=[];for(var i=0;i<TOTAL;i++)cells.push({open:false,flag:false,question:false,mine:false,el:null});gameOver=false;mode=0;firstClick=true;flags=0;opened=0;score=0;seconds=0;lastTap=-1;lastTapAt=0;modeButton.setAttribute('aria-pressed','false');modeButton.textContent='MODE: REVEAL';board.innerHTML='';for(var j=0;j<TOTAL;j++){(function(i){var b=document.createElement('button');b.type='button';b.className='tile';b.setAttribute('aria-label','Hidden square');cells[i].el=b;board.appendChild(b);b.addEventListener('click',function(e){if(sweeping)return;var now=Date.now();if(lastTap===i&&now-lastTapAt<360){audit(i);lastTap=-1;return}lastTap=i;lastTapAt=now;mark(i)});b.addEventListener('contextmenu',function(e){e.preventDefault();var old=mode;mode=1;mark(i);mode=old});b.addEventListener('pointerenter',function(){if(sweeping){swept[i]=true;cells[i].el.classList.add('swept')}});b.addEventListener('pointerdown',function(e){if(e.button===0&&mode===0){sweeping=true;swept={};swept[i]=true;setTimeout(function(){if(sweeping){Object.keys(swept).forEach(function(k){cells[k].el.classList.add('swept')})}},80)}});b.addEventListener('pointerup',function(){if(sweeping){sweeping=false;var row=Math.floor(i/SIZE);Object.keys(swept).forEach(function(k){cells[k].el.classList.remove('swept')});var picks=Object.keys(swept).filter(function(k){return Math.floor(Number(k)/SIZE)===row});if(picks.length>1){picks.forEach(function(k){reveal(Number(k))});say('ROW SWEEP: '+picks.length+' squares inspected. HR has been notified.')}swept={}}})})(j)}var placed=0;while(placed<MINES){var p=random(TOTAL);if(!cells[p].mine){cells[p].mine=true;placed++}}say('The board is innocent until proven explosive.');update()}
-modeButton.addEventListener('click',function(){mode=(mode+1)%3;modeButton.textContent='MODE: '+['REVEAL','FLAG','QUESTION'][mode];modeButton.setAttribute('aria-pressed',String(mode!==0));say(['Reveal the truth.','Plant a flag. Accuse the nearest square.','Mark the square as legally suspicious.'][mode])});
-document.getElementById('restart').addEventListener('click',newGame);
-document.getElementById('weird').addEventListener('click',function(){say(nonsense[random(nonsense.length)]);effect(symbols[random(symbols.length)]);if(!gameOver){var hidden=[];cells.forEach(function(c,i){if(!c.open&&!c.flag)hidden.push(i)});if(hidden.length){var i=hidden[random(hidden.length)];cells[i].el.textContent='¿';cells[i].el.style.borderColor='var(--pink)';setTimeout(function(){if(!cells[i].open&&!cells[i].flag&&!cells[i].question){cells[i].el.textContent='';cells[i].el.style.borderColor=''}},650)}}});
-document.getElementById('sweep').addEventListener('click',function(){if(gameOver)return;var row=random(SIZE);for(var i=row*SIZE;i<(row+1)*SIZE;i++){if(!cells[i].open&&!cells[i].flag&&!cells[i].question)cells[i].el.classList.add('swept')}say('THE SHRIMP HAS SELECTED ROW '+(row+1)+'. Tap any square there to continue the audit.');setTimeout(function(){cells.forEach(function(c){c.el.classList.remove('swept')})},1200)});
-document.addEventListener('pointerup',function(){if(sweeping){sweeping=false;Object.keys(swept).forEach(function(k){cells[k].el.classList.remove('swept')});swept={}}});
-newGame();
-})();
-</script>
+  <h1>0wn3d 8y n1cky</h1>
+  <canvas id="scene" width="160" height="100" role="img" aria-label="Pixelanimation: Eine dunkle, verregnete Dorfstra&szlig;e. Unter einer leuchtenden Laterne steht ein Mann in Badehose im Regen. Er l&auml;sst sich mit den Pfeiltasten oder per Tippen steuern."></canvas>
+  <p id="hint">Pfeiltasten / WASD oder tippen: gehen &middot; M: Ton</p>
+  <p id="laterne" aria-live="off"></p>
+  <script src="assets/scene.js"></script>
+  <script src="assets/laterne.js"></script>
 </body>
 </html>
