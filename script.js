@@ -1,7 +1,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),nextCanvas=document.querySelector('#next'),nctx=nextCanvas.getContext('2d');
 const scoreEl=document.querySelector('#score'),levelEl=document.querySelector('#level'),linesEl=document.querySelector('#lines'),twistsEl=document.querySelector('#twists'),statusEl=document.querySelector('#status'),ruleEl=document.querySelector('#rule'),playButton=document.querySelector('#play');
 const W=12,H=20,S=30;
-const BUILD='0.5',PREF='cr34te:v=';
+const BUILD='0.6',PREF='cr34te:v=';
 const versionEl=document.querySelector('#version'),prevBtn=document.querySelector('#ver-prev'),nextBtn=document.querySelector('#ver-next'),latestBtn=document.querySelector('#ver-latest'),pinBtn=document.querySelector('#ver-pin'),reloadBtn=document.querySelector('#ver-reload');
 const NICKY={labels:['N','I','C','K','Y'],shapes:[[[1,0,0,1],[1,1,0,1],[1,0,1,1],[1,0,0,1],[1,0,0,1]],[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],[[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],[[1,0,0,1],[1,0,1,0],[1,1,0,0],[1,0,1,0],[1,0,0,1]],[[1,0,0,1],[1,0,0,1],[0,1,1,0],[0,1,0,0],[0,1,0,0]]],colors:['#4deeea','#ffe66d','#ff4fb3','#a78bfa','#8aff80']};
 const TETRIS={labels:null,shapes:[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]]],colors:['#4deeea','#ffe66d','#ff4fb3','#a78bfa','#ff875e','#8aff80','#70a1ff']};
@@ -13,7 +13,8 @@ const ARCHIVE=[
 {v:'0.2',name:'WRONG NICKY',note:'Letter blocks spell N I C K Y in order.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true},
 {v:'0.3',name:'WRONG NICKY + CACHE',note:'NICKY blocks plus this version cache.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true},
 {v:'0.4',name:'EXPLODED NICKY',note:'NICKY blocks, version cache and the 3D exploded view, which starts by itself on load.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true,explode:true},
-{v:'0.5',name:'EXPLODED NICKY (ON CLICK)',note:'Same as 0.4, but the 3D view waits for the 3D VIEW button or the E key.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true}
+{v:'0.5',name:'EXPLODED NICKY (ON CLICK)',note:'Same as 0.4, but the 3D view waits for the 3D VIEW button or the E key.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true},
+{v:'0.6',name:'BLITZ NICKY',note:'Neon strobe skin running hot, with the 3D view on demand. Press KALM if it is too much.',title:'BLITZ<br>NICKY',kind:NICKY,ordered:true,blitz:true}
 ];
 let active=ARCHIVE[ARCHIVE.length-1],shapes=active.kind.shapes,colors=active.kind.colors,labels=active.kind.labels;
 const rules=['Gravity is a suggestion.','Every 5 lines, gravity reverses.','The next piece may be mirrored.','The floor is now the ceiling.','Reality is running out of patience.'];
@@ -218,10 +219,38 @@ function indexOfVersion(v){for(let i=0;i<ARCHIVE.length;i++)if(ARCHIVE[i].v===v)
 function prefRead(){try{const raw=String(window.name||'');return raw.indexOf(PREF)===0?raw.slice(PREF.length):null}catch(e){return null}}
 function prefWrite(v){try{const raw=String(window.name||'');if(raw&&raw.indexOf(PREF)!==0)return false;window.name=v?PREF+v:'';return true}catch(e){return false}}
 function updateVersionUI(){const i=ARCHIVE.indexOf(active),pinned=prefRead();versionEl.textContent='v'+active.v+(active.v===BUILD?' · latest':' · older');versionEl.title=active.name+' — '+active.note;prevBtn.disabled=i<=0;nextBtn.disabled=i>=ARCHIVE.length-1;latestBtn.className=active.v===BUILD?'hidden':'';pinBtn.setAttribute('aria-pressed',pinned===active.v?'true':'false');pinBtn.textContent=pinned===active.v?'UNPIN':'PIN';reloadBtn.title='Purge cached state and reload v'+active.v}
-function applyVersion(i,message){const next=ARCHIVE[Math.max(0,Math.min(ARCHIVE.length-1,i))];active=next;shapes=next.kind.shapes;colors=next.kind.colors;labels=next.kind.labels;document.querySelector('#game-title').innerHTML=next.title;ruleEl.textContent=rules[0];cancelAnimationFrame(raf);raf=0;running=false;paused=false;reset();playButton.textContent='BREAK REALITY';playButton.classList.remove('hidden');statusEl.textContent=message||'v'+next.v+' · '+next.name+' live.'+(next.v===BUILD?'':'. Latest is v'+BUILD+'.');updateVersionUI();if(stage)assemble();if(explodeTimer)clearTimeout(explodeTimer);if(next.explode)explodeTimer=setTimeout(function(){if(active.explode&&!stage&&!running)explode()},900)}
+function applyVersion(i,message){const next=ARCHIVE[Math.max(0,Math.min(ARCHIVE.length-1,i))];active=next;shapes=next.kind.shapes;colors=next.kind.colors;labels=next.kind.labels;document.querySelector('#game-title').innerHTML=next.title;ruleEl.textContent=rules[0];cancelAnimationFrame(raf);raf=0;running=false;paused=false;reset();playButton.textContent='BREAK REALITY';playButton.classList.remove('hidden');statusEl.textContent=message||'v'+next.v+' · '+next.name+' live.'+(next.v===BUILD?'':'. Latest is v'+BUILD+'.');updateVersionUI();if(stage)assemble();if(explodeTimer)clearTimeout(explodeTimer);if(next.explode)explodeTimer=setTimeout(function(){if(active.explode&&!stage&&!running)explode()},900);applyStorm()}
 function stepVersion(d){const i=ARCHIVE.indexOf(active)+d;if(i<0||i>=ARCHIVE.length){statusEl.textContent=d<0?'v'+ARCHIVE[0].v+' is the oldest build in the cache.':'v'+BUILD+' is the latest build.';return}applyVersion(i)}
 function togglePin(){if(prefRead()===active.v){const ok=prefWrite('');statusEl.textContent=ok?'Unpinned. The next load runs v'+BUILD+'.':'Pin cleared for this session.'}else{const ok=prefWrite(active.v);statusEl.textContent=ok?'v'+active.v+' pinned. It survives reloads of this frame.':'v'+active.v+' pinned for this session — this sandbox blocks persistent storage.'}updateVersionUI()}
 prevBtn.addEventListener('click',()=>stepVersion(-1));nextBtn.addEventListener('click',()=>stepVersion(1));latestBtn.addEventListener('click',()=>applyVersion(ARCHIVE.length-1));pinBtn.addEventListener('click',togglePin);reloadBtn.addEventListener('click',()=>applyVersion(ARCHIVE.indexOf(active),'Cache purged. v'+active.v+' reloaded from the shipped build.'));
+/* --- BLITZ storm driver --------------------------------------------------
+   The strobe is CSS, this only drives it: colour jumps, short invert bursts
+   and one switch that stops every layer at once. Bounded on purpose: the
+   full-area luminance flips stay near 1.3 Hz, so the madness lives in the
+   small parts (type, borders, scanlines) instead of a photosensitive trap.
+   It also starts calm when the system asks for reduced motion.           */
+const kalmBtn=document.querySelector('#kalm'),stormBody=document.body;
+const calmBySystem=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+let kalmOn=calmBySystem,burstTimer=0;
+function stopStorm(){if(burstTimer)clearInterval(burstTimer);burstTimer=0;stormBody.classList.remove('burst')}
+function startStorm(){
+  stopStorm();
+  burstTimer=setInterval(function(){
+    if(!stormBody.classList.contains('blitz'))return;
+    stormBody.classList.add('burst');
+    setTimeout(function(){stormBody.classList.remove('burst')},90+Math.random()*80);
+    document.documentElement.style.setProperty('--hue',String(Math.floor(Math.random()*360)));
+  },760);
+}
+function applyStorm(){
+  const hot=!!active.blitz&&!kalmOn;
+  stormBody.classList.toggle('blitz',hot);
+  stormBody.classList.toggle('kalm',kalmOn);
+  kalmBtn.textContent=kalmOn?'KALM ON':'KALM';
+  kalmBtn.setAttribute('aria-pressed',kalmOn?'true':'false');
+  if(hot)startStorm();else stopStorm();
+}
+kalmBtn.addEventListener('click',function(){kalmOn=!kalmOn;applyStorm();statusEl.textContent=kalmOn?'Storm paused. The arcade breathes.':'BLITZ. Hold on to something.'});
 const pinned=prefRead(),pinnedIndex=pinned?indexOfVersion(pinned):-1;
 if(pinned&&pinnedIndex<0)prefWrite('');
 if(pinnedIndex>=0&&ARCHIVE[pinnedIndex].v!==BUILD)applyVersion(pinnedIndex,'Pinned v'+ARCHIVE[pinnedIndex].v+' restored. Latest is v'+BUILD+' — press LATEST to update.');else applyVersion(ARCHIVE.length-1,'v'+BUILD+' · '+ARCHIVE[ARCHIVE.length-1].name+'. Newest build live, cache served from it.');
