@@ -1,7 +1,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),nextCanvas=document.querySelector('#next'),nctx=nextCanvas.getContext('2d');
 const scoreEl=document.querySelector('#score'),levelEl=document.querySelector('#level'),linesEl=document.querySelector('#lines'),twistsEl=document.querySelector('#twists'),statusEl=document.querySelector('#status'),ruleEl=document.querySelector('#rule'),playButton=document.querySelector('#play');
 const W=12,H=20,S=30;
-const BUILD='0.4',PREF='cr34te:v=';
+const BUILD='0.5',PREF='cr34te:v=';
 const versionEl=document.querySelector('#version'),prevBtn=document.querySelector('#ver-prev'),nextBtn=document.querySelector('#ver-next'),latestBtn=document.querySelector('#ver-latest'),pinBtn=document.querySelector('#ver-pin'),reloadBtn=document.querySelector('#ver-reload');
 const NICKY={labels:['N','I','C','K','Y'],shapes:[[[1,0,0,1],[1,1,0,1],[1,0,1,1],[1,0,0,1],[1,0,0,1]],[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],[[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],[[1,0,0,1],[1,0,1,0],[1,1,0,0],[1,0,1,0],[1,0,0,1]],[[1,0,0,1],[1,0,0,1],[0,1,1,0],[0,1,0,0],[0,1,0,0]]],colors:['#4deeea','#ffe66d','#ff4fb3','#a78bfa','#8aff80']};
 const TETRIS={labels:null,shapes:[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]]],colors:['#4deeea','#ffe66d','#ff4fb3','#a78bfa','#ff875e','#8aff80','#70a1ff']};
@@ -12,7 +12,8 @@ const ARCHIVE=[
 {v:'0.1',name:'WRONG TETRIS',note:'Seven tetrominoes, random spawn, no letters.',title:'WRONG<br>TETRIS',kind:TETRIS,ordered:false},
 {v:'0.2',name:'WRONG NICKY',note:'Letter blocks spell N I C K Y in order.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true},
 {v:'0.3',name:'WRONG NICKY + CACHE',note:'NICKY blocks plus this version cache.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true},
-{v:'0.4',name:'EXPLODED NICKY',note:'NICKY blocks, version cache and the 3D exploded view with draggable debris.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true,explode:true}
+{v:'0.4',name:'EXPLODED NICKY',note:'NICKY blocks, version cache and the 3D exploded view, which starts by itself on load.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true,explode:true},
+{v:'0.5',name:'EXPLODED NICKY (ON CLICK)',note:'Same as 0.4, but the 3D view waits for the 3D VIEW button or the E key.',title:'WRONG<br>NICKY',kind:NICKY,ordered:true}
 ];
 let active=ARCHIVE[ARCHIVE.length-1],shapes=active.kind.shapes,colors=active.kind.colors,labels=active.kind.labels;
 const rules=['Gravity is a suggestion.','Every 5 lines, gravity reverses.','The next piece may be mirrored.','The floor is now the ceiling.','Reality is running out of patience.'];
