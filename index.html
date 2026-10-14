@@ -5,16 +5,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>C64 BASIC V2 Simulator</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="assets/dos.css">
 </head>
 <body>
 <main class="machine" aria-label="Commodore 64 BASIC simulator">
-  <header><span class="led"></span><span>COMMODORE 64</span><span class="version">BASIC V2</span></header>
+  <header><span class="led"></span><span>COMMODORE 64</span><span class="version">BASIC V2</span><button id="dosbtn" style="margin-left:10px;font:inherit;font-size:.75em;cursor:pointer">DOS</button></header>
   <section id="screen" class="screen" aria-label="BASIC terminal" aria-live="polite">
     <div id="output" class="output"></div>
     <div class="inputline"><span id="prompt">READY.</span><input id="command" autofocus autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="BASIC command"><span class="cursor"></span></div>
   </section>
   <footer><div class="status"><span id="state">READY</span><span id="memory">38911 BASIC BYTES FREE</span></div><div class="help">Enter a command · F1 LIST · F3 RUN · F5 NEW · ↑ history</div></footer>
 </main>
+<div id="dos" style="display:none"></div>
 <script src="script.js"></script>
+<script src="assets/dos.js"></script>
 </body>
 </html>

@@ -1,0 +1,7 @@
+#dos{position:fixed;left:0;top:0;width:100vw;height:100dvh;background:#000;color:#b8b8b8;font:16px/1.2 "Perfect DOS VGA 437","Px437 IBM VGA8",Consolas,"Courier New",monospace;overflow:hidden;z-index:60;cursor:text}
+#dos pre{margin:0;padding:10px 12px;white-space:pre-wrap;word-break:break-all;height:100%;box-sizing:border-box;overflow:hidden;font:inherit}
+#dos .cur{display:inline-block;width:.6em;height:.18em;background:#b8b8b8;vertical-align:baseline;animation:dosb 1.06s steps(1) infinite}
+#dos .w{color:#fff}#dos .g{color:#5f5}#dos .y{color:#ff5}#dos .c{color:#5ff}#dos .r{color:#f55}
+#dos input{position:absolute;left:-200px;top:0;width:10px;opacity:0}
+@keyframes dosb{50%{opacity:0}}
+@media(max-width:560px){#dos{font-size:13px}}
