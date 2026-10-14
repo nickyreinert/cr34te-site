@@ -3,15 +3,15 @@
   var el = document.getElementById('laterne');
   if (!el) return;
   var lines = [
-    'Ich stehe hier seit 1946.',
-    'Ich habe alles gesehen. Gesagt habe ich nie etwas.',
-    'Der Mann da unten steht seit Stunden im Regen.',
-    'Badehose. Oktober. Ich urteile nicht.',
-    'Manchmal frage ich mich, ob er auf den Sommer wartet.',
-    'Oder ob der Sommer auf ihn wartet.',
-    'Ich flackere, wenn mich etwas bewegt.',
-    'Gerade flackere ich ein bisschen.',
-    'Der Regen hört auf. Irgendwann. Meistens.'
+    'TRANSMISSION // SEKTOR 07 // JAHR 2089',
+    'Ich bin die letzte analoge Laterne dieser Stadt.',
+    'Seit 1946 sehe ich Menschen. Jetzt sehe ich Drohnen.',
+    'Der Mann da unten braucht vermutlich einen Raumanzug.',
+    'Dort oben fahren die letzten Züge ohne Gleise.',
+    'Die Sterne sind echt. Die Werbung leider auch.',
+    'Die Stadt kann Gedanken lesen. Meine nicht.',
+    'SYSTEM: Menschlichkeit weiterhin erkannt.',
+    'Der Regen ist das Einzige, das noch kostenlos ist.'
   ];
   var calm = false;
   try { calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
