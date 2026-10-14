@@ -114,21 +114,20 @@
       var xx = hash(i + 21) * W, yy = 37 + hash(i + 41) * 24;
       box(xx + Math.sin(t * .6 + i) * 2, yy, 1, 1, i % 2 ? '#f06bc8' : '#45f3ff');
     }
-    ctx.restore();
-    // Reflections decorate the original rain-soaked pavement.
-    ctx.save();
+    // Keep the clipping region active so no overlay pixels reach the player.
     ctx.globalAlpha = .35;
     for (i = 0; i < 19; i++) {
       var rx = (i * 37 + 11) % W, ry = 77 + (i * 11) % 23;
       box(rx, ry, 1 + (i % 4), 1, neon[i % 3]);
     }
-    ctx.restore();
-    // Tiny transparent HUD keeps the gameplay area unobstructed.
+    ctx.globalAlpha = 1;
+    // Tiny transparent HUD stays inside the clipped upper background.
     ctx.font = '5px monospace';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#74f8ff';
     ctx.fillText('NEON // 2089', 4, 13);
     box(4, 19, 28, 1, '#34b7d1');
+    ctx.restore();
     if (!calm) requestAnimationFrame(draw);
   }
   requestAnimationFrame(draw);
