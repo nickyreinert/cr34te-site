@@ -1,8 +1,0 @@
-html,body{margin:0;height:100%;overflow:hidden;background:#020615}
-h1{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-#scene{position:fixed;left:0;top:0;width:100vw;height:100dvh;display:block;image-rendering:pixelated;touch-action:none}
-#future{position:fixed;z-index:1;left:0;top:0;display:block;pointer-events:none;image-rendering:pixelated;clip-path:inset(0 0 27% 0)}
-#laterne{position:fixed;left:50%;bottom:clamp(8px,4dvh,40px);transform:translateX(-50%);width:min(92vw,42em);min-height:2.6em;margin:0;text-align:center;font:600 clamp(11px,2.5vw,18px)/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:#70f7fc;text-shadow:0 0 9px #008eec,0 1px 0 #000;pointer-events:none;z-index:2}
-#laterne:empty::after{content:"\\00a0"}
-#hint{position:fixed;left:10px;top:8px;max-width:calc(100vw - 20px);margin:0;font:600 clamp(9px,2vw,13px)/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:#a7faff;text-shadow:0 0 6px #067dab,0 1px 0 #000;pointer-events:none;z-index:2;transition:opacity 1.5s}
-@media(max-height:430px){#laterne{bottom:4px;min-height:1.3em;font-size:11px}#hint{font-size:9px}}
