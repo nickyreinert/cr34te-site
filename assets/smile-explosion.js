@@ -14,9 +14,18 @@
     [0x1F900, 0x1F9FF],
     [0x1FA70, 0x1FAFF]
   ];
+  function randomInt(max) {
+    if (window.crypto && window.crypto.getRandomValues) {
+      var values = new Uint32Array(1);
+      var limit = Math.floor(4294967296 / max) * max;
+      do { window.crypto.getRandomValues(values); } while (values[0] >= limit);
+      return values[0] % max;
+    }
+    return Math.floor(Math.random() * max);
+  }
   function randomEmoji() {
-    var range = emojiRanges[Math.floor(Math.random() * emojiRanges.length)];
-    return String.fromCodePoint(range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1)));
+    var range = emojiRanges[randomInt(emojiRanges.length)];
+    return String.fromCodePoint(range[0] + randomInt(range[1] - range[0] + 1));
   }
   function burst(x, y) {
     var now = Date.now();
@@ -57,6 +66,21 @@
     }
     window.setTimeout(function () { if (layer) layer.replaceChildren(); }, 1500);
   }
+  var pointerStart = null;
+  canvas.addEventListener('pointerdown', function (e) {
+    if (e.isPrimary === false || e.button !== 0) return;
+    pointerStart = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  }, { passive: true });
+  canvas.addEventListener('pointerup', function (e) {
+    if (!pointerStart || e.pointerId !== pointerStart.id) return;
+    var start = pointerStart;
+    pointerStart = null;
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) return;
+    var rect = canvas.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
+    burst(e.clientX, e.clientY);
+  }, { passive: true });
+  canvas.addEventListener('pointercancel', function () { pointerStart = null; }, { passive: true });
   canvas.addEventListener('click', function (e) {
     var rect = canvas.getBoundingClientRect();
     if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
