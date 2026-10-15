@@ -1,71 +1,23 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>K-POP 8-BIT DJ STUDIO</title>
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="Drehbare Dose als 3D-Modell, gerechnet mit eigenem WebGL-Renderer.">
+<title>Dose 340 g — drehbares 3D-Modell</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="start-overlay">
-    <button id="start-btn">✨ START DJ SESSION ✨</button>
+
+<main class="buehne">
+  <canvas id="buehne" aria-label="Drehbare 3D-Ansicht der Dose"></canvas>
+  <div class="schatten" id="schatten" aria-hidden="true"></div>
+
+  <div class="hinweis" id="hinweis" hidden aria-hidden="true">
+    <p>Für die 3D-Ansicht fehlt WebGL in diesem Browser.</p>
   </div>
+</main>
 
-  <div class="app-container">
-    <header class="top-bar">
-      <h1 class="neon-title">NEON BEATZ 8-BIT</h1>
-    </header>
-
-    <div class="visualizer-section">
-      <div class="vis-card">
-        <span class="vis-label">OSCILLOSCOPE</span>
-        <canvas id="oscilloscope"></canvas>
-      </div>
-      <div class="vis-card">
-        <span class="vis-label">EQ SPECTRUM</span>
-        <canvas id="spectrum"></canvas>
-      </div>
-    </div>
-
-    <div class="dj-face-container">
-      <div class="dj-head">
-        <div class="hair-style"></div>
-        
-        <div class="eyes-row">
-          <div class="turntable-eye" id="left-turntable">
-            <div class="jog-wheel">
-              <div class="jog-ring"></div>
-              <div class="jog-center">LEFT</div>
-            </div>
-          </div>
-          <div class="turntable-eye" id="right-turntable">
-            <div class="jog-wheel">
-              <div class="jog-ring"></div>
-              <div class="jog-center">RIGHT</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="nose-pitch-container">
-          <div class="pitch-track">
-            <div class="pitch-ticks">
-              <span>+12</span>
-              <span>0</span>
-              <span>-12</span>
-            </div>
-            <input type="range" id="pitch-slider" min="0.5" max="1.5" step="0.01" value="1.0" orient="vertical">
-          </div>
-        </div>
-
-        <div class="mouth-container">
-          <button id="applause-btn" class="mouth-applause">
-            <span>👏 APPLAUS 👏</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="script.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
