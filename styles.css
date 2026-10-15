@@ -60,6 +60,26 @@ body {
   -webkit-user-drag: none;
 }
 
+/* Rahmen um das Bild, damit die Aubergine am Bild haftet und mit ihm skaliert. */
+.zeichnung {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+/* Die Aubergine hängt unten am Bauch des Pferdes. */
+.aubergine {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  width: 12%;
+  height: auto;
+  overflow: visible;
+  transform: translateX(-50%) rotate(4deg);
+  pointer-events: none;
+}
+
 .vers {
   flex: 0 1 auto;
   max-width: 20ch;
