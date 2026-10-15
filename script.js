@@ -1,78 +1,42 @@
-/* cr34te.it — die Zeichnung ist mit Tinte gemacht, also darf man mit Tinte
-   hineinschreiben. Jeder Tipp setzt einen Klecks; mehr als sechs bleiben
-   nicht liegen, damit das Blatt nicht zuläuft.
-   Kein Speicher, kein Netz, keine Fremddatei: der Klecks ist ein Element
-   im Dokument und wird über das Stylesheet gesetzt. */
-(function () {
-  "use strict";
-
-  var MAX = 6;
-  var blots = [];
-  var hinweis = document.querySelector(".hinweis");
-  var hinweisWeg = false;
-
-  /* Die Aubergine unter dem Bauch des Pferdes: in derselben schwarzen Tinte
-     gezeichnet, nur Linien und Schraffur. Sie liegt als SVG über dem Bild. */
-  function zeichneAubergine() {
-    var bild = document.querySelector(".bild");
-    if (!bild || !bild.parentNode) return;
-    var rahmen = document.createElement("span");
-    rahmen.className = "zeichnung";
-    bild.parentNode.insertBefore(rahmen, bild);
-    rahmen.appendChild(bild);
-    rahmen.insertAdjacentHTML("beforeend",
-      "<svg class='aubergine' viewBox='0 0 60 100' aria-hidden='true' focusable='false' " +
-      "fill='none' stroke='#14100e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'>" +
-      "<path d='M30 19 C19 23 9 46 12 72 C15 91 37 97 45 79 C53 60 46 29 30 19 Z'/>" +
-      "<path d='M30 19 L17 23 L25 28 L30 21 L36 29 L44 23 Z'/>" +
-      "<path d='M30 19 C30 11 33 6 37 3'/>" +
-      "<path d='M20 42 C17 53 18 63 21 71' stroke-width='1.6'/>" +
-      "<path d='M36 40 L42 36 M36 50 L45 44 M35 60 L46 53 M34 70 L44 63 M34 79 L40 74' stroke-width='1.4'/>" +
-      "</svg>");
-  }
-
-  zeichneAubergine();
-
-  function zufall(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
-  function setzeKlecks(x, y) {
-    var groesse = zufall(16, 46);
-    var blot = document.createElement("span");
-    blot.className = "klecks";
-    /* Die Lage kommt über das Stylesheet, nicht über ein style-Attribut:
-       die Seite verbietet eingebettete Stile. */
-    blot.style.setProperty("--durchmesser", groesse.toFixed(1) + "px");
-    blot.style.setProperty("--drehung", zufall(-25, 25).toFixed(1) + "deg");
-    blot.style.left = x + "px";
-    blot.style.top = y + "px";
-    document.body.appendChild(blot);
-    blots.push(blot);
-    while (blots.length > MAX) {
-      blots.shift().remove();
-    }
-  }
-
-  function versteckeHinweis() {
-    if (hinweisWeg || !hinweis) return;
-    hinweisWeg = true;
-    hinweis.classList.add("weg");
-  }
-
-  document.addEventListener("pointerdown", function (event) {
-    if (event.button !== 0 && event.pointerType === "mouse") return;
-    versteckeHinweis();
-    setzeKlecks(event.clientX, event.clientY);
-  }, { passive: true });
-
-  /* Tastatur: die Mitte des Blattes bekommt einen Klecks, damit auch ohne
-     Zeigegerät etwas passiert. */
-  document.addEventListener("keydown", function (event) {
-    if (event.key !== " " && event.key !== "Enter") return;
-    if (event.target !== document.body) return;
-    versteckeHinweis();
-    setzeKlecks(window.innerWidth / 2 + zufall(-30, 30),
-                window.innerHeight / 2 + zufall(-30, 30));
-  });
-}());
+/* WOPR / Global Thermonuclear War — fictional, self-contained 1983 cinematic simulation. */
+(()=>{'use strict';
+const $=id=>document.getElementById(id), NS='http://www.w3.org/2000/svg';
+const WORLD={
+  na:'M25 58 45 39 74 27 98 30 113 17 137 23 143 37 165 38 180 53 172 65 155 68 147 80 134 82 132 99 120 112 114 130 103 139 93 126 82 125 73 106 61 110 49 92 36 85 25 70Z M96 127 114 132 124 149 118 157 105 143Z M12 38 20 20 44 12 67 17 49 29Z',
+  sa:'M109 158 135 158 155 171 164 194 155 219 143 243 135 265 121 275 118 250 110 234 112 211 102 186 105 170Z',
+  europe:'M256 72 270 60 278 45 298 47 311 59 326 55 332 69 315 78 307 95 292 101 277 89 265 91 250 83Z M282 98 289 115 294 130 286 139 277 120Z M239 76 248 62 253 69 247 83Z',
+  asia:'M314 45 332 33 348 34 357 25 380 29 398 18 420 27 451 16 475 25 503 42 526 43 545 60 565 65 574 79 556 92 538 93 533 112 514 113 499 127 483 116 461 113 454 132 439 131 422 118 401 121 389 109 371 114 359 99 343 98 327 76Z M414 122 426 146 422 172 411 176 403 154Z M470 130 488 145 485 160 474 154Z M529 125 539 136 535 147 523 144Z',
+  africa:'M259 108 280 104 307 110 326 129 328 154 317 175 306 202 288 222 276 202 269 179 250 163 246 137Z',
+  australia:'M485 212 507 202 528 207 545 225 541 242 521 250 500 245 485 232Z',
+  greenland:'M175 23 193 9 211 12 221 26 208 39 184 41Z',
+  antarctica:'M185 287 250 281 300 286 370 281 433 291 410 297 245 300Z'
+};
+const STATE_LINES=['M62 95 130 96','M79 108 118 108','M100 66 106 122','M120 74 120 123','M136 80 145 105','M48 86 85 87'];
+let tick=null,sequence=[],current='ready',startTime=0,launchFrames=0,skipRequested=false;let side='USSR',target='LAS VEGAS';
+let tracks=[];let endTimers=[];let endWriting=false;
+function svgEl(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs||{}))e.setAttribute(k,v);if(parent)parent.appendChild(e);return e;}
+function path(d,cls,parent){return svgEl('path',{d,class:cls},parent);}
+function textSvg(x,y,s,parent){const e=svgEl('text',{x,y,class:'map-label'},parent);e.textContent=s;return e;}
+function grid(svg){for(let x=0;x<600;x+=60)svgEl('line',{x1:x,y1:0,x2:x,y2:300,class:'grid-line'},svg);for(let y=0;y<300;y+=60)svgEl('line',{x1:0,y1:y,x2:600,y2:y,class:'grid-line'},svg);}
+function drawMap(id,view){const root=$(id);const svg=svgEl('svg',{viewBox:'0 0 600 305',preserveAspectRatio:'xMidYMid meet','aria-hidden':'true'},root);grid(svg);
+ const outline=svgEl('g',{},svg);Object.entries(WORLD).forEach(([k,d])=>path(d,'land '+(k==='asia'||k==='africa'?'alt':k==='europe'?'red':''),outline));
+ if(view==='us'){svg.setAttribute('viewBox','15 0 185 158');STATE_LINES.forEach(d=>path(d,'state',svg));[[64,82,'26'],[98,91,'25'],[131,102,'24'],[152,96,'21'],[108,114,'27'],[154,116,'28']].forEach(([x,y,t])=>textSvg(x,y,t,svg));}
+ if(view==='asia')svg.setAttribute('viewBox','210 5 365 225');
+ const landMarkers=view==='us'?[[64,86],[99,94],[132,97],[150,96],[103,112]]:view==='asia'?[[278,81],[301,71],[338,77],[382,88],[432,101],[510,92]]:[[100,97],[150,95],[287,81],[314,92],[410,90],[520,111]];
+ landMarkers.forEach(([x,y])=>svgEl('circle',{cx:x,cy:y,r:'2.1',class:'dot'},svg));
+ const trajectoryGroup=svgEl('g',{'class':'trajectories'},svg);
+ return{svg,trajectoryGroup,view};}
+const maps={us:drawMap('map-us','us'),world:drawMap('map-world','world'),asia:drawMap('map-eurasia','asia')};
+function network(){const root=$('network');const svg=svgEl('svg',{viewBox:'0 0 420 130',preserveAspectRatio:'none'},root);for(let i=0;i<18;i++){const x=18+i*23;const y=55+Math.sin(i*.91)*35;svgEl('line',{x1:x,y1:y,x2:x+25,y2:55+Math.sin((i+1)*.91)*35,stroke:'#297fc6','stroke-width':1.3},svg);svgEl('circle',{cx:x,cy:y,r:2.6,fill:i%4===0?'#e27681':'#5ac7ff'},svg);}for(let i=0;i<18;i++){const x=18+i*23;svgEl('line',{x1:x,y1:55+Math.sin(i*.91)*35,x2:210,y2:70,stroke:'#124477','stroke-width':'.6',opacity:'.65'},svg);}}
+network();
+const fmt=n=>String(Math.floor(n)).padStart(7,'0');const setTerm=html=>$('terminal-lines').innerHTML=html+'<span class="cursor">_</span>';
+function reset(){stop();$('ending').classList.add('hidden');$('ending-replay').classList.add('hidden');$('ending-text').textContent='';current='ready';skipRequested=false;tracks=[];Object.values(maps).forEach(m=>m.trajectoryGroup.replaceChildren());$('setup').classList.remove('hidden');$('running').classList.add('hidden');$('finished').classList.add('hidden');$('phase').textContent='01 / SELECT GAME';$('headline').textContent='GLOBAL THERMONUCLEAR WAR';$('instruction').textContent='CHOOSE YOUR SIDE. SELECT TARGETS. INITIATE THE SIMULATION.';$('defcon').textContent='DEFCON 5';$('defcon').classList.remove('red-alert');$('defcon-data').textContent='05';$('world-status').textContent='STANDBY';$('terminal-status').textContent='JOSHUA ONLINE';$('track-count').textContent='000';$('scenario-count').textContent='0000000';$('winner').textContent='UNKNOWN';$('progress').style.width='0%';$('system-status').textContent='READY';$('map-code').textContent='CPE 1704 TKS';setTerm('GREETINGS PROFESSOR FALKEN.<br><br>SHALL WE PLAY A GAME?');}
+function stop(){if(tick!==null){clearInterval(tick);tick=null;}endTimers.forEach(clearTimeout);endTimers=[];endWriting=false;}
+function setPhase(no,title,sub,terminal){$('phase').textContent=no;$('headline').textContent=title;$('instruction').textContent=sub;if(terminal)setTerm(terminal);}
+const PAIRS=[[[322,65],[106,94]],[[339,80],[142,99]],[[382,84],[63,83]],[[310,75],[100,103]],[[398,95],[154,106]],[[280,75],[99,88]],[[310,85],[115,110]],[[440,92],[155,97]],[[102,92],[320,80]],[[148,97],[408,95]],[[85,96],[370,83]],[[135,108],[287,81]],[[100,95],[524,118]],[[351,89],[118,105]],[[155,95],[330,83]],[[290,90],[74,90]],[[416,103],[94,114]],[[114,90],[430,112]],[[398,90],[131,89]],[[330,98],[63,100]],[[95,88],[319,78]],[[346,65],[148,100]],[[132,88],[300,85]],[[110,90],[469,112]]];
+function launch(index,enemy){const a=PAIRS[index%PAIRS.length][enemy?1:0],b=PAIRS[index%PAIRS.length][enemy?0:1];for(const m of Object.values(maps)){const dx=b[0]-a[0],dy=b[1]-a[1],distance=Math.abs(dx);const arch=Math.max(22,distance*.36);const mx=(a[0]+b[0])/2;const my=(a[1]+b[1])/2-arch;const d=`M ${a[0]} ${a[1]} Q ${mx} ${my} ${b[0]} ${b[1]}`;const p=path(d,'track'+(enemy?' enemy':''),m.trajectoryGroup);const len=p.getTotalLength();p.setAttribute('stroke-dasharray',`${len} ${len}`);p.setAttribute('stroke-dashoffset',len);const dot=svgEl('circle',{r:2.4,class:'head-dot'},m.trajectoryGroup);tracks.push({p,dot,len,started:performance.now(),duration:2100+(index%7)*210,side:enemy});}}
+function animate(){const now=performance.now();for(const t of tracks){let progress=Math.max(0,Math.min(1,(now-t.started)/t.duration));t.p.setAttribute('stroke-dashoffset',t.len*(1-progress));const pt=t.p.getPointAtLength(t.len*progress);t.dot.setAttribute('cx',pt.x);t.dot.setAttribute('cy',pt.y);if(progress===1)t.dot.setAttribute('opacity','.15');} }
+function start(){reset();side=$('side').value;target=$('target').value;current='running';$('setup').classList.add('hidden');$('running').classList.remove('hidden');$('defcon').textContent='DEFCON 1';$('defcon').classList.add('red-alert');$('defcon-data').textContent='01';$('world-status').textContent='LAUNCH DETECTED';$('terminal-status').textContent='SIMULATION ACTIVE';$('system-status').textContent='ALERT';$('map-code').textContent='ATTACK SCENARIO 01';setPhase('02 / FIRST STRIKE','MISSILE LAUNCH DETECTED',`SIMULATION ONLY · ${side} · TARGET ${target}`,'AWAITING FIRST STRIKE COMMAND<br>PRIMARY TARGET: '+target+'<br><br>LAUNCH DETECTED');launchFrames=0;startTime=performance.now();tick=setInterval(()=>{const elapsed=performance.now()-startTime;animate();if(elapsed<9200){const expected=Math.min(24,Math.floor(elapsed/280));while(launchFrames<expected){launch(launchFrames,launchFrames%3===0);launchFrames++;}$('track-count').textContent=String(launchFrames).padStart(3,'0');$('progress').style.width=Math.round(elapsed/92)+'%';if(elapsed>4300&&$('phase').textContent.startsWith('02')){setPhase('03 / RETALIATION','FULL-SCALE RESPONSE', 'WARNING: ESCALATING EXCHANGE · ALL TRACKS SIMULATED','NORAD STRATEGIC COMMAND<br>DEFCON 1<br><br>FULL-SCALE RETALIATORY STRIKE');}}else if(elapsed<17000){if($('phase').textContent.startsWith('03')){setPhase('04 / STRATEGIC ANALYSIS','SEARCHING FOR A WINNER','JOSHUA IS TESTING EVERY OUTCOME.','GLOBAL THERMONUCLEAR WAR<br><br>WINNER: NONE<br>RECALCULATING...');$('world-status').textContent='SCENARIO LOOP';}$('scenario-count').textContent=fmt((elapsed-9200)*1632);$('progress').style.width=((elapsed-9200)/78)+'%';$('winner').textContent='NONE';const n=Math.floor((elapsed-9200)/520);if(n%2===0&&n!==window._lastScenario){window._lastScenario=n;Object.values(maps).forEach(m=>m.trajectoryGroup.replaceChildren());tracks=[];for(let i=0;i<9;i++)launch((n*5+i)%PAIRS.length,i%2===0);$('map-code').textContent='SCENARIO '+String(n+1).padStart(4,'0');}}else finish();},42);}
+function finish(){if(current!=='running')return;stop();current='finished';$('running').classList.add('hidden');$('finished').classList.remove('hidden');$('defcon').textContent='DEFCON 5';$('defcon').classList.remove('red-alert');$('defcon-data').textContent='05';$('winner').textContent='NONE';$('scenario-count').textContent='1048576';$('track-count').textContent='000';$('progress').style.width='100%';$('world-status').textContent='STAND DOWN';$('system-status').textContent='SAFE';setPhase('05 / CONCLUSION','WINNER: NONE','SIMULATION ENDED · NO LAUNCHES OCCURRED','WINNER: NONE<br><br>GREETINGS PROFESSOR FALKEN.');$('ending').classList.remove('hidden');const lines=['GREETINGS PROFESSOR FALKEN.','\nHELLO, JOSHUA.','\n\nA STRANGE GAME.','\nTHE ONLY WINNING MOVE IS','\nNOT TO PLAY.','\n\nHOW ABOUT A NICE GAME OF CHESS?'];const result=$('ending-text');result.textContent='';let position=0;let line=0;function type(){if(current!=='finished')return;if(line>=lines.length){$('ending-replay').classList.remove('hidden');return;}const s=lines[line];if(position<s.length){result.textContent+=s[position++];endTimers.push(setTimeout(type,s[position-1]==='\n'?220:30));}else{line++;position=0;endTimers.push(setTimeout(type,line===2?800:line===3?950:500));}}type();}
+$('start').addEventListener('click',start);$('skip').addEventListener('click',finish);$('replay').addEventListener('click',reset);$('ending-replay').addEventListener('click',reset);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&current!=='ready')reset();if(e.key==='Enter'&&current==='ready'&&e.target.tagName!=='SELECT')start();});function clock(){const d=new Date();$('clock').textContent=d.toISOString().slice(11,19)+' Z';}clock();setInterval(clock,1000);reset();
+})();
