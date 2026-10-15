@@ -1,38 +1,71 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#020611">
-<title>WOPR / GLOBAL THERMONUCLEAR WAR</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K-POP 8-BIT DJ STUDIO</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div id="app">
-  <header class="topbar">
-    <div class="brand"><span class="mark">◈</span> NORAD <span class="slash">/</span> WOPR <span class="subbrand">STRATEGIC SIMULATION SYSTEM</span></div>
-    <div class="readouts"><span id="clock">00:00:00 Z</span><span id="defcon" class="defcon">DEFCON 5</span><span class="led"></span></div>
-  </header>
-  <main class="wall" aria-label="WOPR strategic simulation screens">
-    <article class="monitor" id="monitor-us"><div class="monitor-head">01 / NORTH AMERICA <span>EARLY WARNING</span></div><div class="map-area" id="map-us"></div><div class="monitor-foot"><span>REGION 21—28</span><span id="us-status">TRACKING ONLINE</span></div></article>
-    <article class="monitor prime" id="monitor-world"><div class="monitor-head">02 / GLOBAL STRATEGIC DISPLAY <span id="world-status">STANDBY</span></div><div class="map-area" id="map-world"></div><div class="monitor-foot"><span id="map-code">CPE 1704 TKS</span><span>WOPR / NORAD</span></div></article>
-    <article class="monitor" id="monitor-eurasia"><div class="monitor-head">03 / EURASIA <span>DEFENSE GRID</span></div><div class="map-area" id="map-eurasia"></div><div class="monitor-foot"><span>SECTOR 01—20</span><span id="eurasia-status">TRACKING ONLINE</span></div></article>
-    <article class="monitor small" id="monitor-network"><div class="monitor-head">04 / DETECTION NETWORK <span>ACTIVE</span></div><div class="network" id="network"></div><div class="monitor-foot"><span>BMEWS / DEW LINE</span><span>LINK ESTABLISHED</span></div></article>
-    <article class="monitor center-terminal"><div class="monitor-head">05 / WOPR TERMINAL <span id="terminal-status">JOSHUA ONLINE</span></div><div class="terminal" aria-live="polite"><div id="terminal-lines">GREETINGS PROFESSOR FALKEN.<br><br>SHALL WE PLAY A GAME?<span class="cursor">_</span></div></div><div class="monitor-foot"><span>WAR OPERATION PLAN RESPONSE</span><span>1983 / ONLINE</span></div></article>
-    <article class="monitor small"><div class="monitor-head">06 / STRATEGIC ASSESSMENT <span>LIVE</span></div><div class="telemetry"><div>SCENARIOS EVALUATED <b id="scenario-count">0000000</b></div><div>INBOUND TRACKS <b id="track-count">000</b></div><div>DEFENSE CONDITION <b id="defcon-data">05</b></div><div>WINNING STRATEGY <b id="winner">UNKNOWN</b></div><div class="bar"><div id="progress"></div></div><div class="wave" id="wave"></div></div><div class="monitor-foot"><span>STRATEGIC COMMAND</span><span id="system-status">READY</span></div></article>
-  </main>
-  <section class="controls" id="controls" aria-label="Simulation controls">
-    <div class="control-copy"><div class="eyebrow" id="phase">01 / SELECT GAME</div><h1 id="headline">GLOBAL THERMONUCLEAR WAR</h1><p id="instruction">CHOOSE YOUR SIDE. SELECT TARGETS. INITIATE THE SIMULATION.</p></div>
-    <div class="control-actions" id="setup">
-      <div class="selectors"><label for="side">YOUR SIDE</label><select id="side"><option value="USSR">SOVIET UNION</option><option value="USA">UNITED STATES</option></select><label for="target">PRIMARY TARGET</label><select id="target"><option>LAS VEGAS</option><option>SEATTLE</option><option>NEW YORK</option><option>WASHINGTON D.C.</option><option>LOS ANGELES</option><option>MOSCOW</option><option>LENINGRAD</option></select></div>
-      <button id="start" class="primary">INITIATE GAME <span>▶</span></button>
+  <div id="start-overlay">
+    <button id="start-btn">✨ START DJ SESSION ✨</button>
+  </div>
+
+  <div class="app-container">
+    <header class="top-bar">
+      <h1 class="neon-title">NEON BEATZ 8-BIT</h1>
+    </header>
+
+    <div class="visualizer-section">
+      <div class="vis-card">
+        <span class="vis-label">OSCILLOSCOPE</span>
+        <canvas id="oscilloscope"></canvas>
+      </div>
+      <div class="vis-card">
+        <span class="vis-label">EQ SPECTRUM</span>
+        <canvas id="spectrum"></canvas>
+      </div>
     </div>
-    <div class="control-actions hidden" id="running"><div class="running-label"><span class="pulse"></span><span id="running-text">SIMULATION IN PROGRESS</span></div><button id="skip">SKIP TO CONCLUSION →</button></div>
-    <div class="control-actions hidden" id="finished"><button id="replay" class="primary">PLAY AGAIN ↻</button></div>
-  </section>
-  <div id="ending" class="ending hidden" aria-live="polite"><div class="ending-title">WOPR / JOSHUA <span>CONNECTION ACTIVE</span></div><div class="ending-text" id="ending-text"></div><button id="ending-replay" class="end-again hidden">↻ PLAY AGAIN</button><div class="ending-footer">NORAD — CHEYENNE MOUNTAIN COMPLEX <span>DEFCON 5 / ALL SYSTEMS NORMAL</span></div></div>
-  <div class="scanlines" aria-hidden="true"></div>
-</div>
-<script src="script.js"></script>
+
+    <div class="dj-face-container">
+      <div class="dj-head">
+        <div class="hair-style"></div>
+        
+        <div class="eyes-row">
+          <div class="turntable-eye" id="left-turntable">
+            <div class="jog-wheel">
+              <div class="jog-ring"></div>
+              <div class="jog-center">LEFT</div>
+            </div>
+          </div>
+          <div class="turntable-eye" id="right-turntable">
+            <div class="jog-wheel">
+              <div class="jog-ring"></div>
+              <div class="jog-center">RIGHT</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nose-pitch-container">
+          <div class="pitch-track">
+            <div class="pitch-ticks">
+              <span>+12</span>
+              <span>0</span>
+              <span>-12</span>
+            </div>
+            <input type="range" id="pitch-slider" min="0.5" max="1.5" step="0.01" value="1.0" orient="vertical">
+          </div>
+        </div>
+
+        <div class="mouth-container">
+          <button id="applause-btn" class="mouth-applause">
+            <span>👏 APPLAUS 👏</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
