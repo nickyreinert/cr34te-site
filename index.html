@@ -1,23 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>C64 BASIC V2 Simulator</title>
+<title>BTC.EXE — Terminal</title>
 <link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="assets/dos.css">
+<link rel="stylesheet" href="assets/bitcoin.css">
 </head>
 <body>
-<main class="machine" aria-label="Commodore 64 BASIC simulator">
-  <header><span class="led"></span><span>COMMODORE 64</span><span class="version">BASIC V2</span><button id="dosbtn" style="margin-left:10px;font:inherit;font-size:.75em;cursor:pointer">DOS</button></header>
-  <section id="screen" class="screen" aria-label="BASIC terminal" aria-live="polite">
-    <div id="output" class="output"></div>
-    <div class="inputline"><span id="prompt">READY.</span><input id="command" autofocus autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="BASIC command"><span class="cursor"></span></div>
-  </section>
-  <footer><div class="status"><span id="state">READY</span><span id="memory">38911 BASIC BYTES FREE</span></div><div class="help">Enter a command · F1 LIST · F3 RUN · F5 NEW · ↑ history</div></footer>
+<main class="machine">
+<header class="topbar"><span class="led"></span><span>CR34TE.IT // BTC.EXE</span><span class="version">MARKET TERMINAL v1.0</span></header>
+<section class="screen" aria-label="Bitcoin Markt-Dashboard">
+<div class="screen-head"><span>SYS://BITCOIN/OVERVIEW</span><span class="live"><i></i> DISPLAY ACTIVE</span></div>
+<div class="hero"><div class="eyebrow">BTC / USD <span class="muted">· KURS-SNAPSHOT</span></div><div class="price" id="price">$81,411.38</div><div class="price-note">REFERENZKURS · 15.10.2026 · KEIN LIVE-FEED</div></div>
+<div class="rule"></div>
+<div class="columns">
+<section class="panel chart-panel"><div class="panel-title">01 / HISTORISCHER EINSTIEG</div><pre class="chart" aria-label="Schematischer logarithmischer Bitcoin-Kurschart">BTC / USD · LOG-SKALA
+
+  120M |                                      * ZIEL
+       |                                      |
+   12M |                                  ____/
+       |                             ____/
+  1.2M |                         ___/
+       |                    ____/
+   120K|               ____/          HEUTE
+       |          ____/                 *
+    12K| *________/  EINSTIEG
+       +-------------------------------------->
+          DAMALS                 HYPOTHETISCH</pre><div class="chart-caption">* 12.000 USD: angenommener Einstiegspunkt. Kurve schematisch, keine vollständige historische Kursreihe.</div></section>
+<section class="panel math-panel"><div class="panel-title">02 / DIE RECHNUNG</div><div class="equation"><span>STARTKAPITAL</span><strong>300 €</strong></div><div class="equation"><span>ZIELVERMÖGEN</span><strong>3.000.000 €</strong></div><div class="multiplier">× 10.000</div><div class="equation"><span>BTC-EINSTIEG</span><strong>12.000 USD</strong></div><div class="equation target"><span>IMPLIZITER BTC-ZIELKURS</span><strong>~120 Mio. USD</strong></div><p class="fineprint">Vereinfachtes Modell ohne Gebühren, Steuern und Wechselkurseffekte. Der Zielkurs ist Mathematik, keine Vorhersage.</p></section>
+</div>
+<section class="panel scenarios"><div class="panel-title">03 / WANN WÄRE DAS?</div><div class="scenario-grid"><div class="scenario"><span>+20 % / JAHR</span><strong>~51 Jahre</strong><small>ca. 2077</small></div><div class="scenario"><span>+50 % / JAHR</span><strong>~23 Jahre</strong><small>ca. 2049</small></div><div class="scenario"><span>+100 % / JAHR</span><strong>~13 Jahre</strong><small>ca. 2039</small></div><div class="scenario"><span>+200 % / JAHR</span><strong>~8 Jahre</strong><small>ca. 2034</small></div></div><div class="fineprint">Rechnerische Dauer bei konstantem jährlichem Wachstum und Wiederanlage. Solche Renditen sind nicht garantiert; Totalverlust ist möglich.</div></section>
+<div class="log" aria-label="Systemmeldungen"><div><span class="prompt">C:\BTC&gt;</span> ANALYZE --dream=3000000</div><div>Ergebnis: Faktor 10.000 erforderlich. Zukunft nicht gefunden.</div><div><span class="prompt">C:\BTC&gt;</span> STATUS --optimism=MAX</div><div class="gold">VIEL GLÜCK. HODL ODER NICHT. DAS IST DEIN TERMINAL.</div><div id="clock">DISPLAY REFRESH: 500 MS</div></div>
+</section>
+<footer><span>NO INPUT // READ ONLY</span><span>MARKTDATEN: SNAPSHOT · OHNE NETZWERKZUGRIFF</span><span id="tick">TICK 000000</span></footer>
 </main>
-<div id="dos" style="display:none"></div>
-<script src="script.js"></script>
-<script src="assets/dos.js"></script>
+<script src="assets/bitcoin.js"></script>
 </body>
 </html>
