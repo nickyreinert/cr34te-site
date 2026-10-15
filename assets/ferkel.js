@@ -11,15 +11,13 @@
   var RUFE = ['Quiek!', 'Oink!', 'Hihi!', 'Quiek quiek!'];
   var ruhe = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-  var stil = document.createElement('style');
-  stil.textContent = '.ferkel-leinwand{position:fixed;left:0;top:0;width:100%;height:100%;z-index:5;pointer-events:none}' +
-    '.ferkel-griff{position:fixed;left:0;top:0;z-index:6;margin:0;padding:0;border:0;border-radius:50%;background:transparent;touch-action:none;cursor:grab;-webkit-tap-highlight-color:transparent}' +
-    '.ferkel-griff:active{cursor:grabbing}';
-  document.head.appendChild(stil);
-
   var leinwand = document.createElement('canvas');
   leinwand.className = 'ferkel-leinwand';
   leinwand.setAttribute('aria-hidden', 'true');
+  // Stile direkt am Element (CSSOM), weil ein eingefuegtes <style> in der Sandbox geblockt sein kann
+  var ls = leinwand.style;
+  ls.position = 'fixed'; ls.left = '0'; ls.top = '0'; ls.width = '100%'; ls.height = '100%';
+  ls.zIndex = '5'; ls.pointerEvents = 'none';
   document.body.appendChild(leinwand);
   var ctx = leinwand.getContext('2d');
   if (!ctx) return;
@@ -28,6 +26,10 @@
   griff.type = 'button';
   griff.className = 'ferkel-griff';
   griff.setAttribute('aria-label', 'Dose \u00f6ffnen: Verschluss ziehen');
+  var gst = griff.style;
+  gst.position = 'fixed'; gst.left = '0'; gst.top = '0'; gst.zIndex = '6'; gst.margin = '0'; gst.padding = '0';
+  gst.border = '0'; gst.borderRadius = '50%'; gst.background = 'transparent'; gst.touchAction = 'none';
+  gst.cursor = 'grab'; gst.webkitTapHighlightColor = 'transparent';
   document.body.appendChild(griff);
 
   var zustand = 'zu';            // 'zu' oder 'offen'
@@ -300,7 +302,8 @@
     pull += (pullZiel - pull) * Math.min(1, dt * 16);
     if (zustand === 'offen') offenT = ruhe ? 1 : Math.min(1, (jetzt - offenSeit) / 0.3);
 
-    var ringM = deckelZeichnen(c, yd, sicht);
+    var ringM;
+    try { ringM = deckelZeichnen(c, yd, sicht); } catch (fehler) { ctx.restore(); return; }
 
     if (zustand === 'zu') {
       var gs = Math.max(56, 2.2 * ringM.s);

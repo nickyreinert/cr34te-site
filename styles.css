@@ -75,3 +75,8 @@ body {
   width: auto;
   filter: drop-shadow(0 8px 18px rgba(40,32,18,0.28));
 }
+
+/* Overlay fuer Ziehverschluss und Ferkel */
+.ferkel-leinwand { position: fixed; left: 0; top: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
+.ferkel-griff { position: fixed; left: 0; top: 0; z-index: 6; margin: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; touch-action: none; cursor: grab; -webkit-tap-highlight-color: transparent; }
+.ferkel-griff:active { cursor: grabbing; }
