@@ -1,33 +1,56 @@
-(() => {
-'use strict';
-const output=document.getElementById('output'), input=document.getElementById('command'), promptEl=document.getElementById('prompt'), stateEl=document.getElementById('state'), memoryEl=document.getElementById('memory');
-let program=new Map(), vars={}, arrays={}, history=[], histPos=0, stopped=false, waiting=null, running=false, pc=0, stack=[], loops=[], data=[], dataPos=0, steps=0, runTimer=null;
-const MAX_STEPS=50000;
-function print(s=''){output.textContent+=String(s)+'\n';output.scrollTop=output.scrollHeight;}
-function setState(s){stateEl.textContent=s;}
-function free(){let used=[...program.entries()].reduce((n,[k,v])=>n+String(k).length+String(v).length+6,0);memoryEl.textContent=Math.max(0,38911-used)+' BASIC BYTES FREE';}
-function prompt(){promptEl.textContent=waiting?'?': 'READY.';input.focus();}
-function ready(){running=false;waiting=null;clearTimeout(runTimer);setState('READY');prompt();}
-function error(msg){print('?'+msg+' ERROR');ready();}
-function reset(){program.clear();vars={};arrays={};history=[];histPos=0;waiting=null;running=false;stopped=false;stack=[];loops=[];data=[];dataPos=0;clearTimeout(runTimer);output.textContent='';print('**** COMMODORE 64 BASIC V2 ****');print('38911 BASIC BYTES FREE');print('');print('READY.');setState('READY');prompt();free();}
-function normalizeName(n){return n.trim().toUpperCase();}
-function tokenizeExpr(s){let out=[],i=0;while(i<s.length){let c=s[i];if(/\s/.test(c)){i++;continue;}if(c==='"'){let j=i+1,str='';while(j<s.length){if(s[j]==='"'){if(s[j+1]==='"'){str+='"';j+=2;continue;}break;}str+=s[j++];}if(j>=s.length)throw Error('UNTERMINATED STRING');out.push({t:'str',v:str});i=j+1;continue;}if(/[0-9.]/.test(c)){let m=s.slice(i).match(/^(?:\d+\.?\d*|\.\d+)(?:E[+-]?\d+)?/i);if(!m)throw Error('SYNTAX');out.push({t:'num',v:Number(m[0])});i+=m[0].length;continue;}if(/[A-Z_$]/i.test(c)){let m=s.slice(i).match(/^[A-Z][A-Z0-9]*[$%]?/i)[0].toUpperCase();out.push({t:'id',v:m});i+=m.length;continue;}let two=s.slice(i,i+2);if(['<=','>=','<>'].includes(two)){out.push({t:'op',v:two});i+=2;continue;}if('+-*/^=<>(),'.includes(c)){out.push({t:'op',v:c});i++;continue;}throw Error('SYNTAX');}return out;}
-function evaluate(src){let ts=tokenizeExpr(src),p=0;function peek(v){return ts[p]&&(!v||ts[p].v===v);}function take(v){if(!peek(v))throw Error('SYNTAX');return ts[p++];}function atom(){if(peek('+')||peek('-')){let op=take().v,x=atom();return op==='-'?-Number(x):Number(x);}if(peek('(')){take('(');let x=compare();take(')');return x;}if(peek()&&ts[p].t==='num')return take().v;if(peek()&&ts[p].t==='str')return take().v;if(peek()&&ts[p].t==='id'){let name=take().v;if(peek('(')){take('(');let args=[];if(!peek(')')){do{args.push(compare());if(!peek(','))break;take(',');}while(true);}take(')');return fn(name,args);}if(name==='PI')return Math.PI;if(name==='TI$')return '000000';if(name==='ST')return 0;if(name==='FRE(0)')return 38911;return vars[name]??(name.endsWith('$')?'':0);}throw Error('SYNTAX');}function power(){let x=atom();if(peek('^')){take('^');x=Math.pow(Number(x),power());}return x;}function mul(){let x=power();while(peek('*')||peek('/')){let o=take().v,y=Number(power());if(o==='/'&&y===0)throw Error('DIVISION BY ZERO');x=o==='*'?Number(x)*y:Number(x)/y;}return x;}function add(){let x=mul();while(peek('+')||peek('-')){let o=take().v,y=mul();if(o==='+')x=(typeof x==='string'||typeof y==='string')?String(x)+String(y):Number(x)+Number(y);else x=Number(x)-Number(y);}return x;}function compare(){let x=add();while(peek('=')||peek('<')||peek('>')||peek('<=')||peek('>=')||peek('<>')){let o=take().v,y=add(),a=x,b=y;if(typeof a==='string'||typeof b==='string'){a=String(a);b=String(b);}else{a=Number(a);b=Number(b);}x=o==='='?+(a===b):o==='<'?+(a<b):o==='>'?+(a>b):o==='<='?+(a<=b):o==='>='?+(a>=b):+(a!==b);}return x;}let val=compare();if(p<ts.length)throw Error('SYNTAX');return val;}
-function fn(n,a){const x=Number(a[0]??0),s=String(a[0]??'');switch(n){case'ABS':return Math.abs(x);case'INT':return Math.floor(x);case'SGN':return Math.sign(x);case'SQR':if(x<0)throw Error('ILLEGAL QUANTITY');return Math.sqrt(x);case'RND':return Math.random()*(x===0?1:Math.abs(x));case'SIN':return Math.sin(x);case'COS':return Math.cos(x);case'TAN':return Math.tan(x);case'ATN':return Math.atan(x);case'EXP':return Math.exp(x);case'LOG':if(x<=0)throw Error('ILLEGAL QUANTITY');return Math.log(x);case'LEN':return s.length;case'VAL':return parseFloat(s)||0;case'STR$':return String(a[0]??0);case'CHR$':return String.fromCharCode((x+65536)%256);case'ASC':if(!s.length)throw Error('ILLEGAL QUANTITY');return s.charCodeAt(0);case'LEFT$':return s.slice(0,Math.max(0,Number(a[1]??1)));case'RIGHT$':return s.slice(-Math.max(0,Number(a[1]??1)));case'MID$':return s.slice(Math.max(0,Number(a[1]??1)-1),a[2]===undefined?undefined:Math.max(0,Number(a[1]??1)-1)+Math.max(0,Number(a[2])));case'TAB':return ' '.repeat(Math.min(80,Math.max(0,x-1)));case'SPC':return ' '.repeat(Math.min(80,Math.max(0,x)));case'FRE':return 38911;default:throw Error('UNDEF\'D FUNCTION');}}
-function splitTop(s,delimiter=','){let out=[],start=0,depth=0,quote=false;for(let i=0;i<s.length;i++){if(s[i]==='"'){if(quote&&s[i+1]==='"'){i++;continue;}quote=!quote;}if(quote)continue;if(s[i]==='(')depth++;else if(s[i]===')')depth--;else if(depth===0&&s[i]===delimiter){out.push(s.slice(start,i).trim());start=i+1;}}out.push(s.slice(start).trim());return out;}
-function assign(lhs,rhs){let m=lhs.trim().match(/^([A-Z][A-Z0-9]*[$%]?)(?:\((.*)\))?$/i);if(!m)throw Error('SYNTAX');let name=normalizeName(m[1]),v=evaluate(rhs);if(m[2]!==undefined){let idx=Math.trunc(Number(evaluate(m[2])));if(idx<0||idx>10000)throw Error('BAD SUBSCRIPT');arrays[name]??=[];arrays[name][idx]=v;}else vars[name]=v;}
-function getLValue(lhs){let m=lhs.trim().match(/^([A-Z][A-Z0-9]*[$%]?)(?:\((.*)\))?$/i);if(!m)throw Error('SYNTAX');let n=normalizeName(m[1]);if(m[2]!==undefined){let idx=Math.trunc(Number(evaluate(m[2])));return arrays[n]?.[idx]??0;}return vars[n]??(n.endsWith('$')?'':0);}
-function parsePrint(s){let parts=splitPrint(s),line='',lastSep='';for(const part of parts){if(part.text!=='')line+=String(evaluate(part.text));if(part.sep===',')line+='        ';lastSep=part.sep;}if(lastSep!==';'&&lastSep!==',')print(line);else{output.textContent+=line;output.scrollTop=output.scrollHeight;}}
-function splitPrint(s){let a=[],start=0,depth=0,quote=false;for(let i=0;i<s.length;i++){if(s[i]==='"'){if(quote&&s[i+1]==='"'){i++;continue;}quote=!quote;}if(quote)continue;if(s[i]==='(')depth++;if(s[i]===')')depth--;if(depth===0&&(s[i]===','||s[i]===';')){a.push({text:s.slice(start,i).trim(),sep:s[i]});start=i+1;}}a.push({text:s.slice(start).trim(),sep:''});return a;}
-function lineList(){return [...program.keys()].sort((a,b)=>a-b);}
-function lineIndex(n){return lineList().findIndex(x=>x>=n);}
-function findThen(s){let quote=false;for(let i=0;i<s.length;i++){if(s[i]==='"')quote=!quote;if(!quote&&/^THEN\b/i.test(s.slice(i)))return i;}return -1;}
-function executeStatement(stmt,fromProgram=false){stmt=stmt.trim();if(!stmt)return null;let m;if((m=stmt.match(/^REM\b(.*)$/i)))return null;if((m=stmt.match(/^PRINT\s*(.*)$/i))){parsePrint(m[1]);return null;}if((m=stmt.match(/^LET\s+(.+?)\s*=\s*(.*)$/i))){assign(m[1],m[2]);return null;}if((m=stmt.match(/^([A-Z][A-Z0-9]*[$%]?(?:\([^)]*\))?)\s*=\s*(.*)$/i))){assign(m[1],m[2]);return null;}if((m=stmt.match(/^INPUT\s*(.*)$/i))){let s=m[1],label='?';if(s.startsWith('"')){let q=s.indexOf('"',1);if(q>=0){label=s.slice(1,q);s=s.slice(q+1).replace(/^\s*[,;]?\s*/,'');}}let names=splitTop(s);if(!names[0])throw Error('SYNTAX');waiting={names,label};print(label);promptEl.textContent='?';return 'wait';}if((m=stmt.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i))){if(evaluate(m[1])){let target=m[2].trim();if(/^\d+$/.test(target))return {jump:Number(target)};return executeStatement(target,fromProgram);}return null;}if((m=stmt.match(/^GOTO\s+(.+)$/i)))return {jump:Math.trunc(Number(evaluate(m[1])))};if((m=stmt.match(/^GOSUB\s+(.+)$/i))){stack.push(pc);return {jump:Math.trunc(Number(evaluate(m[1])))};}if(/^RETURN$/i.test(stmt)){if(!stack.length)throw Error('RETURN WITHOUT GOSUB');return {index:stack.pop()+1};}if((m=stmt.match(/^FOR\s+([A-Z][A-Z0-9]*%?)\s*=\s*(.+?)\s+TO\s+(.+?)(?:\s+STEP\s+(.+))?$/i))){let name=normalizeName(m[1]),start=Number(evaluate(m[2])),end=Number(evaluate(m[3])),step=Number(evaluate(m[4]??'1'));if(!step)throw Error('ILLEGAL QUANTITY');vars[name]=start;loops.push({name,end,step,line:pc});return null;}if((m=stmt.match(/^NEXT\s*([A-Z][A-Z0-9]*%?)?/i))){if(!loops.length)throw Error('NEXT WITHOUT FOR');let l=loops[loops.length-1];if(m[1]&&normalizeName(m[1])!==l.name)throw Error('NEXT WITHOUT FOR');vars[l.name]=Number(vars[l.name]??0)+l.step;if((l.step>0&&vars[l.name]<=l.end)||(l.step<0&&vars[l.name]>=l.end))return {index:l.line+1};loops.pop();return null;}if((m=stmt.match(/^DIM\s+(.+)$/i))){for(const item of splitTop(m[1])){let d=item.match(/^([A-Z][A-Z0-9]*[$%]?)\((.+)\)$/i);if(!d)throw Error('SYNTAX');let n=normalizeName(d[1]),size=Math.trunc(Number(evaluate(d[2])));if(size<0||size>10000)throw Error('BAD SUBSCRIPT');arrays[n]=Array(size+1).fill(0);}return null;}if(/^CLR$/i.test(stmt)){vars={};arrays={};return null;}if(/^NEW$/i.test(stmt)){program.clear();vars={};arrays={};free();print('READY.');return 'stop';}if(/^LIST(?:\s+(\d+)(?:\s*-\s*(\d+))?)?$/i.test(stmt)){let q=stmt.match(/^LIST(?:\s+(\d+)(?:\s*-\s*(\d+))?)?$/i),lo=q[1]?Number(q[1]):0,hi=q[2]?Number(q[2]):Infinity;for(const n of lineList())if(n>=lo&&n<=hi)print(n+' '+program.get(n));return null;}if(/^RUN$/i.test(stmt)){startRun();return 'stop';}if(/^END$/i.test(stmt)||/^STOP$/i.test(stmt)){print('READY.');return 'stop';}if((m=stmt.match(/^RESTORE$/i))){dataPos=0;return null;}if((m=stmt.match(/^READ\s+(.+)$/i))){for(const n of splitTop(m[1])){if(dataPos>=data.length)throw Error('OUT OF DATA');assign(n,JSON.stringify(data[dataPos++]));}return null;}if((m=stmt.match(/^DATA\s*(.*)$/i))){data.push(...splitTop(m[1]).map(x=>x.startsWith('"')?x.slice(1,-1):Number(x)));return null;}if((m=stmt.match(/^ON\s+(.+?)\s+GOTO\s+(.+)$/i))){let ix=Math.trunc(Number(evaluate(m[1]))),dest=splitTop(m[2]);if(ix>=1&&ix<=dest.length)return {jump:Number(evaluate(dest[ix-1]))};return null;}if((m=stmt.match(/^ON\s+(.+?)\s+GOSUB\s+(.+)$/i))){let ix=Math.trunc(Number(evaluate(m[1]))),dest=splitTop(m[2]);if(ix>=1&&ix<=dest.length){stack.push(pc);return {jump:Number(evaluate(dest[ix-1]))};}return null;}if((m=stmt.match(/^SYS\s+(.+)$/i)))throw Error('ILLEGAL DIRECT');if((m=stmt.match(/^POKE\s+(.+?),\s*(.+)$/i))){throw Error('ILLEGAL DIRECT');}if(/^HELP\??$/i.test(stmt)){print('BASIC V2: PRINT LET INPUT IF THEN GOTO GOSUB RETURN FOR TO STEP NEXT DIM CLR');print('          LIST RUN NEW END STOP ON GOTO/GOSUB DATA READ RESTORE');print('Functions: ABS INT SGN SQR RND SIN COS TAN ATN EXP LOG LEN VAL STR$');print('          CHR$ ASC LEFT$ RIGHT$ MID$ TAB SPC FRE PI');print('Use numbered lines to create a program. Example: 10 PRINT "HELLO"');return null;}throw Error('SYNTAX');}
-function direct(s){try{let result=executeStatement(s,false);if(result&&result!=='stop'&&result!=='wait'&&result.jump!==undefined){let i=lineIndex(result.jump);if(i<0)throw Error('UNDEF\'D STATEMENT');pc=i;print('DIRECT JUMP NOT AVAILABLE');}else if(result!=='wait'&&result!=='stop'&&!running) { /* command complete */ }}catch(e){error(e.message||'SYNTAX');}}
-function startRun(){clearTimeout(runTimer);vars={};arrays={};stack=[];loops=[];data=[];dataPos=0;for(const n of lineList()){let m=program.get(n).match(/^DATA\s*(.*)$/i);if(m)data.push(...splitTop(m[1]).map(x=>x.startsWith('"')?x.slice(1,-1):Number(x)));}const lines=lineList();if(!lines.length){print('READY.');return;}running=true;waiting=null;pc=0;steps=0;setState('RUNNING');runNext(lines);}
-function runNext(lines){if(!running)return;if(++steps>MAX_STEPS){error('?OUT OF MEMORY');return;}if(pc<0||pc>=lines.length){print('READY.');ready();return;}let n=lines[pc],stmt=program.get(n);try{let parts=splitTopStatements(stmt);let advance=true;for(const part of parts){let r=executeStatement(part,true);if(r==='wait'){running=false;setState('INPUT');return;}if(r==='stop'){ready();return;}if(r&&r.jump!==undefined){let i=lineIndex(r.jump);if(i<0)throw Error('UNDEF\'D STATEMENT');pc=i;advance=false;break;}if(r&&r.index!==undefined){pc=r.index;advance=false;break;}}if(advance)pc++;runTimer=setTimeout(()=>runNext(lines),0);}catch(e){print('?'+(e.message||'SYNTAX')+' ERROR IN '+n);ready();}}
-function splitTopStatements(s){let out=[],start=0,quote=false,depth=0;for(let i=0;i<s.length;i++){if(s[i]==='"')quote=!quote;if(quote)continue;if(s[i]==='(')depth++;else if(s[i]===')')depth--;else if(depth===0&&s[i]===':'){out.push(s.slice(start,i));start=i+1;}}out.push(s.slice(start));return out;}
-function handle(raw){let s=raw.trim();if(!s)return;if(waiting){let vals=splitTop(s);try{waiting.names.forEach((n,i)=>{if(vals[i]===undefined)throw Error('REDO FROM START');assign(n,vals[i]);});waiting=null;running=true;setState('RUNNING');runNext(lineList());}catch(e){print('?'+e.message);waiting=null;ready();}return;}let numbered=s.match(/^(\d+)\s*(.*)$/);if(numbered){let n=Number(numbered[1]);if(n>63999){error('SYNTAX');return;}if(!numbered[2].trim())program.delete(n);else program.set(n,numbered[2].trim());free();return;}if(/^CONT$/i.test(s)){if(stopped){stopped=false;running=true;runNext(lineList());}else print('?CAN\'T CONTINUE ERROR');return;}if(/^LOAD|^SAVE|^VERIFY|^OPEN|^CLOSE|^CMD|^GET|^WAIT|^USR\b/i.test(s)){error('UNIMPLEMENTED');return;}if(/^QUIT$/i.test(s)){print('READY.');return;}if(/^RUN$/i.test(s)){startRun();return;}direct(s);}
-input.addEventListener('keydown',e=>{if(e.key==='ArrowUp'){e.preventDefault();if(history.length){histPos=Math.max(0,histPos-1);input.value=history[histPos]||'';}return;}if(e.key==='ArrowDown'){e.preventDefault();histPos=Math.min(history.length,histPos+1);input.value=history[histPos]||'';return;}if(e.key==='F1'){e.preventDefault();handle('LIST');return;}if(e.key==='F3'){e.preventDefault();handle('RUN');return;}if(e.key==='F5'){e.preventDefault();handle('NEW');return;}if(e.key==='Escape'&&running){running=false;clearTimeout(runTimer);print('BREAK');ready();return;}if(e.key==='Enter'){e.preventDefault();let s=input.value;input.value='';if(s.trim()){print((waiting?'?': 'READY.')+' '+s);history.push(s);histPos=history.length;}handle(s);}});
-reset();print('10 PRINT "HELLO, WORLD!"');print('20 GOTO 10');print('');print('Type LIST, then RUN. Press Esc to break a running program.');print('READY.');
-})();
+/* cr34te.it — die Zeichnung ist mit Tinte gemacht, also darf man mit Tinte
+   hineinschreiben. Jeder Tipp setzt einen Klecks; mehr als sechs bleiben
+   nicht liegen, damit das Blatt nicht zuläuft.
+   Kein Speicher, kein Netz, keine Fremddatei: der Klecks ist ein Element
+   im Dokument und wird über das Stylesheet gesetzt. */
+(function () {
+  "use strict";
+
+  var MAX = 6;
+  var blots = [];
+  var hinweis = document.querySelector(".hinweis");
+  var hinweisWeg = false;
+
+  function zufall(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function setzeKlecks(x, y) {
+    var groesse = zufall(16, 46);
+    var blot = document.createElement("span");
+    blot.className = "klecks";
+    /* Die Lage kommt über das Stylesheet, nicht über ein style-Attribut:
+       die Seite verbietet eingebettete Stile. */
+    blot.style.setProperty("--durchmesser", groesse.toFixed(1) + "px");
+    blot.style.setProperty("--drehung", zufall(-25, 25).toFixed(1) + "deg");
+    blot.style.left = x + "px";
+    blot.style.top = y + "px";
+    document.body.appendChild(blot);
+    blots.push(blot);
+    while (blots.length > MAX) {
+      blots.shift().remove();
+    }
+  }
+
+  function versteckeHinweis() {
+    if (hinweisWeg || !hinweis) return;
+    hinweisWeg = true;
+    hinweis.classList.add("weg");
+  }
+
+  document.addEventListener("pointerdown", function (event) {
+    if (event.button !== 0 && event.pointerType === "mouse") return;
+    versteckeHinweis();
+    setzeKlecks(event.clientX, event.clientY);
+  }, { passive: true });
+
+  /* Tastatur: die Mitte des Blattes bekommt einen Klecks, damit auch ohne
+     Zeigegerät etwas passiert. */
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== " " && event.key !== "Enter") return;
+    if (event.target !== document.body) return;
+    versteckeHinweis();
+    setzeKlecks(window.innerWidth / 2 + zufall(-30, 30),
+                window.innerHeight / 2 + zufall(-30, 30));
+  });
+}());
