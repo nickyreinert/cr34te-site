@@ -11,12 +11,14 @@
 <main id="game">
   <canvas id="scene" tabindex="0" aria-label="Three-dimensional pipe maze game"></canvas>
   <header class="hud"><div class="brand">PIPE<span>CHASE</span></div><div class="score-wrap"><span class="label">SCORE</span><strong id="score">0000</strong></div></header>
-  <div class="help"><span class="dot"></span> CLICK TO PLAY <i>·</i> ARROW KEYS <i>·</i> CATCH THE RUNNER</div>
+  <div class="help"><span class="dot"></span> CLICK TO PLAY · ARROWS MOVE · Q UP A DOWN</div>
   <div class="mobile-controls" aria-label="Movement controls">
-    <button data-dir="up" aria-label="Move up">▲</button>
-    <div><button data-dir="left" aria-label="Move left">◀</button><button data-dir="down" aria-label="Move down">▼</button><button data-dir="right" aria-label="Move right">▶</button></div>
+    <button data-dir="up" aria-label="Move forward">▲</button>
+    <div><button data-dir="left" aria-label="Move left">◀</button><button data-dir="down" aria-label="Move back">▼</button><button data-dir="right" aria-label="Move right">▶</button></div>
+    <div class="level-controls"><button data-dir="rise" aria-label="Move up one level">Q ▲ LEVEL</button><button data-dir="descend" aria-label="Move down one level">A ▼ LEVEL</button></div>
   </div>
-  <div class="toast" id="toast">MAZE ONLINE <span>— CATCH IT</span></div>
+  <div class="legend">LOCAL ROUTES <span class="xkey">X</span> <span class="ykey">Y</span> <span class="zkey">LEVEL</span></div>
+  <div class="toast" id="toast">MAZE ONLINE <span>— CHOOSE A DIRECTION</span></div>
 </main>
 <script src="script.js"></script>
 </body>
