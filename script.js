@@ -5,13 +5,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const ctxGeisha = geishaCanvas.getContext('2d');
   const noseHotspot = document.getElementById('noseHotspot');
   const frame = document.getElementById('paintingFrame');
+  const wall = document.querySelector('.louvre-wall');
   const replayBtn = document.getElementById('replayBtn');
   const hintOverlay = document.getElementById('hintOverlay');
   const robber1 = document.getElementById('robber1');
   const robber2 = document.getElementById('robber2');
   const grandpa = document.getElementById('grandpa');
   const son = document.getElementById('son');
-  let isAnimating = false, audioCtx = null, currentMusic = null, eyeZoomActive = false;
+  let isAnimating = false, audioCtx = null, currentMusic = null, eyeZoomActive = false, zoomFrameId = null;
+  const EYE = { x: 52, y: 59, w: 10, h: 6 };
+  const ZOOM_MS = 5000, NEST_DEPTH = 3;
 
   function initAudio() {
     if (!audioCtx) {
@@ -68,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ctxGeisha.fillStyle = '#2b6cb0'; ctxGeisha.fillRect(25,100,70,60);
     ctxGeisha.fillStyle = '#c53030'; ctxGeisha.fillRect(45,100,30,60);
     ctxGeisha.fillStyle = '#f6e05e'; ctxGeisha.fillRect(48,115,24,45);
+    ctxGeisha.fillStyle = '#fff'; ctxGeisha.fillRect(47,56,10,6); ctxGeisha.fillRect(63,56,10,6);
     ctxGeisha.fillStyle = '#1a202c'; ctxGeisha.fillRect(48,58,8,2); ctxGeisha.fillRect(64,58,8,2);
     ctxGeisha.fillStyle = '#e53e3e'; ctxGeisha.fillRect(55,74,10,4); ctxGeisha.fillRect(44,66,6,3); ctxGeisha.fillRect(70,66,6,3);
   }
@@ -113,29 +117,73 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1000);
   }
 
+  function cloneWall() {
+    const copy = wall.cloneNode(true);
+    copy.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    const src = wall.querySelectorAll('canvas'), dst = copy.querySelectorAll('canvas');
+    src.forEach((c, i) => dst[i].getContext('2d').drawImage(c, 0, 0));
+    return copy;
+  }
+  function buildNest(depth, g) {
+    const wrap = document.createElement('div');
+    wrap.className = 'eye-nest';
+    wrap.style.cssText = 'position:absolute;left:0;top:0;overflow:hidden;z-index:6;pointer-events:none;transform-origin:0 0;' +
+      `width:${g.w}px;height:${g.h}px;` +
+      `transform:translate(${g.ox}px,${g.oy}px) scale(${1 / g.s}) translate(${-g.w / 2}px,${-g.h / 2}px);`;
+    const copy = cloneWall();
+    if (depth > 1) copy.appendChild(buildNest(depth - 1, g));
+    wrap.appendChild(copy);
+    return wrap;
+  }
+  function removeNest() {
+    wall.querySelectorAll('.eye-nest').forEach(n => n.remove());
+  }
+  function setupEyeZoom() {
+    wall.style.transform = 'none';
+    wall.style.transformOrigin = '0 0';
+    removeNest();
+    const wr = wall.getBoundingClientRect(), cr = geishaCanvas.getBoundingClientRect();
+    const eyeW = EYE.w / 120 * cr.width, eyeH = EYE.h / 160 * cr.height;
+    const g = {
+      w: wr.width, h: wr.height,
+      ox: cr.left - wr.left + EYE.x / 120 * cr.width,
+      oy: cr.top - wr.top + EYE.y / 160 * cr.height
+    };
+    g.s = Math.max(g.w / (eyeW * 0.9), g.h / (eyeH * 0.9));
+    wall.appendChild(buildNest(NEST_DEPTH, g));
+    return g;
+  }
+  function runEyeZoom(g) {
+    const start = performance.now();
+    const tick = now => {
+      if (!eyeZoomActive) return;
+      const u = ((now - start) % ZOOM_MS) / ZOOM_MS;
+      const tx = g.ox + (g.w / 2 - g.ox) * u, ty = g.oy + (g.h / 2 - g.oy) * u;
+      wall.style.transform = `translate(${tx}px,${ty}px) scale(${Math.pow(g.s, u)}) translate(${-g.ox}px,${-g.oy}px)`;
+      zoomFrameId = requestAnimationFrame(tick);
+    };
+    zoomFrameId = requestAnimationFrame(tick);
+  }
+  function stopEyeZoom() {
+    eyeZoomActive = false;
+    if (zoomFrameId) { cancelAnimationFrame(zoomFrameId); zoomFrameId = null; }
+    removeNest();
+    wall.style.transform = ''; wall.style.transformOrigin = '';
+  }
   function startEndlessEyeZoom() {
     if (eyeZoomActive || geishaCanvas.style.display !== 'block') return;
     eyeZoomActive = true;
     hintOverlay.style.display = 'none';
-    frame.style.transition = 'transform 2.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s';
-    frame.style.transformOrigin = '50% 37%';
-    function cycle() {
-      if (!eyeZoomActive) return;
-      frame.style.transform = 'scale(8)';
-      setTimeout(() => {
-        if (!eyeZoomActive) return;
-        frame.style.transition = 'none';
-        frame.style.transform = 'none';
-        void frame.offsetWidth;
-        frame.style.transition = 'transform 2.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s';
-        setTimeout(cycle, 650);
-      }, 2400);
-    }
-    cycle();
+    runEyeZoom(setupEyeZoom());
   }
+  window.addEventListener('resize', () => {
+    if (!eyeZoomActive) return;
+    cancelAnimationFrame(zoomFrameId);
+    runEyeZoom(setupEyeZoom());
+  });
   geishaCanvas.addEventListener('click', startEndlessEyeZoom);
   replayBtn.addEventListener('click', () => {
-    eyeZoomActive = false;
+    stopEyeZoom();
     replayBtn.style.display = 'none'; monaCanvas.style.display = 'block'; geishaCanvas.style.display = 'none';
     frame.style.transition = ''; frame.style.transformOrigin = ''; frame.style.transform = 'none'; frame.style.opacity = '1';
     robber1.style.right = '-120px'; robber2.style.right = '-120px';
