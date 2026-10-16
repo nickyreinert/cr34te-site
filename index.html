@@ -3,149 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mona Lisa Louvre interactive</title>
+  <title>Mona Lisa Louvre Heist - Pixel Art Edition</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="app-container">
     <div class="louvre-wall">
-      <div class="wall-texture"></div>
-      <div class="painting-frame" id="paintingFrame">
-        <!-- Mona Lisa Canvas Element / Structure -->
-        <div class="painting-content" id="monaLisaPainting">
-          <svg viewBox="0 0 400 550" class="mona-svg">
-            <defs>
-              <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
-                <stop offset="0%" stop-color="#4a3f35" />
-                <stop offset="100%" stop-color="#1a1510" />
-              </radialGradient>
-              <radialGradient id="faceGrad" cx="50%" cy="45%" r="40%">
-                <stop offset="0%" stop-color="#e8cbaf" />
-                <stop offset="100%" stop-color="#a68160" />
-              </radialGradient>
-            </defs>
-            <!-- Background landscape -->
-            <rect width="400" height="550" fill="url(#bgGrad)" />
-            <path d="M0,320 Q100,280 200,330 T400,310 L400,550 L0,550 Z" fill="#2a3325" opacity="0.7" />
-            <path d="M0,380 Q150,340 250,390 T400,360 L400,550 L0,550 Z" fill="#1c2418" opacity="0.9" />
-            
-            <!-- Veil & Hair -->
-            <ellipse cx="200" cy="200" rx="85" ry="105" fill="#111111" opacity="0.95" />
-            <path d="M135,180 Q110,280 130,400 L270,400 Q290,280 265,180 Z" fill="#1a120b" />
-            
-            <!-- Face -->
-            <ellipse cx="200" cy="210" rx="55" ry="70" fill="url(#faceGrad)" />
-            <!-- Neck / Chest -->
-            <path d="M170,265 L230,265 L250,380 L150,380 Z" fill="#d9b493" />
-            <!-- Dress -->
-            <path d="M120,350 Q200,330 280,350 L310,550 L90,550 Z" fill="#2d3828" />
-            <path d="M150,360 Q200,380 250,360 L240,420 Q200,440 160,420 Z" fill="#4a3728" />
-            <path d="M165,270 Q200,285 235,270 L240,320 Q200,340 160,320 Z" fill="#d4af37" opacity="0.8" />
-
-            <!-- Eyebrows (faint) -->
-            <path d="M165,192 Q180,188 192,192" stroke="#73563a" stroke-width="2" fill="none" opacity="0.4" />
-            <path d="M208,192 Q220,188 235,192" stroke="#73563a" stroke-width="2" fill="none" opacity="0.4" />
-
-            <!-- Eyes Sockets -->
-            <ellipse cx="178" cy="202" rx="11" ry="6" fill="#ffffff" opacity="0.9" />
-            <ellipse cx="222" cy="202" rx="11" ry="6" fill="#ffffff" opacity="0.9" />
-            
-            <!-- Iris/Pupils (Animated) -->
-            <g id="eyesGroup">
-              <ellipse id="leftPupil" cx="178" cy="202" rx="4.5" ry="4.5" fill="#2b1d0c" />
-              <ellipse id="rightPupil" cx="222" cy="202" rx="4.5" ry="4.5" fill="#2b1d0c" />
-              <circle cx="176" cy="200" r="1.2" fill="#ffffff" />
-              <circle cx="220" cy="200" r="1.2" fill="#ffffff" />
-            </g>
-
-            <!-- Nose -->
-            <path d="M198,202 Q202,220 195,228 Q200,232 205,228" stroke="#9e7654" stroke-width="2.5" fill="none" stroke-linecap="round" />
-            <!-- Interactive Nose Hotspot -->
-            <circle id="noseHotspot" cx="200" cy="226" r="18" fill="transparent" style="cursor: pointer;" />
-
-            <!-- Mouth (Famous Smile) -->
-            <path d="M182,246 Q200,253 218,246" stroke="#6e3b2e" stroke-width="3" fill="none" stroke-linecap="round" />
-            <path d="M186,246 Q200,250 214,246" stroke="#a35a49" stroke-width="1.5" fill="none" />
-          </svg>
-          <!-- Sneeze effect text/particles -->
-          <div id="sneezeEffect" class="sneeze-effect">Achoo! 🤧</div>
-        </div>
-
-        <!-- Geisha Painting (Hidden initially) -->
-        <div class="painting-content geisha-painting" id="geishaPainting" style="display:none;">
-          <svg viewBox="0 0 400 550" class="geisha-svg">
-            <defs>
-              <radialGradient id="geishaBg" cx="50%" cy="50%" r="70%">
-                <stop offset="0%" stop-color="#8b263e" />
-                <stop offset="100%" stop-color="#2b0810" />
-              </radialGradient>
-            </defs>
-            <rect width="400" height="550" fill="url(#geishaBg)" />
-            <!-- Red Sun -->
-            <circle cx="200" cy="180" r="120" fill="#d63447" opacity="0.6" />
-            <!-- Hair -->
-            <path d="M120,170 C120,70 280,70 280,170 C280,220 260,250 260,250 L140,250 C140,250 120,220 120,170 Z" fill="#111111" />
-            <!-- Hair ornaments (Kanzashi) -->
-            <circle cx="270" cy="130" r="12" fill="#f4d160" />
-            <path d="M270,130 L310,160" stroke="#e63946" stroke-width="4" />
-            <circle cx="130" cy="140" r="8" fill="#e63946" />
-            
-            <!-- Face (White makeup) -->
-            <ellipse cx="200" cy="210" rx="50" ry="65" fill="#fefefe" />
-            <!-- Neck -->
-            <path d="M170,260 L230,260 L245,340 L155,340 Z" fill="#ffffff" />
-            
-            <!-- Kimono -->
-            <path d="M110,340 L200,370 L290,340 L330,550 L70,550 Z" fill="#22577a" />
-            <path d="M140,340 L200,410 L260,340 L200,370 Z" fill="#f4a261" />
-            <path d="M170,340 L200,390 L230,340 Z" fill="#e63946" />
-            
-            <!-- Eyebrows & Eyes -->
-            <path d="M168,195 Q180,190 190,196" stroke="#111" stroke-width="2.5" fill="none" />
-            <path d="M210,196 Q220,190 232,195" stroke="#111" stroke-width="2.5" fill="none" />
-            <!-- Eyes -->
-            <path d="M170,205 Q180,200 190,207" stroke="#111" stroke-width="3" fill="none" />
-            <path d="M210,207 Q220,200 230,205" stroke="#111" stroke-width="3" fill="none" />
-            <!-- Red eye accent -->
-            <path d="M188,206 Q192,205 194,208" stroke="#e63946" stroke-width="2" fill="none" />
-            <path d="M206,208 Q208,205 212,206" stroke="#e63946" stroke-width="2" fill="none" />
-            
-            <!-- Nose -->
-            <path d="M200,208 L198,222 L202,223" stroke="#ddd" stroke-width="1.5" fill="none" />
-            
-            <!-- Smiling Mouth (Red Lips) -->
-            <path d="M185,240 Q200,255 215,240 Q200,246 185,240 Z" fill="#e63946" />
-            <!-- Rosy Cheeks -->
-            <ellipse cx="165" cy="225" rx="10" ry="6" fill="#ffb5a7" opacity="0.5" />
-            <ellipse cx="235" cy="225" rx="10" ry="6" fill="#ffb5a7" opacity="0.5" />
-          </svg>
-        </div>
+      <div class="wall-paper"></div>
+      <div class="wall-dado"></div>
+      <div class="stanchion-rope"></div>
+      
+      <div class="pixel-frame" id="paintingFrame">
+        <canvas id="monaCanvas" width="120" height="160"></canvas>
+        <canvas id="geishaCanvas" width="120" height="160" style="display:none;"></canvas>
+        <div id="noseHotspot" title="Klicke auf die Nase!"></div>
       </div>
     </div>
 
-    <!-- Robbers Layer -->
-    <div id="robbersGroup" class="actors-layer">
-      <div class="robber robber1">
-        <div class="speech-bubble">Giggling... 🤭</div>
+    <div class="actors-container">
+      <div class="pixel-actor robber robber-1" id="robber1">
+        <div class="speech-bubble">Hehehe! 🤭</div>
       </div>
-      <div class="robber robber2"></div>
-    </div>
+      <div class="pixel-actor robber robber-2" id="robber2"></div>
 
-    <!-- Grandpa & Son Layer -->
-    <div id="menGroup" class="actors-layer">
-      <div class="man grandpa">
-        <div class="man-head"></div>
-        <div class="man-body"></div>
-      </div>
-      <div class="man son">
-        <div class="man-head"></div>
-        <div class="man-body"></div>
-        <div class="speech-bubble men-laugh">Haha! 😄</div>
+      <div class="pixel-actor man grandpa" id="grandpa"></div>
+      <div class="pixel-actor man son" id="son">
+        <div class="speech-bubble">Banzai! 😄</div>
       </div>
     </div>
 
-    <!-- Replay Button Overlay -->
-    <button id="replayBtn" class="replay-btn">Replay 🔄</button>
+    <div id="hintOverlay" class="hint-overlay">Tippe der Mona Lisa auf die Nase! 👃</div>
+    <button id="replayBtn" class="replay-btn">REPLAY 🔄</button>
   </div>
 
   <script src="script.js"></script>
