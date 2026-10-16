@@ -1,163 +1,217 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const leftPupil = document.getElementById('leftPupil');
-  const rightPupil = document.getElementById('rightPupil');
+  const monaCanvas = document.getElementById('monaCanvas');
+  const geishaCanvas = document.getElementById('geishaCanvas');
+  const ctxMona = monaCanvas.getContext('2d');
+  const ctxGeisha = geishaCanvas.getContext('2d');
   const noseHotspot = document.getElementById('noseHotspot');
-  const sneezeEffect = document.getElementById('sneezeEffect');
-  const paintingFrame = document.getElementById('paintingFrame');
-  const monaLisaPainting = document.getElementById('monaLisaPainting');
-  const geishaPainting = document.getElementById('geishaPainting');
-  const robbersGroup = document.getElementById('robbersGroup');
-  const menGroup = document.getElementById('menGroup');
+  const frame = document.getElementById('paintingFrame');
   const replayBtn = document.getElementById('replayBtn');
-  const speechBubbles = document.querySelectorAll('.speech-bubble');
+  const hintOverlay = document.getElementById('hintOverlay');
+
+  const robber1 = document.getElementById('robber1');
+  const robber2 = document.getElementById('robber2');
+  const grandpa = document.getElementById('grandpa');
+  const son = document.getElementById('son');
 
   let isAnimating = false;
+  let audioCtx = null;
+  let currentMusic = null;
 
-  // Eye tracking logic
-  const leftEyeCenter = { x: 178, y: 202 };
-  const rightEyeCenter = { x: 222, y: 202 };
-  const maxRadius = 5.5;
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
 
-  function updateEyePosition(e) {
+  function playTone(freq, duration, type = 'square') {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  function play8BitMelody(notes, speed = 250) {
+    stopMusic();
+    let index = 0;
+    currentMusic = setInterval(() => {
+      if (notes[index]) {
+        playTone(notes[index], 0.22);
+      }
+      index = (index + 1) % notes.length;
+    }, speed);
+  }
+
+  function stopMusic() {
+    if (currentMusic) clearInterval(currentMusic);
+  }
+
+  const marseillaise = [392, 392, 392, 523, 523, 587, 587, 659, 523, 440, 523, 392];
+  const bigInJapan = [440, 440, 523, 440, 392, 349, 392, 440, 349, 330, 293, 330];
+
+  function drawMonaLisa(pupilX = 0, pupilY = 0) {
+    ctxMona.clearRect(0, 0, 120, 160);
+    
+    ctxMona.fillStyle = '#3a4f33'; ctxMona.fillRect(0, 0, 120, 160);
+    ctxMona.fillStyle = '#2b3a26'; ctxMona.fillRect(0, 90, 120, 70);
+    ctxMona.fillStyle = '#1e2b1a'; ctxMona.fillRect(0, 110, 120, 50);
+
+    ctxMona.fillStyle = '#111';
+    ctxMona.fillRect(35, 30, 50, 80);
+    ctxMona.fillRect(30, 45, 60, 90);
+
+    ctxMona.fillStyle = '#e8beac';
+    ctxMona.fillRect(45, 45, 30, 40);
+    ctxMona.fillRect(48, 85, 24, 20);
+
+    ctxMona.fillStyle = '#4a3b2c'; ctxMona.fillRect(32, 100, 56, 60);
+    ctxMona.fillStyle = '#2d4a27'; ctxMona.fillRect(28, 115, 64, 45);
+    ctxMona.fillStyle = '#d4af37'; ctxMona.fillRect(45, 102, 30, 6);
+
+    ctxMona.fillStyle = '#fff';
+    ctxMona.fillRect(50, 58, 6, 4);
+    ctxMona.fillRect(64, 58, 6, 4);
+
+    ctxMona.fillStyle = '#2b1a0e';
+    const clampX = Math.max(-1.5, Math.min(1.5, pupilX));
+    const clampY = Math.max(-1, Math.min(1, pupilY));
+    ctxMona.fillRect(52 + clampX, 59 + clampY, 3, 3);
+    ctxMona.fillRect(66 + clampX, 59 + clampY, 3, 3);
+
+    ctxMona.fillStyle = '#6e503b';
+    ctxMona.fillRect(49, 55, 8, 2); ctxMona.fillRect(63, 55, 8, 2);
+    ctxMona.fillStyle = '#c49885'; ctxMona.fillRect(58, 62, 4, 10);
+    ctxMona.fillStyle = '#8b4513'; ctxMona.fillRect(54, 76, 12, 2);
+  }
+
+  function drawGeisha() {
+    ctxGeisha.clearRect(0, 0, 120, 160);
+    ctxGeisha.fillStyle = '#7a1c27'; ctxGeisha.fillRect(0, 0, 120, 160);
+    ctxGeisha.fillStyle = '#c53030'; ctxGeisha.beginPath(); ctxGeisha.arc(60, 70, 45, 0, Math.PI*2); ctxGeisha.fill();
+    
+    ctxGeisha.fillStyle = '#0d0d0d'; ctxGeisha.fillRect(30, 25, 60, 50);
+    ctxGeisha.fillStyle = '#d4af37'; ctxGeisha.fillRect(80, 30, 12, 6);
+
+    ctxGeisha.fillStyle = '#f7fafc'; ctxGeisha.fillRect(42, 45, 36, 40);
+    ctxGeisha.fillRect(48, 85, 24, 15);
+
+    ctxGeisha.fillStyle = '#2b6cb0'; ctxGeisha.fillRect(25, 100, 70, 60);
+    ctxGeisha.fillStyle = '#c53030'; ctxGeisha.fillRect(45, 100, 30, 60);
+    ctxGeisha.fillStyle = '#f6e05e'; ctxGeisha.fillRect(48, 115, 24, 45);
+
+    ctxGeisha.fillStyle = '#1a202c';
+    ctxGeisha.fillRect(48, 58, 8, 2); ctxGeisha.fillRect(64, 58, 8, 2);
+    ctxGeisha.fillStyle = '#e53e3e';
+    ctxGeisha.fillRect(55, 74, 10, 4);
+    ctxGeisha.fillRect(44, 66, 6, 3); ctxGeisha.fillRect(70, 66, 6, 3);
+  }
+
+  drawMonaLisa();
+  drawGeisha();
+
+  window.addEventListener('mousemove', (e) => {
     if (isAnimating) return;
+    initAudio();
+    if (!currentMusic) play8BitMelody(marseillaise, 280);
 
-    const rect = monaLisaPainting.getBoundingClientRect();
-    // Normalize mouse coords relative to SVG viewBox (400x550)
-    const mouseX = ((e.clientX - rect.left) / rect.width) * 400;
-    const mouseY = ((e.clientY - rect.top) / rect.height) * 550;
+    const rect = monaCanvas.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const offsetX = (e.clientX - centerX) / (window.innerWidth / 2);
+    const offsetY = (e.clientY - centerY) / (window.innerHeight / 2);
 
-    movePupil(leftPupil, leftEyeCenter, mouseX, mouseY);
-    movePupil(rightPupil, rightEyeCenter, mouseX, mouseY);
-  }
-
-  function movePupil(pupilElem, center, targetX, targetY) {
-    const dx = targetX - center.x;
-    const dy = targetY - center.y;
-    const angle = Math.atan2(dy, dx);
-    const dist = Math.min(Math.hypot(dx, dy) / 15, maxRadius);
-
-    const newX = center.x + Math.cos(angle) * dist;
-    const newY = center.y + Math.sin(angle) * dist;
-
-    pupilElem.setAttribute('cx', newX);
-    pupilElem.setAttribute('cy', newY);
-  }
-
-  window.addEventListener('mousemove', updateEyePosition);
-
-  // Trigger Sneeze and Heist Sequence
-  noseHotspot.addEventListener('click', triggerSneezeSequence);
-  noseHotspot.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    triggerSneezeSequence();
+    drawMonaLisa(offsetX * 2, offsetY * 2);
   });
 
-  function triggerSneezeSequence() {
+  noseHotspot.addEventListener('click', startHeistSequence);
+
+  function startHeistSequence() {
     if (isAnimating) return;
     isAnimating = true;
+    initAudio();
+    hintOverlay.style.display = 'none';
 
-    // 1. Sneeze
-    sneezeEffect.classList.add('active');
-    paintingFrame.style.transform = 'rotate(-3deg) scale(1.02)';
-
-    setTimeout(() => {
-      sneezeEffect.classList.remove('active');
-      paintingFrame.style.transform = 'none';
-      startRobbery();
-    }, 1000);
-  }
-
-  function startRobbery() {
-    const robber1 = robbersGroup.querySelector('.robber1');
-    const robber2 = robbersGroup.querySelector('.robber2');
-    const bubble = robber1.querySelector('.speech-bubble');
-
-    // Robbers enter from right
-    robber1.style.right = '45%';
-    robber2.style.right = '38%';
+    playTone(150, 0.4, 'sawtooth');
+    frame.style.transform = 'rotate(-5deg) scale(1.05)';
 
     setTimeout(() => {
-      if (bubble) bubble.style.opacity = '1';
-    }, 800);
-
-    // Robbers take Mona Lisa away
-    setTimeout(() => {
-      paintingFrame.style.transform = 'translateX(100vw) rotate(15deg)';
-      paintingFrame.style.opacity = '0';
-      robber1.style.right = '-300px';
-      robber2.style.right = '-300px';
-
-      setTimeout(startMenSequence, 1200);
-    }, 2000);
-  }
-
-  function startMenSequence() {
-    const grandpa = menGroup.querySelector('.grandpa');
-    const son = menGroup.querySelector('.son');
-    const laughBubble = menGroup.querySelector('.men-laugh');
-
-    // Reset frame off-screen on the left to bring Geisha
-    monaLisaPainting.style.display = 'none';
-    geishaPainting.style.display = 'block';
-    paintingFrame.style.transform = 'translateX(-100vw) rotate(-15deg)';
-
-    // Men enter from left
-    grandpa.style.left = '40%';
-    son.style.left = '48%';
-
-    setTimeout(() => {
-      // Hang the new picture (Geisha)
-      paintingFrame.style.opacity = '1';
-      paintingFrame.style.transform = 'none';
-    }, 800);
-
-    setTimeout(() => {
-      // Men laugh and exit to right
-      if (laughBubble) laughBubble.style.opacity = '1';
+      frame.style.transform = 'rotate(0deg)';
+      robber1.style.right = '40%';
+      robber2.style.right = '32%';
       
       setTimeout(() => {
+        robber1.querySelector('.speech-bubble').style.opacity = '1';
+        robber1.classList.add('carrying');
+        robber2.classList.add('carrying');
+        frame.style.transform = 'translate(100vw, -20px) rotate(15deg)';
+        frame.style.opacity = '0';
+        
+        robber1.style.right = '-200px';
+        robber2.style.right = '-200px';
+
+        setTimeout(startGeishaPlacement, 1200);
+      }, 1000);
+    }, 600);
+  }
+
+  function startGeishaPlacement() {
+    monaCanvas.style.display = 'none';
+    geishaCanvas.style.display = 'block';
+    frame.style.transform = 'translate(-100vw, -20px) rotate(-15deg)';
+
+    play8BitMelody(bigInJapan, 220);
+
+    grandpa.style.left = '35%';
+    son.style.left = '43%';
+    grandpa.classList.add('carrying');
+    son.classList.add('carrying');
+
+    setTimeout(() => {
+      frame.style.opacity = '1';
+      frame.style.transform = 'none';
+      grandpa.classList.remove('carrying');
+      son.classList.remove('carrying');
+
+      setTimeout(() => {
+        son.querySelector('.speech-bubble').style.opacity = '1';
         grandpa.style.left = '120vw';
         son.style.left = '120vw';
 
-        // Show Replay Button
         setTimeout(() => {
-          replayBtn.classList.add('visible');
+          replayBtn.style.display = 'block';
         }, 1200);
       }, 1200);
-    }, 2000);
+    }, 1000);
   }
 
-  // Replay Reset
-  replayBtn.addEventListener('click', resetAll);
+  replayBtn.addEventListener('click', () => {
+    replayBtn.style.display = 'none';
+    monaCanvas.style.display = 'block';
+    geishaCanvas.style.display = 'none';
+    frame.style.transform = 'none';
+    frame.style.opacity = '1';
 
-  function resetAll() {
-    replayBtn.classList.remove('visible');
-    
-    // Reset paintings
-    monaLisaPainting.style.display = 'block';
-    geishaPainting.style.display = 'none';
-    paintingFrame.style.transform = 'none';
-    paintingFrame.style.opacity = '1';
+    robber1.style.right = '-120px';
+    robber2.style.right = '-120px';
+    grandpa.style.left = '-120px';
+    son.style.left = '-120px';
 
-    // Reset positions
-    const robber1 = robbersGroup.querySelector('.robber1');
-    const robber2 = robbersGroup.querySelector('.robber2');
-    const grandpa = menGroup.querySelector('.grandpa');
-    const son = menGroup.querySelector('.son');
+    robber1.classList.remove('carrying');
+    robber2.classList.remove('carrying');
+    grandpa.classList.remove('carrying');
+    son.classList.remove('carrying');
 
-    robber1.style.right = '-200px';
-    robber2.style.right = '-200px';
-    grandpa.style.left = '-250px';
-    son.style.left = '-250px';
+    document.querySelectorAll('.speech-bubble').forEach(b => b.style.opacity = '0');
 
-    speechBubbles.forEach(b => b.style.opacity = '0');
-
-    // Reset pupils
-    leftPupil.setAttribute('cx', leftEyeCenter.x);
-    leftPupil.setAttribute('cy', leftEyeCenter.y);
-    rightPupil.setAttribute('cx', rightEyeCenter.x);
-    rightPupil.setAttribute('cy', rightEyeCenter.y);
-
+    drawMonaLisa();
+    play8BitMelody(marseillaise, 280);
     isAnimating = false;
-  }
+  });
 });

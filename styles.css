@@ -9,8 +9,10 @@ html, body {
   width: 100%;
   height: 100dvh;
   overflow: hidden;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #111;
+  font-family: 'Courier New', Courier, monospace;
+  background: #110d08;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 #app-container {
@@ -20,224 +22,202 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(circle at 50% 40%, #3a2a22 0%, #18110d 70%, #0a0705 100%);
+  background: #1a120b;
   overflow: hidden;
 }
 
-/* Louvre Wall Decor */
 .louvre-wall {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.wall-texture {
-  position: absolute;
   inset: 0;
-  background-image: 
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 80px 80px;
-  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  background: #2d1e18;
 }
 
-/* Picture Frame */
-.painting-frame {
-  position: relative;
-  height: 65dvh;
-  aspect-ratio: 4 / 5.5;
-  max-height: 800px;
-  border: 22px solid #a87b32;
-  border-image: linear-gradient(135deg, #d4af37 0%, #8a641c 40%, #573e0e 70%, #b89230 100%) 1;
-  box-shadow: 
-    0 20px 50px rgba(0,0,0,0.8),
-    inset 0 0 15px rgba(0,0,0,0.7);
-  background: #000;
-  transition: transform 0.8s ease-in-out, opacity 0.5s;
-  z-index: 5;
-}
-
-.painting-content {
+.wall-paper {
+  position: absolute;
+  top: 0;
   width: 100%;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
+  height: 70%;
+  background:
+    radial-gradient(circle at 50% 30%, #4a3225 0%, #2a1a12 70%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 4px, transparent 4px 16px);
+  border-bottom: 8px solid #180e08;
 }
 
-.mona-svg, .geisha-svg {
+.wall-dado {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 30%;
+  background: linear-gradient(180deg, #180e08 0%, #0d0704 100%);
+}
+
+.stanchion-rope {
+  position: absolute;
+  bottom: 8%;
+  width: 80%;
+  height: 12px;
+  background: repeating-linear-gradient(45deg, #8b0000, #8b0000 10px, #b22222 10px, #b22222 20px);
+  border-radius: 6px;
+  box-shadow: 0 10px 0 #000;
+}
+.stanchion-rope::before, .stanchion-rope::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  width: 16px;
+  height: 40px;
+  background: #d4af37;
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px #8a641c;
+}
+.stanchion-rope::before { left: 0; }
+.stanchion-rope::after { right: 0; }
+
+.pixel-frame {
+  position: absolute;
+  top: 15dvh;
+  width: 240px;
+  height: 320px;
+  background: #8b5a2b;
+  border: 16px solid #d4af37;
+  box-shadow: 
+    inset 0 0 0 4px #5c3a17,
+    inset 0 0 0 8px #f3e5ab,
+    0 16px 30px rgba(0,0,0,0.8);
+  cursor: crosshair;
+  z-index: 5;
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s;
+}
+
+canvas {
   width: 100%;
   height: 100%;
   display: block;
+  image-rendering: pixelated;
 }
 
-/* Sneeze Effect */
-.sneeze-effect {
+#noseHotspot {
   position: absolute;
-  top: 35%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.5);
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #ff3366;
-  text-shadow: 0 0 10px rgba(255,255,255,0.8), 2px 2px 0 #000;
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
-}
-
-.sneeze-effect.active {
-  opacity: 1;
-  transform: translate(-50%, -60%) scale(1.3);
-}
-
-/* Actors / Animation Layers */
-.actors-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+  top: 36%;
+  left: 44%;
+  width: 12%;
+  height: 10%;
+  cursor: pointer;
   z-index: 10;
-}
-
-/* Robbers */
-.robber {
-  position: absolute;
-  bottom: -20px;
-  width: 140px;
-  height: 280px;
-  background: #1a1a1a;
-  border-radius: 70px 70px 0 0;
-  right: -200px;
-  transition: right 1.2s ease-in-out;
-}
-
-.robber::before {
-  /* Mask */
-  content: '';
-  position: absolute;
-  top: 40px;
-  left: 15px;
-  width: 110px;
-  height: 35px;
-  background: #000;
-  border-radius: 10px;
-}
-
-.robber::after {
-  /* Eyes inside mask */
-  content: '👀';
-  position: absolute;
-  top: 42px;
-  left: 45px;
-  font-size: 20px;
-}
-
-.robber2 {
-  margin-right: -90px;
-  height: 250px;
-  background: #2a2a2a;
 }
 
 .speech-bubble {
   position: absolute;
-  top: -40px;
-  left: -20px;
+  top: -35px;
+  left: -10px;
   background: #fff;
   color: #000;
-  padding: 6px 12px;
-  border-radius: 15px;
+  padding: 4px 8px;
+  font-size: 12px;
   font-weight: bold;
-  font-size: 14px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  border: 2px solid #000;
+  box-shadow: 3px 3px 0 #000;
   white-space: nowrap;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.2s;
 }
 
-/* Grandpa & Son */
-.man {
+.actors-container {
   position: absolute;
-  bottom: -20px;
-  left: -250px;
-  width: 130px;
-  height: 290px;
-  transition: left 1.2s ease-in-out;
-}
-
-.grandpa {
-  background: #4a5568;
-  border-radius: 60px 60px 0 0;
-}
-.grandpa .man-head {
-  position: absolute;
-  top: 20px;
-  left: 25px;
-  width: 80px;
-  height: 80px;
-  background: #e2e8f0;
-  border-radius: 50%;
-}
-/* Beard */
-.grandpa .man-head::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 10px;
-  width: 60px;
-  height: 40px;
-  background: #ffffff;
-  border-radius: 0 0 30px 30px;
-}
-
-.son {
-  margin-left: -80px;
-  height: 270px;
-  background: #2b6cb0;
-  border-radius: 55px 55px 0 0;
-}
-.son .man-head {
-  position: absolute;
-  top: 20px;
-  left: 25px;
-  width: 75px;
-  height: 75px;
-  background: #ed8936;
-  border-radius: 50%;
-}
-
-/* Replay Button */
-.replay-btn {
-  position: absolute;
-  bottom: 40px;
-  padding: 15px 35px;
-  font-size: 1.4rem;
-  font-weight: bold;
-  color: #fff;
-  background: linear-gradient(135deg, #e53e3e, #9b2c2c);
-  border: none;
-  border-radius: 50px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-  cursor: pointer;
-  opacity: 0;
-  transform: translateY(50px);
+  inset: 0;
   pointer-events: none;
-  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 15;
+}
+
+.pixel-actor {
+  position: absolute;
+  bottom: 8dvh;
+  width: 70px;
+  height: 130px;
+  transition: left 1s linear, right 1s linear, transform 0.3s;
+}
+
+.robber {
+  right: -120px;
+}
+.robber-1 {
+  background:
+    linear-gradient(#111, #111) 10px 10px / 50px 25px no-repeat,
+    linear-gradient(#fff, #fff) 20px 25px / 30px 6px no-repeat,
+    repeating-linear-gradient(0deg, #fff 0 8px, #111 8px 16px) 15px 40px / 40px 50px no-repeat,
+    linear-gradient(#222, #222) 15px 90px / 40px 40px no-repeat;
+}
+.robber-2 {
+  margin-right: -60px;
+  background:
+    linear-gradient(#111, #111) 10px 15px / 50px 25px no-repeat,
+    linear-gradient(#fff, #fff) 20px 28px / 30px 6px no-repeat,
+    repeating-linear-gradient(0deg, #e53e3e 0 8px, #111 8px 16px) 15px 45px / 40px 45px no-repeat,
+    linear-gradient(#222, #222) 15px 90px / 40px 40px no-repeat;
+}
+
+.man {
+  left: -120px;
+}
+.grandpa {
+  background:
+    linear-gradient(#e2e8f0, #e2e8f0) 15px 10px / 40px 45px no-repeat,
+    linear-gradient(#fbd38d, #fbd38d) 20px 20px / 30px 20px no-repeat,
+    linear-gradient(#3182ce, #3182ce) 15px 55px / 40px 45px no-repeat,
+    linear-gradient(#4a5568, #4a5568) 15px 100px / 40px 30px no-repeat;
+}
+.son {
+  margin-left: -60px;
+  background:
+    linear-gradient(#742a2a, #742a2a) 15px 15px / 40px 20px no-repeat,
+    linear-gradient(#ed8936, #ed8936) 20px 25px / 30px 25px no-repeat,
+    linear-gradient(#2b6cb0, #2b6cb0) 15px 50px / 40px 50px no-repeat,
+    linear-gradient(#1a202c, #1a202c) 15px 100px / 40px 30px no-repeat;
+}
+
+.carrying {
+  transform: translateY(-10px);
+}
+
+.hint-overlay {
+  position: absolute;
+  top: 5%;
+  background: rgba(0,0,0,0.8);
+  color: #f6e05e;
+  padding: 8px 16px;
+  border: 2px solid #f6e05e;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 0 #000;
   z-index: 20;
 }
 
-.replay-btn.visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+.replay-btn {
+  position: absolute;
+  bottom: 5%;
+  padding: 12px 28px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  background: #e53e3e;
+  border: 4px solid #fff;
+  box-shadow: 4px 4px 0 #000;
+  cursor: pointer;
+  display: none;
+  z-index: 30;
 }
-
 .replay-btn:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 15px 30px rgba(229,62,62,0.4);
+  background: #c53030;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 #000;
 }
-
 .replay-btn:active {
-  transform: translateY(1px) scale(0.98);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
 }
