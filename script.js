@@ -10,9 +10,10 @@
   const dirs={up:[0,-1,0],down:[0,1,0],left:[-1,0,0],right:[1,0,0]};
   const opposite={up:'down',down:'up',left:'right',right:'left'};
   let player={x:0,y:0,z:0,dir:'right',progress:0}, enemy={x:6,y:6,z:6,dir:'left',progress:0};
-  let build=0, ready=false, lastMove=0, lastEnemy=0;
+  let build=0, ready=false, lastMove=0, lastEnemy=0, queuedDirection=null;
   function resize(){dpr=Math.min(devicePixelRatio||1,2);w=canvas.clientWidth;h=canvas.clientHeight;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
   addEventListener('resize',resize); resize();
+  canvas.addEventListener('pointerdown',()=>canvas.focus({preventScroll:true}));
   function addEdge(a,b){const id=edges.length;edges.push({a,b,id});adjacency.get(key(...a)).push(id);adjacency.get(key(...b)).push(id)}
   for(let z=0;z<N;z++)for(let y=0;y<N;y++)for(let x=0;x<N;x++){nodes.push([x,y,z]);adjacency.set(key(x,y,z),[])}
   // A connected, looping 3D pipe network. Every junction is a real traversable connection.
@@ -40,9 +41,9 @@
     if(build<edges.length)build=Math.min(edges.length,build+Math.max(1,Math.ceil(edges.length/90)));
     const visible=edges.slice(0,build).sort((a,b)=>{const pa=nodePoint(a.a),pb=nodePoint(b.a);return pa.y+pb.y-(nodePoint(b.b).y+nodePoint(a.b).y)});visible.forEach(e=>drawPipe(e,build===edges.length?1:.75));
     for(const p of nodes){const q=project(p);ctx.fillStyle='#5bdff0';ctx.globalAlpha=.28;ctx.beginPath();ctx.arc(q.x,q.y,2.1,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
-    if(build===edges.length){ready=true;const dt=Math.min(.05,(now-last)/1000||0);move(player,dt,1.45);if(enemy.progress<.02 && (Math.random()<.22||!connected([enemy.x,enemy.y,enemy.z],enemy.dir)) )randomDirection(enemy);move(enemy,dt,1.05);drawCharacter(player,true);drawCharacter(enemy,false);collide()}else{drawCharacter(player,true)}
+    if(build===edges.length){ready=true;const dt=Math.min(.05,(now-last)/1000||0);if(queuedDirection && player.progress<=.05 && step(player,queuedDirection))queuedDirection=null;move(player,dt,1.45);if(queuedDirection && player.progress<=.05 && step(player,queuedDirection))queuedDirection=null;if(enemy.progress<.02 && (Math.random()<.22||!connected([enemy.x,enemy.y,enemy.z],enemy.dir)) )randomDirection(enemy);move(enemy,dt,1.05);drawCharacter(player,true);drawCharacter(enemy,false);collide()}else{drawCharacter(player,true)}
     last=now;requestAnimationFrame(draw)}
-  function setDirection(dir){if(ready)step(player,dir)}
+  function setDirection(dir){queuedDirection=dir;if(ready && player.progress<=.05 && step(player,dir))queuedDirection=null}
   addEventListener('keydown',e=>{const map={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'};if(map[e.key]){e.preventDefault();setDirection(map[e.key])} });
   document.querySelectorAll('[data-dir]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();setDirection(b.dataset.dir)})});
   respawnEnemy();requestAnimationFrame(draw);
