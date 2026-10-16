@@ -1,12 +1,23 @@
-<!DOCTYPE html>
-<html lang="de">
+<!doctype html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080d16">
+<title>PIPE CHASE</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<canvas id="roehren" aria-hidden="true"></canvas>
+<main id="game">
+  <canvas id="scene" aria-label="Three-dimensional pipe maze game"></canvas>
+  <header class="hud"><div class="brand">PIPE<span>CHASE</span></div><div class="score-wrap"><span class="label">SCORE</span><strong id="score">0000</strong></div></header>
+  <div class="help"><span class="dot"></span> ARROW KEYS <i>·</i> CATCH THE RUNNER</div>
+  <div class="mobile-controls" aria-label="Movement controls">
+    <button data-dir="up" aria-label="Move up">▲</button>
+    <div><button data-dir="left" aria-label="Move left">◀</button><button data-dir="down" aria-label="Move down">▼</button><button data-dir="right" aria-label="Move right">▶</button></div>
+  </div>
+  <div class="toast" id="toast">MAZE ONLINE <span>— CATCH IT</span></div>
+</main>
 <script src="script.js"></script>
 </body>
 </html>
