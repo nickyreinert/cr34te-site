@@ -1,5 +1,5 @@
-/* Dose 3D — Gestaltung. Mobil zuerst, kein Framework, keine externe Schrift.
-   Kein Zwei-Finger-Seitenzoom, weil die Geste dem Modell gehört. */
+/* 3D-Roehren — Gestaltung. Nur der schwarze Grund und die Buehne,
+   kein Text, kein Rahmen, kein Rollbalken. */
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -7,71 +7,20 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  touch-action: pan-x pan-y;          /* sperrt das Zwei-Finger-Zoomen der Seite */
+  background: #000;
+  overflow: hidden;
+  touch-action: none;                 /* kein Seitenzoomen; die Flaeche braucht keine Geste */
   overscroll-behavior: none;
-}
-
-body {
-  height: 100dvh;
-  overflow: hidden;                    /* kein Rollbalken */
   -webkit-tap-highlight-color: transparent;
-  background:
-    radial-gradient(120% 90% at 50% 12%, #fdfcf7 0%, #efe9dc 42%, #d8d0bd 78%, #c2b9a4 100%);
 }
 
-.buehne {
-  position: relative;
-  width: 100%;
-  height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+body { height: 100dvh; }
 
-#buehne {
+#roehren {
   display: block;
   width: 100%;
-  height: 100%;
-  touch-action: none;                  /* alle Berührungen gehören dem Modell */
-  cursor: grab;
-  position: relative;
-  z-index: 2;
-}
-#buehne:active { cursor: grabbing; }
-
-/* weicher Standschatten unter der Dose */
-.schatten {
-  position: absolute;
-  left: 50%;
-  bottom: 8%;
-  width: min(46%, 320px);
-  aspect-ratio: 2.6 / 1;
-  transform: translateX(-50%);
-  background: radial-gradient(50% 50% at 50% 50%, rgba(60,50,30,0.34) 0%, rgba(60,50,30,0.16) 45%, rgba(60,50,30,0) 72%);
-  filter: blur(2px);
-  z-index: 1;
-  pointer-events: none;
-}
-
-/* Ausfall ohne WebGL: nur dann sichtbar */
-.hinweis {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  text-align: center;
-  background: #faf8f2;
-  font: 0.85rem system-ui, sans-serif;
-  color: #23201a;
-}
-.hinweis[hidden] { display: none; }
-.hinweis img {
-  max-height: 60%;
-  width: auto;
-  filter: drop-shadow(0 8px 18px rgba(40,32,18,0.28));
+  height: 100dvh;                     /* fuellt den Rahmen ohne feste Pixelhoehe */
+  background: #000;
+  touch-action: none;
+  cursor: none;                       /* ein Bildschirmschoner zeigt keinen Zeiger */
 }
