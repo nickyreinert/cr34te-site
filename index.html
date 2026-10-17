@@ -1,52 +1,27 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Croc O'Dile</title>
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scale of the Universe</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="game-container">
-    <header id="game-header">
-      <h1>Croc O'Dile</h1>
-      <div id="score-board">
-        <span>Punkte: <strong id="score">0</strong></span>
-        <span>Rekord: <strong id="high-score">0</strong></span>
-      </div>
-    </header>
-
-    <div id="arena-wrapper">
-      <svg id="jungle-frame" viewBox="0 0 500 500" aria-hidden="true">
-        <path d="M 50 100 C 20 40, 100 20, 120 70 C 140 30, 200 40, 180 100 C 120 120, 70 140, 50 100 Z" fill="#1b4d2e" opacity="0.8"/>
-        <path d="M 450 100 C 480 40, 400 20, 380 70 C 360 30, 300 40, 320 100 C 380 120, 430 140, 450 100 Z" fill="#1b4d2e" opacity="0.8"/>
-        <path d="M 50 400 C 20 460, 100 480, 120 430 C 140 470, 200 460, 180 400 C 120 380, 70 360, 50 400 Z" fill="#1b4d2e" opacity="0.8"/>
-        <path d="M 450 400 C 480 460, 400 480, 380 430 C 360 470, 300 460, 320 400 C 380 380, 430 360, 450 400 Z" fill="#1b4d2e" opacity="0.8"/>
-        <circle cx="250" cy="250" r="215" fill="none" stroke="#2d6a4f" stroke-width="8"/>
-      </svg>
-
-      <canvas id="game-canvas"></canvas>
-
-      <div id="overlay" class="active">
-        <div id="overlay-content">
-          <h2 id="overlay-title">Croc O'Dile</h2>
-          <p id="overlay-msg">Klicke zum Starten & Steuern</p>
-          <button id="start-btn">Spiel Starten</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="controls">
-      <div class="control-row">
-        <button id="btn-out" class="ctrl-btn" title="Nach außen (⬆)">⬆ Außen</button>
-      </div>
-      <div class="control-row">
-        <button id="btn-ccw" class="ctrl-btn" title="Gegen Uhrzeigersinn (↺)">↺ Links</button>
-        <button id="btn-in" class="ctrl-btn" title="Nach innen (⬇)">⬇ Innen</button>
-        <button id="btn-cw" class="ctrl-btn" title="Im Uhrzeigersinn (↻)">↻ Rechts</button>
-      </div>
-    </div>
+<main>
+  <div id="stage"><canvas id="view"></canvas></div>
+  <section id="info">
+    <h1 id="name"></h1>
+    <p id="size"></p>
+    <p class="rel" id="rel1"></p>
+    <p class="rel" id="rel2"></p>
+  </section>
+  <div id="controls">
+    <button id="smaller" type="button">&#9664; Smaller</button>
+    <input id="zoom" type="range" aria-label="Zoom level (logarithmic)">
+    <button id="larger" type="button">Larger &#9654;</button>
   </div>
-  <script src="script.js"></script>
+  <div id="chips"></div>
+</main>
+<script src="script.js"></script>
 </body>
 </html>
