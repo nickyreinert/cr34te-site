@@ -1,340 +1,256 @@
 (function () {
-  const NUM_RINGS = 5;
-  const NUM_SECTORS = 16;
-  const TICK_INTERVAL = 180;
+  'use strict';
 
-  let canvas, ctx;
-  let canvasSize = 300;
-  let score = 0;
-  let highScore = 0;
-  let isRunning = false;
-  let gameTimer = null;
+  var LY = 9.4607e15; // metres per light-year
+  var HALF = Math.log10(2); // selected object fills half of the view width
 
-  const DIR = { CW: 'CW', CCW: 'CCW', IN: 'IN', OUT: 'OUT' };
+  // [name, approximate diameter in metres], ascending
+  var items = [
+    ['Quark (upper limit)', 1e-18],
+    ['Proton', 1.7e-15],
+    ['Uranium nucleus', 1.5e-14],
+    ['Hydrogen atom', 1.06e-10],
+    ['Water molecule', 2.8e-10],
+    ['DNA double helix (width)', 2e-9],
+    ['SARS-CoV-2 virus', 1e-7],
+    ['E. coli bacterium (length)', 2e-6],
+    ['Red blood cell', 7e-6],
+    ['Human hair (width)', 7e-5],
+    ['Ant', 5e-3],
+    ['Human', 1.7],
+    ['Blue whale (length)', 30],
+    ['Eiffel Tower (height)', 330],
+    ['Mount Everest (height)', 8849],
+    ['Moon', 3.474e6],
+    ['Earth', 1.2742e7],
+    ['Jupiter', 1.3982e8],
+    ['Sun', 1.3927e9],
+    ['Betelgeuse (approx.)', 1.2e12],
+    ['Solar system (Neptune orbit)', 9.0e12],
+    ['Oort cloud (outer edge, estimated)', 3e16],
+    ['Orion Nebula', 2.4e17],
+    ['Milky Way', 1.0e21],
+    ['Andromeda Galaxy', 2.1e21],
+    ['Local Group', 9.5e22],
+    ['Virgo Supercluster', 1.0e24],
+    ['Laniakea Supercluster', 4.9e24],
+    ['Observable universe', 8.8e26]
+  ].map(function (e) {
+    return { n: e[0], d: e[1], lg: Math.log10(e[1]) };
+  });
 
-  let snake = [];
-  let currentDir = DIR.CW;
-  let inputQueue = [];
-  let food = { ring: 2, sector: 8 };
+  var UNITS = [[1e-18, 'am'], [1e-15, 'fm'], [1e-12, 'pm'], [1e-9, 'nm'], [1e-6, '\u00b5m'], [1e-3, 'mm']];
 
-  let scoreEl, highScoreEl, overlayEl, overlayTitleEl, overlayMsgEl, startBtn;
+  var ZMIN = items[0].lg + HALF;
+  var ZMAX = items[items.length - 1].lg + HALF;
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  var cv = document.getElementById('view');
+  var stage = document.getElementById('stage');
+  var ctx = cv.getContext('2d');
+  var zoom = document.getElementById('zoom');
+  var chipsEl = document.getElementById('chips');
+  var nameEl = document.getElementById('name');
+  var sizeEl = document.getElementById('size');
+  var rel1 = document.getElementById('rel1');
+  var rel2 = document.getElementById('rel2');
+
+  var w = 0;
+  var h = 0;
+  var raf = 0;
+  var target = zFor(items.findIndex(function (o) { return o.n === 'Human'; }));
+  var cur = target;
+
+  function zFor(i) {
+    return items[i].lg + HALF;
   }
 
-  function init() {
-    canvas = document.getElementById('game-canvas');
-    ctx = canvas.getContext('2d');
-    scoreEl = document.getElementById('score');
-    highScoreEl = document.getElementById('high-score');
-    overlayEl = document.getElementById('overlay');
-    overlayTitleEl = document.getElementById('overlay-title');
-    overlayMsgEl = document.getElementById('overlay-msg');
-    startBtn = document.getElementById('start-btn');
+  function clamp(z) {
+    return Math.min(ZMAX, Math.max(ZMIN, z));
+  }
 
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+  function num(x) {
+    if (x >= 1e6 || x < 1e-2) {
+      return x.toExponential(2).replace('e+', 'e');
+    }
+    return String(parseFloat(x.toPrecision(3)));
+  }
 
-    document.getElementById('btn-cw').addEventListener('click', (e) => { e.preventDefault(); queueInput(DIR.CW); });
-    document.getElementById('btn-ccw').addEventListener('click', (e) => { e.preventDefault(); queueInput(DIR.CCW); });
-    document.getElementById('btn-in').addEventListener('click', (e) => { e.preventDefault(); queueInput(DIR.IN); });
-    document.getElementById('btn-out').addEventListener('click', (e) => { e.preventDefault(); queueInput(DIR.OUT); });
+  function fmt(m) {
+    if (m >= LY) { return num(m / LY) + ' ly'; }
+    if (m >= 1e3) { return num(m / 1e3) + ' km'; }
+    if (m >= 1) { return num(m) + ' m'; }
+    var u = UNITS[0];
+    UNITS.forEach(function (e) { if (m >= e[0]) { u = e; } });
+    return num(m / u[0]) + ' ' + u[1];
+  }
 
-    startBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      startGame();
+  // index of the item closest (in log scale) to the one shown at half view width
+  function selIndex(z) {
+    var best = 0;
+    items.forEach(function (o, i) {
+      if (Math.abs(o.lg - (z - HALF)) < Math.abs(items[best].lg - (z - HALF))) { best = i; }
     });
-
-    canvas.addEventListener('click', () => {
-      if (!isRunning) startGame();
-    });
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    draw();
+    return best;
   }
 
-  function resizeCanvas() {
-    const wrapper = document.getElementById('arena-wrapper');
-    if (!wrapper || !canvas) return;
-    const size = Math.min(wrapper.clientWidth - 20, wrapper.clientHeight - 20, 380);
-    canvasSize = Math.max(size, 220);
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
-    draw();
+  function hue(i) {
+    return 220 - 200 * ((items[i].lg + 18) / 45);
   }
 
-  function queueInput(dir) {
-    if (inputQueue.length < 2) {
-      inputQueue.push(dir);
+  // visible rings at the current zoom, largest first
+  function rings() {
+    var D = Math.pow(10, cur);
+    var r0 = Math.min(w, h) * 0.46;
+    var list = [];
+    for (var i = items.length - 1; i >= 0; i--) {
+      var ratio = items[i].d / D;
+      var r = ratio * r0;
+      if (ratio <= 1.05 && r >= 2) { list.push({ i: i, r: r }); }
     }
-  }
-
-  function handleKeyDown(e) {
-    switch (e.key) {
-      case 'ArrowLeft':
-      case 'a':
-      case 'A':
-        queueInput(DIR.CCW);
-        e.preventDefault();
-        break;
-      case 'ArrowRight':
-      case 'd':
-      case 'D':
-        queueInput(DIR.CW);
-        e.preventDefault();
-        break;
-      case 'ArrowDown':
-      case 's':
-      case 'S':
-        queueInput(DIR.IN);
-        e.preventDefault();
-        break;
-      case 'ArrowUp':
-      case 'w':
-      case 'W':
-        queueInput(DIR.OUT);
-        e.preventDefault();
-        break;
-      case ' ':
-      case 'Enter':
-        if (!isRunning) startGame();
-        e.preventDefault();
-        break;
-    }
-  }
-
-  function startGame() {
-    score = 0;
-    scoreEl.textContent = score;
-    isRunning = true;
-    inputQueue = [];
-    currentDir = DIR.CW;
-
-    snake = [
-      { ring: 2, sector: 4 },
-      { ring: 2, sector: 3 },
-      { ring: 2, sector: 2 }
-    ];
-
-    spawnFood();
-    overlayEl.classList.remove('active');
-
-    if (gameTimer) clearInterval(gameTimer);
-    gameTimer = setInterval(gameTick, TICK_INTERVAL);
-    draw();
-  }
-
-  function spawnFood() {
-    let valid = false;
-    while (!valid) {
-      const r = Math.floor(Math.random() * NUM_RINGS);
-      const s = Math.floor(Math.random() * NUM_SECTORS);
-      const onSnake = snake.some(seg => seg.ring === r && seg.sector === s);
-      if (!onSnake) {
-        food = { ring: r, sector: s };
-        valid = true;
-      }
-    }
-  }
-
-  function gameTick() {
-    if (inputQueue.length > 0) {
-      currentDir = inputQueue.shift();
-    }
-
-    const head = snake[0];
-    let nextHead = { ring: head.ring, sector: head.sector };
-
-    if (currentDir === DIR.CW) {
-      nextHead.sector = (head.sector + 1) % NUM_SECTORS;
-    } else if (currentDir === DIR.CCW) {
-      nextHead.sector = (head.sector - 1 + NUM_SECTORS) % NUM_SECTORS;
-    } else if (currentDir === DIR.OUT) {
-      nextHead.ring = head.ring + 1;
-    } else if (currentDir === DIR.IN) {
-      if (head.ring > 0) {
-        nextHead.ring = head.ring - 1;
-      } else {
-        nextHead.sector = (head.sector + NUM_SECTORS / 2) % NUM_SECTORS;
-        nextHead.ring = 0;
-      }
-    }
-
-    if (nextHead.ring >= NUM_RINGS) {
-      gameOver('Banden-Crash! Du bist aus dem Kreis gelaufen.');
-      return;
-    }
-
-    const selfHit = snake.some((seg, idx) => {
-      if (idx === snake.length - 1 && !(nextHead.ring === food.ring && nextHead.sector === food.sector)) {
-        return false;
-      }
-      return seg.ring === nextHead.ring && seg.sector === nextHead.sector;
-    });
-
-    if (selfHit) {
-      gameOver('In den eigenen Schwanz gebissen!');
-      return;
-    }
-
-    snake.unshift(nextHead);
-
-    if (nextHead.ring === food.ring && nextHead.sector === food.sector) {
-      score += 10;
-      scoreEl.textContent = score;
-      if (score > highScore) {
-        highScore = score;
-        highScoreEl.textContent = highScore;
-      }
-      spawnFood();
-    } else {
-      snake.pop();
-    }
-
-    draw();
-  }
-
-  function gameOver(msg) {
-    isRunning = false;
-    clearInterval(gameTimer);
-    overlayTitleEl.textContent = 'Game Over!';
-    overlayMsgEl.textContent = msg + ` Finale Punkte: ${score}`;
-    startBtn.textContent = 'Erneut Spielen';
-    overlayEl.classList.add('active');
-  }
-
-  function getCellCenter(ring, sector) {
-    const cx = canvasSize / 2;
-    const cy = canvasSize / 2;
-    const maxR = canvasSize / 2 - 12;
-
-    const ringStep = maxR / NUM_RINGS;
-    const r = (ring + 0.5) * ringStep;
-
-    const angleStep = (2 * Math.PI) / NUM_SECTORS;
-    const angle = sector * angleStep - Math.PI / 2 + angleStep / 2;
-
-    return {
-      x: cx + r * Math.cos(angle),
-      y: cy + r * Math.sin(angle),
-      angle: angle,
-      r: r
-    };
+    return { list: list, D: D };
   }
 
   function draw() {
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvasSize, canvasSize);
+    ctx.clearRect(0, 0, w, h);
+    var cx = w / 2;
+    var cy = h / 2;
+    var view = rings();
+    var sel = selIndex(cur);
 
-    const cx = canvasSize / 2;
-    const cy = canvasSize / 2;
-    const maxR = canvasSize / 2 - 12;
-    const ringStep = maxR / NUM_RINGS;
-    const angleStep = (2 * Math.PI) / NUM_SECTORS;
-
-    ctx.strokeStyle = 'rgba(82, 183, 136, 0.15)';
-    ctx.lineWidth = 1;
-
-    for (let i = 1; i <= NUM_RINGS; i++) {
+    view.list.forEach(function (k) {
+      var c = 'hsl(' + hue(k.i) + ',80%,62%)';
       ctx.beginPath();
-      ctx.arc(cx, cy, i * ringStep, 0, 2 * Math.PI);
+      ctx.arc(cx, cy, k.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'hsla(' + hue(k.i) + ',80%,60%,0.08)';
+      ctx.fill();
+      ctx.lineWidth = k.i === sel ? 3 : 1.5;
+      ctx.strokeStyle = k.i === sel ? '#ffffff' : c;
       ctx.stroke();
-    }
+    });
 
-    for (let s = 0; s < NUM_SECTORS; s++) {
-      const a = s * angleStep - Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + maxR * Math.cos(a), cy + maxR * Math.sin(a));
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = 'rgba(45, 106, 79, 0.2)';
-    ctx.beginPath();
-    ctx.arc(cx, cy, ringStep * 0.4, 0, 2 * Math.PI);
-    ctx.fill();
-
-    const foodPos = getCellCenter(food.ring, food.sector);
-    ctx.save();
-    ctx.translate(foodPos.x, foodPos.y);
-
-    ctx.fillStyle = '#ffb703';
-    ctx.shadowColor = '#ffb703';
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.arc(0, 0, ringStep * 0.3, 0, 2 * Math.PI);
-    ctx.fill();
-
-    ctx.fillStyle = '#fb8500';
-    ctx.beginPath();
-    ctx.arc(-1, -1, ringStep * 0.15, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.restore();
-
-    for (let i = snake.length - 1; i >= 0; i--) {
-      const seg = snake[i];
-      const pos = getCellCenter(seg.ring, seg.sector);
-
-      ctx.save();
-      ctx.translate(pos.x, pos.y);
-
-      if (i === 0) {
-        ctx.rotate(pos.angle + Math.PI / 2);
-
-        ctx.fillStyle = '#2d6a4f';
-        ctx.shadowColor = '#52b788';
-        ctx.shadowBlur = 4;
-
-        ctx.beginPath();
-        ctx.moveTo(-ringStep * 0.25, ringStep * 0.2);
-        ctx.lineTo(-ringStep * 0.15, -ringStep * 0.35);
-        ctx.lineTo(0, -ringStep * 0.42);
-        ctx.lineTo(ringStep * 0.15, -ringStep * 0.35);
-        ctx.lineTo(ringStep * 0.25, ringStep * 0.2);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = '#ffb703';
-        ctx.beginPath();
-        ctx.arc(-ringStep * 0.15, 0, 3, 0, 2 * Math.PI);
-        ctx.arc(ringStep * 0.15, 0, 3, 0, 2 * Math.PI);
-        ctx.fill();
-
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(-ringStep * 0.15, 0, 1.5, 0, 2 * Math.PI);
-        ctx.arc(ringStep * 0.15, 0, 1.5, 0, 2 * Math.PI);
-        ctx.fill();
-
-        ctx.fillStyle = '#1b4d2e';
-        ctx.beginPath();
-        ctx.arc(-ringStep * 0.05, -ringStep * 0.35, 1, 0, 2 * Math.PI);
-        ctx.arc(ringStep * 0.05, -ringStep * 0.35, 1, 0, 2 * Math.PI);
-        ctx.fill();
-
-      } else {
-        const segRadius = Math.max(ringStep * 0.28, 4);
-
-        ctx.fillStyle = (i % 2 === 0) ? '#40916c' : '#52b788';
-        ctx.beginPath();
-        ctx.arc(0, 0, segRadius, 0, 2 * Math.PI);
-        ctx.fill();
-
-        ctx.fillStyle = '#1b4d2e';
-        ctx.beginPath();
-        ctx.moveTo(0, -segRadius - 3);
-        ctx.lineTo(-3, -segRadius + 2);
-        ctx.lineTo(3, -segRadius + 2);
-        ctx.closePath();
-        ctx.fill();
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var lastY = -1e9;
+    view.list.forEach(function (k) {
+      var y = cy - k.r + 13;
+      if (k.i === sel || y - lastY >= 15) {
+        ctx.fillStyle = k.i === sel ? '#ffffff' : 'hsl(' + hue(k.i) + ',80%,70%)';
+        ctx.fillText(items[k.i].n, cx, y);
+        lastY = y;
       }
+    });
 
-      ctx.restore();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#9aa3b5';
+    ctx.fillText('View width: ' + fmt(view.D), 10, 14);
+  }
+
+  function step() {
+    raf = 0;
+    var diff = target - cur;
+    if (Math.abs(diff) < 1e-3) {
+      cur = target;
+    } else {
+      cur += diff * 0.15;
+    }
+    draw();
+    if (cur !== target) { go(); }
+  }
+
+  function go() {
+    if (!raf) { raf = requestAnimationFrame(step); }
+  }
+
+  function updateUi() {
+    var s = selIndex(target);
+    var o = items[s];
+    nameEl.textContent = o.n;
+    sizeEl.textContent = 'Diameter \u2248 ' + fmt(o.d);
+    rel1.textContent = s > 0 ? num(o.d / items[s - 1].d) + '\u00d7 larger than ' + items[s - 1].n : '';
+    rel2.textContent = s < items.length - 1 ? items[s + 1].n + ' is ' + num(items[s + 1].d / o.d) + '\u00d7 larger' : '';
+    zoom.value = target;
+    Array.prototype.forEach.call(chipsEl.children, function (b, i) {
+      b.classList.toggle('on', i === s);
+    });
+    var chip = chipsEl.children[s];
+    chipsEl.scrollLeft = chip.offsetLeft - chipsEl.clientWidth / 2 + chip.offsetWidth / 2;
+  }
+
+  function sync() {
+    updateUi();
+    go();
+  }
+
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    w = r.width;
+    h = r.height;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function stepTo(dir) {
+    var found = -1;
+    if (dir < 0) {
+      items.forEach(function (o, i) { if (zFor(i) < target - 0.01) { found = i; } });
+    } else {
+      for (var i = items.length - 1; i >= 0; i--) {
+        if (zFor(i) > target + 0.01) { found = i; }
+      }
+    }
+    if (found >= 0) {
+      target = zFor(found);
+      sync();
     }
   }
+
+  items.forEach(function (o, i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = o.n;
+    b.addEventListener('click', function () {
+      target = zFor(i);
+      sync();
+    });
+    chipsEl.appendChild(b);
+  });
+
+  zoom.min = ZMIN;
+  zoom.max = ZMAX;
+  zoom.step = 'any';
+  zoom.addEventListener('input', function () {
+    target = cur = clamp(parseFloat(zoom.value));
+    sync();
+  });
+
+  document.getElementById('smaller').addEventListener('click', function () { stepTo(-1); });
+  document.getElementById('larger').addEventListener('click', function () { stepTo(1); });
+
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    target = cur = clamp(target + e.deltaY * 0.002);
+    sync();
+  }, { passive: false });
+
+  // tapping a ring selects the object it represents
+  cv.addEventListener('click', function (e) {
+    var r = cv.getBoundingClientRect();
+    var dist = Math.hypot(e.clientX - r.left - w / 2, e.clientY - r.top - h / 2);
+    var best = null;
+    rings().list.forEach(function (k) {
+      if (best === null || Math.abs(k.r - dist) < Math.abs(best.r - dist)) { best = k; }
+    });
+    if (best !== null && Math.abs(best.r - dist) <= 14) {
+      target = zFor(best.i);
+      sync();
+    }
+  });
+
+  window.addEventListener('resize', resize);
+  resize();
+  updateUi();
 })();
