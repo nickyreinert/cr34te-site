@@ -3,25 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scale of the Universe</title>
+<title>Critter</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main>
-  <div id="stage"><canvas id="view"></canvas></div>
-  <section id="info">
-    <h1 id="name"></h1>
-    <p id="size"></p>
-    <p class="rel" id="rel1"></p>
-    <p class="rel" id="rel2"></p>
-  </section>
-  <div id="controls">
-    <button id="smaller" type="button">&#9664; Smaller</button>
-    <input id="zoom" type="range" aria-label="Zoom level (logarithmic)">
-    <button id="larger" type="button">Larger &#9654;</button>
+<canvas id="gpu"></canvas>
+<canvas id="flat" hidden></canvas>
+<div id="hud">
+  <div id="top">
+    <div id="who"></div>
+    <div id="score"></div>
+    <button id="egg" type="button">New egg</button>
   </div>
-  <div id="chips"></div>
-</main>
+  <div id="zz" hidden>Zzz</div>
+  <div id="bottom">
+    <div id="msg"></div>
+    <div id="bars">
+      <div class="bar"><span>Food</span><div class="track"><i id="b0"></i></div></div>
+      <div class="bar"><span>Fun</span><div class="track"><i id="b1"></i></div></div>
+      <div class="bar"><span>Rest</span><div class="track"><i id="b2"></i></div></div>
+      <div class="bar"><span>Clean</span><div class="track"><i id="b3"></i></div></div>
+    </div>
+    <div id="btns">
+      <button id="feed" type="button">Feed</button>
+      <button id="play" type="button">Play</button>
+      <button id="wash" type="button">Clean</button>
+      <button id="rest" type="button">Sleep</button>
+    </div>
+  </div>
+</div>
 <script src="script.js"></script>
 </body>
 </html>
