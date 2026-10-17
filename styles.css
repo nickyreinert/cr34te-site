@@ -92,6 +92,7 @@ body {
   background: rgba(11, 26, 16, 0.82);
   backdrop-filter: blur(2px);
   border-radius: 12px;
+  pointer-events: auto;
 }
 
 #overlay.active {
