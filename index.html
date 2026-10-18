@@ -3,35 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Critter</title>
+<title>Life Lab</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<canvas id="gpu"></canvas>
-<canvas id="flat" hidden></canvas>
-<div id="hud">
-  <div id="top">
-    <div id="who"></div>
-    <div id="score"></div>
-    <button id="egg" type="button">New egg</button>
-  </div>
-  <div id="zz" hidden>Zzz</div>
-  <div id="bottom">
-    <div id="msg"></div>
-    <div id="bars">
-      <div class="bar"><span>Food</span><div class="track"><i id="b0"></i></div></div>
-      <div class="bar"><span>Fun</span><div class="track"><i id="b1"></i></div></div>
-      <div class="bar"><span>Rest</span><div class="track"><i id="b2"></i></div></div>
-      <div class="bar"><span>Clean</span><div class="track"><i id="b3"></i></div></div>
+<main>
+  <section id="stage">
+    <canvas id="board"></canvas>
+    <div id="hint">Draw with pointer. Space = play/pause (click the board first).</div>
+  </section>
+  <section id="panel">
+    <div class="row">
+      <button id="toggle">Play</button>
+      <button id="step">Step</button>
+      <button id="random">Random</button>
+      <button id="clear">Clear</button>
     </div>
-    <div id="btns">
-      <button id="feed" type="button">Feed</button>
-      <button id="play" type="button">Play</button>
-      <button id="wash" type="button">Clean</button>
-      <button id="rest" type="button">Sleep</button>
+    <label>Speed <output id="speedOut"></output>
+      <input id="speed" type="range" min="1" max="60" value="10">
+    </label>
+    <div class="grid">
+      <label>Birth (counts)
+        <input id="birth" type="text" value="3">
+      </label>
+      <label>Survive (counts)
+        <input id="survive" type="text" value="2,3">
+      </label>
+      <label>Radius <output id="radiusOut"></output>
+        <input id="radius" type="range" min="1" max="3" value="1">
+      </label>
+      <label>Max age <output id="maxAgeOut"></output>
+        <input id="maxAge" type="range" min="0" max="100" value="0">
+      </label>
+      <label>Mutation % <output id="mutOut"></output>
+        <input id="mut" type="range" min="0" max="2" step="0.05" value="0">
+      </label>
+      <label>Cell size <output id="cellOut"></output>
+        <input id="cell" type="range" min="4" max="20" value="8">
+      </label>
     </div>
-  </div>
-</div>
+    <div class="row">
+      <label class="check"><input id="wrap" type="checkbox" checked> Wrap edges</label>
+      <label class="check"><input id="ageColor" type="checkbox" checked> Color by age</label>
+    </div>
+    <dl id="stats">
+      <dt>Generation</dt><dd id="sGen">0</dd>
+      <dt>Alive</dt><dd id="sAlive">0</dd>
+      <dt>Born / Died</dt><dd id="sFlow">0 / 0</dd>
+      <dt>Peak alive</dt><dd id="sPeak">0</dd>
+      <dt>Avg / Oldest age</dt><dd id="sAge">0 / 0</dd>
+    </dl>
+  </section>
+</main>
 <script src="script.js"></script>
 </body>
 </html>
