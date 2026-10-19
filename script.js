@@ -1,63 +1,109 @@
-// Brick toy: tap to aim a batch of random bricks. Flat landings build a combo, combos earn laser, bomb and gold bricks, full rows clear, and a big pile explodes for a payout.
+// Brick Dino: drop bricks, then remove same-colored groups for points. Reach the round target to pick an upgrade; a dino eats whatever is left.
 (function () {
   'use strict';
 
-  var COLS = 12;        // studs across the build area
-  var ROWS = 11;        // max brick rows in the pile
-  var BATCH = 4;        // bricks dropped per tap
-  var MAX_BRICKS = 16;  // pile size that makes the next tap an explosion
-  var ASPECT = 1.2;     // brick height relative to one stud width
+  var COLS = 12;          // studs across the build area
+  var ROWS = 11;          // max brick rows in the pile
+  var BATCH = 4;          // bricks dropped per build tap
+  var ASPECT = 1.2;       // brick height relative to one stud width
   var WIDTHS = [1, 2, 2, 2, 3, 4];
-  var FALL_G = 70;      // gravity for falling bricks, rows per second squared
-  var DEBRIS_G = 50;    // gravity for exploded bricks, studs per second squared
-  var FX_LIFE = 0.35;   // seconds a beam or ring stays visible
-  var SCALE = [0, 2, 4, 7, 9];  // pentatonic semitone steps for the combo notes
+  var FALL_G = 70;        // gravity for falling bricks, rows per second squared
+  var DEBRIS_G = 50;      // gravity for flying bricks, studs per second squared
+  var SCALE = [0, 2, 4, 7, 9];  // pentatonic semitone steps for group notes
+  var DINO_SPEED = 8;     // studs per second
+  var DINO_BOOST = 24;    // studs per second after a tap
+  var DINO_LEN = 3.4;     // studs from the dino's origin to its mouth
   var PALETTE = [
     { base: '#d01012', light: '#ee4a4c', dark: '#8a0a0c' },
     { base: '#0055bf', light: '#3f85e0', dark: '#003a85' },
     { base: '#f2cd37', light: '#fae27a', dark: '#b8960f' },
     { base: '#237841', light: '#4da56a', dark: '#154d29' },
-    { base: '#fe8a18', light: '#ffb15c', dark: '#b85d05' },
-    { base: '#f2f3f2', light: '#ffffff', dark: '#a9adaa' },
-    { base: '#a5ca18', light: '#c8e55a', dark: '#6f8c0a' },
     { base: '#923978', light: '#bf6aa3', dark: '#62214f' }
   ];
-  // Perk bricks are earned every 5 combo, in this order
-  var PERK_ORDER = ['laser', 'bomb', 'gold'];
-  var PERKS = {
-    laser: { label: 'LASER', pal: { base: '#ff2a2a', light: '#ff9a9a', dark: '#8a0000' } },
-    bomb: { label: 'BOMB', pal: { base: '#2b2b33', light: '#ff9030', dark: '#000000' } },
-    gold: { label: 'GOLD', pal: { base: '#ffd21f', light: '#fff2a0', dark: '#b8860b' } }
-  };
+  var WILD_PAL = { base: '#f2f3f2', light: '#ffffff', dark: '#a9adaa' };
 
   var stage = document.getElementById('stage');
   var canvas = document.getElementById('view');
-  var hint = document.getElementById('hint');
   var ctx = canvas.getContext('2d');
 
-  // Bricks in the pile or still falling: { col, w, row, y, vy, delay, pal, kind, perfect, fresh }
+  // Bricks in the pile or still falling: { col, w, row, y, vy, delay, ci, wild, pal }
   var bricks = [];
-  var debris = [];  // exploded bricks: { x, y, n, pal, a, vx, vy, spin }
+  var debris = [];  // flying bricks: { x, y, n, pal, a, vx, vy, spin }
   var popups = [];  // floating text: { s, x, y, life, size, color }
-  var fx = [];      // beams and rings: { kind, x, y, life, color }
-  var perks = [];   // earned perk bricks waiting for the next batch
   var tops = [];    // number of filled rows per column
-  var score = 0;
-  var combo = 0;
-  var best = 0;     // session best, kept in memory only because storage is blocked
+  var choices = []; // upgrade options while the pick screen is open
+  var dino = null;  // set while the dino runs: { x, mouth, boost }
+  var lost = false;
+
+  // Run and round state, set by newGame and startRound
+  var level = 1;
+  var bestLevel = 0;  // session best, kept in memory only because storage is blocked
+  var roundScore = 0;
+  var target = 0;
+  var buildTaps = 5;
+  var removeTaps = 5;
+  var buildLeft = 0;
+  var removeLeft = 0;
+  var colorCount = 5;
+  var uniform = false;
+  var wildChance = 0;
+  var sweepLevel = 0;
+  var sweepsLeft = 0;
+
   var view = { w: 0, h: 0, u: 0, bh: 0, ox: 0, floorY: 0, plate: 0 };
   var last = null;
+  var clock = 0;
 
   for (var i = 0; i < COLS; i++) {
     tops.push(0);
   }
+
+  // Upgrades offered after a cleared round
+  var UPGRADES = [
+    {
+      name: 'Color focus',
+      desc: 'One color fewer in the drops',
+      ok: function () { return colorCount > 2; },
+      apply: function () { colorCount--; }
+    },
+    {
+      name: 'Uniform',
+      desc: 'Each drop uses one brick width',
+      ok: function () { return !uniform; },
+      apply: function () { uniform = true; }
+    },
+    {
+      name: 'Wild bricks',
+      desc: 'Rainbow bricks connect to anything',
+      ok: function () { return wildChance < 0.4; },
+      apply: function () { wildChance += 0.1; }
+    },
+    {
+      name: 'Extra drop',
+      desc: '+1 drop tap every round',
+      ok: function () { return true; },
+      apply: function () { buildTaps++; }
+    },
+    {
+      name: 'Extra removal',
+      desc: '+1 removal tap every round',
+      ok: function () { return true; },
+      apply: function () { removeTaps++; }
+    },
+    {
+      name: 'Color sweep',
+      desc: 'First removal each round takes a color',
+      ok: function () { return sweepLevel < 3; },
+      apply: function () { sweepLevel++; }
+    }
+  ];
 
   function rand(n) {
     return Math.floor(Math.random() * n);
   }
 
   var audio = null;  // created on the first tap because browsers require a user gesture
-  var noise = null;  // one second of white noise reused for clacks and the explosion
+  var noise = null;  // one second of white noise reused for clacks and chomps
 
   function initAudio() {
     if (audio) {
@@ -126,43 +172,33 @@
     }
   }
 
-  // Perfect landing: a pentatonic note that climbs with the combo
-  function soundNote(c) {
+  // Group removed: one rising note per brick, so big groups sound bigger
+  function soundPop(n) {
     if (audio) {
-      var step = c - 1;
-      var semi = SCALE[step % SCALE.length] + 12 * Math.min(2, Math.floor(step / SCALE.length));
-      var f = 330 * Math.pow(2, semi / 12);
-      burst('bandpass', 3000, 1500, 0.05, 0.2);
-      blip(f, f * 0.99, 0.18, 0.14);
+      for (var k = 0; k < Math.min(n, 8); k++) {
+        var f = 330 * Math.pow(2, (SCALE[k % SCALE.length] + 12 * Math.floor(k / SCALE.length)) / 12);
+        blip(f, f * 0.99, 0.15, 0.12, k * 0.05);
+      }
     }
   }
 
-  // Imperfect landing: dull thunk, combo lost
+  function soundMiss() {
+    if (audio) {
+      blip(200, 150, 0.06, 0.1);
+    }
+  }
+
+  function soundChomp() {
+    if (audio) {
+      burst('bandpass', 800, 300, 0.07, 0.3);
+      blip(240, 110, 0.09, 0.25);
+    }
+  }
+
   function soundThunk() {
     if (audio) {
-      burst('lowpass', 900, 150, 0.08, 0.3);
-      blip(170, 90, 0.1, 0.2);
-    }
-  }
-
-  function soundReady() {
-    if (audio) {
-      blip(880, 880, 0.1, 0.14);
-      blip(1320, 1320, 0.15, 0.14, 0.09);
-    }
-  }
-
-  function soundLaser() {
-    if (audio) {
-      blip(2000, 150, 0.4, 0.2);
-      burst('bandpass', 5000, 600, 0.4, 0.25);
-    }
-  }
-
-  function soundBomb() {
-    if (audio) {
-      burst('lowpass', 2500, 100, 0.45, 0.4);
-      blip(130, 40, 0.35, 0.35);
+      burst('lowpass', 900, 150, 0.2, 0.4);
+      blip(170, 60, 0.3, 0.3);
     }
   }
 
@@ -171,14 +207,6 @@
       blip(660, 660, 0.2, 0.14);
       blip(880, 880, 0.2, 0.14, 0.08);
       blip(1320, 1320, 0.3, 0.14, 0.16);
-    }
-  }
-
-  function soundBoom() {
-    if (audio) {
-      burst('lowpass', 3000, 80, 0.7, 0.45);
-      blip(140, 35, 0.5, 0.4);
-      burst('highpass', 4000, 1000, 0.15, 0.15);
     }
   }
 
@@ -204,7 +232,7 @@
     popups.push({ s: s, x: x, y: y, life: 1, size: size, color: color });
   }
 
-  // Pixel center of a brick at its current rows
+  // Pixel center of a brick at its current position
   function centerOf(b) {
     return {
       x: view.ox + (b.col + b.w / 2) * view.u,
@@ -212,9 +240,8 @@
     };
   }
 
-  // Reserve a spot for one random brick near the aimed column; returns false if nothing fits
-  function placeBrick(delay, aim, kind) {
-    var w = WIDTHS[rand(WIDTHS.length)];
+  // Reserve a spot for one brick near the aimed column; returns false if nothing fits
+  function placeBrick(delay, aim, w, wild) {
     var pick = null;
     for (var attempt = 0; attempt < 5 && !pick; attempt++) {
       var col;
@@ -224,18 +251,12 @@
         col = Math.min(COLS - w, Math.max(0, aim - Math.floor(w / 2) + rand(3) - 1));
       }
       var row = 0;
-      var c;
-      for (c = col; c < col + w; c++) {
+      for (var c = col; c < col + w; c++) {
         row = Math.max(row, tops[c]);
       }
-      if (row >= ROWS) {
-        continue;
+      if (row < ROWS) {
+        pick = { col: col, row: row };
       }
-      var gaps = 0;
-      for (c = col; c < col + w; c++) {
-        gaps += row - tops[c];
-      }
-      pick = { col: col, row: row, gaps: gaps };
     }
     if (!pick) {
       return false;
@@ -243,6 +264,7 @@
     for (var k = pick.col; k < pick.col + w; k++) {
       tops[k] = pick.row + 1;
     }
+    var ci = wild ? -1 : rand(colorCount);
     bricks.push({
       col: pick.col,
       w: w,
@@ -250,27 +272,19 @@
       y: ROWS + 3,
       vy: 0,
       delay: delay,
-      pal: kind ? PERKS[kind].pal : PALETTE[rand(PALETTE.length)],
-      kind: kind,
-      perfect: pick.gaps === 0 || kind === 'gold',  // flat landing, gold fits anywhere
-      fresh: true                                   // scores once, on the first landing only
+      ci: ci,
+      wild: wild,
+      pal: wild ? WILD_PAL : PALETTE[ci]
     });
     return true;
   }
 
-  // Drop a batch; the first brick takes the oldest earned perk
   function spawnBatch(aim) {
-    var placed = 0;
+    var batchW = WIDTHS[rand(WIDTHS.length)];
     for (var n = 0; n < BATCH; n++) {
-      var kind = n === 0 ? perks[0] : undefined;
-      if (placeBrick(n * 0.2 + Math.random() * 0.1, aim, kind)) {
-        placed++;
-        if (kind) {
-          perks.shift();
-        }
-      }
+      var w = uniform ? batchW : WIDTHS[rand(WIDTHS.length)];
+      placeBrick(n * 0.2 + Math.random() * 0.1, aim, w, Math.random() < wildChance);
     }
-    return placed;
   }
 
   // Turn one brick into a flying piece
@@ -292,30 +306,6 @@
       vy: -(10 + Math.random() * 16) * u * power,
       spin: (Math.random() - 0.5) * 16
     });
-  }
-
-  // Blow up every brick and clear the pile
-  function explode() {
-    for (var b = 0; b < bricks.length; b++) {
-      launch(bricks[b], 1);
-    }
-    bricks.length = 0;
-    for (var c = 0; c < COLS; c++) {
-      tops[c] = 0;
-    }
-  }
-
-  // Explosion with payout: tower height times combo
-  function blow() {
-    var h = Math.max.apply(null, tops);
-    var bonus = h * 10 * Math.max(combo, 1);
-    if (bonus > 0) {
-      score += bonus;
-      best = Math.max(best, score);
-      popup('+' + bonus, view.w / 2, view.floorY - h * view.bh / 2, view.u * 1.8, '#ffd24a');
-    }
-    explode();
-    soundBoom();
   }
 
   // Recompute every brick's row bottom-up so everything above a removed brick falls down
@@ -351,103 +341,226 @@
     resettle();
   }
 
-  // A row with all studs filled by landed bricks is cleared for a bonus
-  function clearFullRows() {
-    var filled = [];
-    var r;
-    for (r = 0; r < ROWS; r++) {
-      filled.push(0);
+  // Bricks touch when they share an edge: side by side in one row, or stacked with overlapping studs
+  function touches(a, b) {
+    if (a.row === b.row) {
+      return a.col + a.w === b.col || b.col + b.w === a.col;
     }
-    bricks.forEach(function (b) {
-      if (b.y <= b.row) {
-        filled[b.row] += b.w;
-      }
-    });
-    var victims = [];
-    for (r = 0; r < ROWS; r++) {
-      if (filled[r] === COLS) {
-        var bonus = 100 * Math.max(combo, 1);
-        var rowY = view.floorY - (r + 0.5) * view.bh;
-        score += bonus;
-        popup('ROW +' + bonus, view.w / 2, rowY, view.u * 1.2, '#7dff9a');
-        fx.push({ kind: 'beam', x: 0, y: rowY, life: FX_LIFE, color: '#ffffff' });
-        soundChime();
-        victims = victims.concat(bricks.filter(function (b) {
-          return b.y <= b.row && b.row === r;
-        }));
-      }
-    }
-    if (victims.length) {
-      removeBricks(victims, 0.5);
-    }
+    return Math.abs(a.row - b.row) === 1 && a.col < b.col + b.w && b.col < a.col + a.w;
   }
 
-  // Called once each time a brick reaches its row
-  function land(b) {
-    var c = centerOf(b);
-    if (b.fresh) {
-      b.fresh = false;
-      if (b.perfect) {
-        combo++;
-        var gain = 10 * combo * (b.kind === 'gold' ? 5 : 1);
-        score += gain;
-        popup('+' + gain, c.x, c.y, view.u * 0.9, b.kind === 'gold' ? '#ffd21f' : '#ffffff');
-        soundNote(combo);
-        if (combo % 5 === 0) {
-          var earned = PERK_ORDER[(combo / 5 - 1) % PERK_ORDER.length];
-          perks.push(earned);
-          popup(PERKS[earned].label + ' READY', view.w / 2, view.u * 3.6, view.u * 1.1, '#ffa030');
-          soundReady();
+  // Same color connects; wild bricks connect to anything
+  function matches(a, b) {
+    return a.wild || b.wild || a.ci === b.ci;
+  }
+
+  // All bricks connected to start through touching, matching bricks
+  function groupOf(start) {
+    var group = [start];
+    for (var i = 0; i < group.length; i++) {
+      for (var j = 0; j < bricks.length; j++) {
+        var b = bricks[j];
+        if (group.indexOf(b) === -1 && touches(group[i], b) && matches(group[i], b)) {
+          group.push(b);
         }
-      } else {
-        combo = 0;
-        soundThunk();
       }
-      var victims = [];
-      if (b.kind === 'laser') {
-        victims = bricks.filter(function (x) {
-          return x.y <= x.row && x.row === b.row;
-        });
-        fx.push({ kind: 'beam', x: 0, y: c.y, life: FX_LIFE, color: '#ff4040' });
-        soundLaser();
-      } else if (b.kind === 'bomb') {
-        victims = bricks.filter(function (x) {
-          return x.y <= x.row && Math.abs(x.row - b.row) <= 2 &&
-            x.col <= b.col + b.w + 1 && x.col + x.w - 1 >= b.col - 2;
-        });
-        fx.push({ kind: 'ring', x: c.x, y: c.y, life: FX_LIFE, color: '#ffa030' });
-        soundBomb();
-      }
-      if (victims.length) {
-        var pts = 20 * Math.max(combo, 1) * victims.length;
-        score += pts;
-        popup('+' + pts, c.x, c.y - view.u * 1.2, view.u * 1.1, '#ff9a9a');
-        removeBricks(victims, 0.7);
-      }
-    } else {
-      soundClack(b.w);
     }
-    clearFullRows();
-    best = Math.max(best, score);
+    return group;
   }
 
-  // One tap: explode first if the pile is big, then always drop a new batch near the aimed column
-  function tap(aim) {
-    initAudio();
-    if (bricks.length >= MAX_BRICKS || Math.max.apply(null, tops) >= ROWS - 1) {
-      blow();
-    } else {
-      soundTap();
+  // Brick drawn at a pixel position, or null
+  function brickAt(px, py) {
+    var col = Math.floor((px - view.ox) / view.u);
+    var rowF = (view.floorY - py) / view.bh;
+    for (var i = 0; i < bricks.length; i++) {
+      var b = bricks[i];
+      if (col >= b.col && col < b.col + b.w && rowF >= b.y && rowF < b.y + 1) {
+        return b;
+      }
     }
-    if (spawnBatch(aim) === 0) {
-      blow();
-      spawnBatch(aim);
+    return null;
+  }
+
+  // Brick that belongs to the biggest group, used when there is no pointer position
+  function bestBrick() {
+    var top = null;
+    var topN = 0;
+    for (var i = 0; i < bricks.length; i++) {
+      var n = groupOf(bricks[i]).length;
+      if (n > topN) {
+        top = bricks[i];
+        topN = n;
+      }
+    }
+    return top;
+  }
+
+  // True when every brick has landed
+  function settled() {
+    for (var i = 0; i < bricks.length; i++) {
+      if (bricks[i].delay > 0 || bricks[i].y > bricks[i].row) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function startRound() {
+    roundScore = 0;
+    target = 200 + 150 * (level - 1);
+    buildLeft = buildTaps;
+    removeLeft = removeTaps;
+    sweepsLeft = sweepLevel;
+    bestLevel = Math.max(bestLevel, level);
+  }
+
+  function newGame() {
+    level = 1;
+    buildTaps = 5;
+    removeTaps = 5;
+    colorCount = 5;
+    uniform = false;
+    wildChance = 0;
+    sweepLevel = 0;
+    lost = false;
+    startRound();
+  }
+
+  // Win: offer three random upgrades. Lose: game over.
+  function endRound() {
+    if (roundScore >= target) {
+      var pool = UPGRADES.filter(function (g) {
+        return g.ok();
+      });
+      while (choices.length < 3 && pool.length) {
+        choices.push(pool.splice(rand(pool.length), 1)[0]);
+      }
+      soundChime();
+    } else {
+      lost = true;
+      soundThunk();
+    }
+  }
+
+  function startDino() {
+    dino = {
+      x: view.ox - 4 * view.u,
+      mouth: view.ox - 4 * view.u + DINO_LEN * view.u,
+      boost: false
+    };
+  }
+
+  // Move the dino and eat the bottom two rows of whatever its mouth sweeps over
+  function runDino(dt) {
+    var u = view.u;
+    var prev = dino.mouth;
+    dino.x += u * (dino.boost ? DINO_BOOST : DINO_SPEED) * dt;
+    dino.mouth = dino.x + DINO_LEN * u;
+    var eaten = bricks.filter(function (b) {
+      var left = view.ox + b.col * u;
+      return b.y <= b.row && b.row <= 1 && left < dino.mouth && left + b.w * u > prev;
+    });
+    if (eaten.length) {
+      soundChomp();
+      removeBricks(eaten, 0.35);
+    }
+    if (dino.x > view.ox + (COLS + 1) * u) {
+      if (bricks.length) {
+        // Leftovers fell down behind it: run another pass
+        dino.x = view.ox - 4 * u;
+        dino.mouth = dino.x + DINO_LEN * u;
+      } else {
+        dino = null;
+      }
+    }
+  }
+
+  function cardRects() {
+    var u = view.u;
+    var w = Math.min(view.w - 24, u * 22);
+    var h = u * 2.8;
+    var gap = u * 0.5;
+    var total = choices.length * h + (choices.length - 1) * gap;
+    var top = (view.h - total) / 2 + u;
+    var rects = [];
+    for (var i = 0; i < choices.length; i++) {
+      rects.push({ x: (view.w - w) / 2, y: top + i * (h + gap), w: w, h: h });
+    }
+    return rects;
+  }
+
+  // Tap on a card takes that upgrade and starts the next level; without a pointer the first card is taken
+  function pickChoice(px, py) {
+    var rects = cardRects();
+    for (var i = 0; i < choices.length; i++) {
+      var r = rects[i];
+      var hit = px === null ? i === 0 : px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+      if (hit) {
+        choices[i].apply();
+        choices = [];
+        level++;
+        startRound();
+        soundTap();
+        return;
+      }
+    }
+  }
+
+  // Build tap: drop a batch near the tapped column
+  function build(px) {
+    var aim = null;
+    if (px !== null) {
+      aim = Math.min(COLS - 1, Math.max(0, Math.floor((px - view.ox) / view.u)));
+    }
+    soundTap();
+    spawnBatch(aim);
+    buildLeft--;
+  }
+
+  // Remove tap: take the tapped brick's group (or all of its color while a sweep is left)
+  function remove(px, py) {
+    var hit = px === null ? bestBrick() : brickAt(px, py);
+    if (!hit) {
+      soundMiss();
+      return;
+    }
+    var group;
+    if (sweepsLeft > 0) {
+      sweepsLeft--;
+      group = bricks.filter(function (b) {
+        return b.wild || b.ci === hit.ci;
+      });
+    } else {
+      group = groupOf(hit);
+    }
+    var pts = group.length * group.length * 10;
+    var c = centerOf(hit);
+    roundScore += pts;
+    popup('+' + pts, c.x, c.y, view.u * (0.9 + Math.min(group.length, 8) * 0.1), '#ffd24a');
+    soundPop(group.length);
+    removeLeft--;
+    removeBricks(group, 0.7);
+  }
+
+  // One tap does whatever the current state asks for
+  function tap(px, py) {
+    initAudio();
+    if (lost) {
+      newGame();
+    } else if (choices.length) {
+      pickChoice(px, py);
+    } else if (dino) {
+      dino.boost = true;
+    } else if (buildLeft > 0) {
+      build(px);
+    } else if (removeLeft > 0) {
+      remove(px, py);
     }
   }
 
   function update(dt) {
     var i;
-    var landed = [];
+    clock += dt;
     for (i = 0; i < bricks.length; i++) {
       var b = bricks[i];
       if (b.delay > 0) {
@@ -460,15 +573,20 @@
         if (b.y <= b.row) {
           b.y = b.row;
           b.vy = 0;
-          landed.push(b);
+          soundClack(b.w);
         }
       }
     }
-    // Handled after the loop because landings can remove bricks
-    for (i = 0; i < landed.length; i++) {
-      if (bricks.indexOf(landed[i]) !== -1) {
-        land(landed[i]);
+    // The round ends once all drops are made and everything has landed
+    if (!dino && !lost && !choices.length && buildLeft === 0 && settled()) {
+      if (bricks.length === 0) {
+        endRound();
+      } else if (removeLeft === 0) {
+        startDino();
       }
+    }
+    if (dino) {
+      runDino(dt);
     }
     for (i = debris.length - 1; i >= 0; i--) {
       var d = debris[i];
@@ -485,12 +603,6 @@
       popups[i].life -= dt;
       if (popups[i].life <= 0) {
         popups.splice(i, 1);
-      }
-    }
-    for (i = fx.length - 1; i >= 0; i--) {
-      fx[i].life -= dt;
-      if (fx[i].life <= 0) {
-        fx.splice(i, 1);
       }
     }
   }
@@ -520,6 +632,76 @@
     }
   }
 
+  function fillEllipse(cx, cy, rx, ry) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Green dinosaur facing right; its origin is the bottom-left of the body
+  function drawDino() {
+    var u = view.u;
+    var t = clock * 12;
+    var bob = Math.abs(Math.sin(t)) * u * 0.15;
+    var leg = Math.sin(t) * u * 0.25;
+    var open = (Math.sin(clock * 14) + 1) / 2;
+    ctx.save();
+    ctx.translate(dino.x, view.floorY - bob);
+    ctx.fillStyle = '#2f9e6a';
+    ctx.beginPath();
+    ctx.moveTo(0, -u * 1.3);
+    ctx.lineTo(-u * 1.6, -u * 0.5);
+    ctx.lineTo(0, -u * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#23805a';
+    ctx.fillRect(u * 0.4 + leg, -u * 0.6, u * 0.45, u * 0.6);
+    ctx.fillRect(u * 1.4 - leg, -u * 0.6, u * 0.45, u * 0.6);
+    ctx.fillStyle = '#2f9e6a';
+    fillEllipse(u * 1.2, -u * 1.2, u * 1.3, u * 0.8);
+    ctx.fillStyle = '#bfe8a8';
+    fillEllipse(u * 1.5, -u * 1.0, u * 0.9, u * 0.5);
+    ctx.fillStyle = '#ff9a2a';
+    for (var p = 0; p < 3; p++) {
+      var px = u * (0.5 + p * 0.55);
+      ctx.beginPath();
+      ctx.moveTo(px, -u * 1.85);
+      ctx.lineTo(px + u * 0.25, -u * 2.3);
+      ctx.lineTo(px + u * 0.5, -u * 1.9);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = '#2f9e6a';
+    fillEllipse(u * 2.5, -u * 1.9, u * 0.8, u * 0.65);
+    ctx.fillRect(u * 2.6, -u * 2.25, u * 0.8, u * 0.4);
+    ctx.fillStyle = '#23805a';
+    ctx.fillRect(u * 2.6, -u * 1.7 + open * u * 0.3, u * 0.8, u * 0.3);
+    ctx.fillStyle = '#ffffff';
+    fillEllipse(u * 2.45, -u * 2.15, u * 0.2, u * 0.2);
+    ctx.fillStyle = '#000000';
+    fillEllipse(u * 2.52, -u * 2.15, u * 0.1, u * 0.1);
+    ctx.restore();
+  }
+
+  function phaseText() {
+    if (lost) {
+      return 'Game over';
+    }
+    if (choices.length) {
+      return 'Pick an upgrade';
+    }
+    if (dino) {
+      return 'Dino time: tap to hurry it';
+    }
+    if (buildLeft > 0) {
+      return 'Drops left ' + buildLeft + ': tap to aim';
+    }
+    if (removeLeft > 0) {
+      return 'Removals left ' + removeLeft + (sweepsLeft > 0 ? ': SWEEP, tap a color' : ': tap a brick');
+    }
+    return '';
+  }
+
   function draw() {
     var u = view.u;
     ctx.clearRect(0, 0, view.w, view.h);
@@ -539,12 +721,15 @@
     var i;
     for (i = 0; i < bricks.length; i++) {
       var b = bricks[i];
-      if (b.kind) {
-        ctx.shadowColor = b.pal.light;
+      if (b.wild) {
+        ctx.shadowColor = 'hsl(' + Math.round((clock * 200) % 360) + ',90%,60%)';
         ctx.shadowBlur = u * 0.8;
       }
       drawBrick(view.ox + b.col * u, view.floorY - (b.y + 1) * view.bh, b.w, b.pal);
       ctx.shadowBlur = 0;
+    }
+    if (dino) {
+      drawDino();
     }
     for (i = 0; i < debris.length; i++) {
       var d = debris[i];
@@ -554,24 +739,6 @@
       drawBrick(-d.n * u / 2, -view.bh / 2, d.n, d.pal);
       ctx.restore();
     }
-
-    // Beams and rings
-    for (i = 0; i < fx.length; i++) {
-      var f = fx[i];
-      var k = f.life / FX_LIFE;
-      ctx.globalAlpha = k;
-      if (f.kind === 'beam') {
-        ctx.fillStyle = f.color;
-        ctx.fillRect(0, f.y - u * 0.25, view.w, u * 0.5);
-      } else {
-        ctx.strokeStyle = f.color;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(f.x, f.y, u * (1 + (1 - k) * 3), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-    ctx.globalAlpha = 1;
 
     // Floating text
     ctx.textAlign = 'center';
@@ -585,24 +752,62 @@
     }
     ctx.globalAlpha = 1;
 
-    // HUD
     var fs = Math.max(11, Math.round(u * 0.55));
+
+    // Upgrade pick screen
+    if (choices.length) {
+      var rects = cardRects();
+      ctx.fillStyle = 'rgba(20, 24, 32, 0.85)';
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#7dff9a';
+      ctx.font = 'bold ' + Math.round(fs * 1.4) + 'px system-ui, sans-serif';
+      ctx.fillText('Level ' + level + ' cleared', view.w / 2, rects[0].y - u * 0.9);
+      for (i = 0; i < choices.length; i++) {
+        var r = rects[i];
+        ctx.fillStyle = '#2d3340';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = '#4f5a6e';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(r.x, r.y, r.w, r.h);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold ' + fs + 'px system-ui, sans-serif';
+        ctx.fillText(choices[i].name, r.x + u * 0.7, r.y + r.h * 0.32);
+        ctx.fillStyle = '#aab3c2';
+        ctx.font = Math.max(10, Math.round(fs * 0.85)) + 'px system-ui, sans-serif';
+        ctx.fillText(choices[i].desc, r.x + u * 0.7, r.y + r.h * 0.7);
+      }
+    }
+
+    // Game over screen
+    if (lost) {
+      ctx.fillStyle = 'rgba(20, 24, 32, 0.85)';
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ff6b6b';
+      ctx.font = 'bold ' + Math.round(u * 1.6) + 'px system-ui, sans-serif';
+      ctx.fillText('GAME OVER', view.w / 2, view.h / 2 - u);
+      ctx.fillStyle = '#c8cfdb';
+      ctx.font = 'bold ' + fs + 'px system-ui, sans-serif';
+      ctx.fillText('Reached level ' + level + '  (' + roundScore + ' / ' + target + ')', view.w / 2, view.h / 2 + u * 0.6);
+      ctx.fillText('Tap to restart', view.w / 2, view.h / 2 + u * 1.8);
+    }
+
+    // HUD
     ctx.font = 'bold ' + fs + 'px system-ui, sans-serif';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#c8cfdb';
     ctx.textAlign = 'left';
-    ctx.fillText('Score ' + score, 12, 8);
+    ctx.fillText('Lv ' + level, 12, 8);
     ctx.textAlign = 'right';
-    ctx.fillText('Best ' + best, view.w - 12, 8);
+    ctx.fillText('Best Lv ' + bestLevel, view.w - 12, 8);
     ctx.textAlign = 'center';
-    ctx.fillStyle = combo >= 5 ? '#ffa030' : '#c8cfdb';
-    ctx.fillText('Combo x' + combo, view.w / 2, 8);
-    if (perks.length) {
-      ctx.fillStyle = '#ffa030';
-      ctx.fillText('next: ' + PERKS[perks[0]].label, view.w / 2, 8 + fs * 1.3);
-    }
-
-    hint.style.opacity = (bricks.length || debris.length) ? '0' : '1';
+    ctx.fillText('Score ' + roundScore + ' / ' + target, view.w / 2, 8);
+    ctx.fillStyle = '#ffa030';
+    ctx.fillText(phaseText(), view.w / 2, 8 + fs * 1.3);
   }
 
   function frame(t) {
@@ -613,23 +818,23 @@
     requestAnimationFrame(frame);
   }
 
-  // Tap position picks the column the batch drops near
+  // Tap position picks the drop column, the brick to remove, or the upgrade card
   document.addEventListener('pointerdown', function (e) {
     var rect = stage.getBoundingClientRect();
-    var col = Math.floor((e.clientX - rect.left - view.ox) / view.u);
-    tap(Math.min(COLS - 1, Math.max(0, col)));
+    tap(e.clientX - rect.left, e.clientY - rect.top);
   });
-  // Keyboard has no pointer position, so the drop is random
+  // Keyboard has no pointer position: random drops, biggest group, first upgrade
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' || e.code === 'Enter') {
       e.preventDefault();
       if (!e.repeat) {
-        tap(null);
+        tap(null, null);
       }
     }
   });
   window.addEventListener('resize', resize);
 
+  newGame();
   resize();
   requestAnimationFrame(frame);
 })();
