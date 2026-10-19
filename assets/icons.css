@@ -1,0 +1,45 @@
+/* Win95-style pixel icons (inline SVG) */
+.icon-box.icon-pc {
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%223%22 y=%223%22 width=%2226%22 height=%2218%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3Crect x=%226%22 y=%226%22 width=%2220%22 height=%2212%22 fill=%22%23008080%22 stroke=%22%23000%22/%3E%3Crect x=%228%22 y=%228%22 width=%228%22 height=%223%22 fill=%22%23fff%22/%3E%3Crect x=%2210%22 y=%2221%22 width=%2212%22 height=%223%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3Crect x=%224%22 y=%2224%22 width=%2224%22 height=%225%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3Crect x=%2221%22 y=%2226%22 width=%225%22 height=%221%22 fill=%22%23000%22/%3E%3C/svg%3E") center / contain no-repeat;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+.icon-box.icon-net {
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%222%22 y=%223%22 width=%2214%22 height=%2211%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3Crect x=%224%22 y=%225%22 width=%2210%22 height=%227%22 fill=%22%23008080%22/%3E%3Crect x=%2216%22 y=%2214%22 width=%2214%22 height=%2211%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3Crect x=%2218%22 y=%2216%22 width=%2210%22 height=%227%22 fill=%22%23000080%22/%3E%3Cpath d=%22M9 14v4h7M23 25v3H8v-5%22 fill=%22none%22 stroke=%22%23000%22/%3E%3Crect x=%225%22 y=%2227%22 width=%226%22 height=%223%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3C/svg%3E") center / contain no-repeat;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+.icon-box.icon-trash {
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 shape-rendering=%22crispEdges%22%3E%3Cpath d=%22M8 8h16l-2 21H10z%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3Crect x=%226%22 y=%225%22 width=%2220%22 height=%223%22 fill=%22%23c0c0c0%22 stroke=%22%23000%22/%3E%3Crect x=%2213%22 y=%223%22 width=%226%22 height=%222%22 fill=%22%23808080%22 stroke=%22%23000%22/%3E%3Cpath d=%22M12 12v13M16 12v13M20 12v13%22 stroke=%22%23808080%22/%3E%3Cpath d=%22M20 20l3 3 5-6%22 fill=%22none%22 stroke=%22%23008000%22 stroke-width=%222%22/%3E%3C/svg%3E") center / contain no-repeat;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+.icon-box.icon-winamp {
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%222%22 y=%222%22 width=%2228%22 height=%2228%22 fill=%22%23222%22 stroke=%22%23000%22/%3E%3Crect x=%224%22 y=%224%22 width=%2224%22 height=%227%22 fill=%22%23000%22 stroke=%22%23555%22/%3E%3Cpath d=%22M6 9v-3M8 9V7M10 9V5M12 9V6M14 9V8%22 stroke=%22%230f0%22/%3E%3Cpath d=%22M5 14h22v14H5z%22 fill=%22%23444%22 stroke=%22%23888%22/%3E%3Cpath d=%22M12 17l9 5-9 5z%22 fill=%22%23fc0%22/%3E%3Crect x=%2221%22 y=%225%22 width=%225%22 height=%223%22 fill=%22%23fc0%22/%3E%3C/svg%3E") center / contain no-repeat;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+.icon-box.icon-folder {
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 shape-rendering=%22crispEdges%22%3E%3Cpath d=%22M2 8h10l2 3h16v17H2z%22 fill=%22%23fc0%22 stroke=%22%23000%22/%3E%3Cpath d=%22M2 13h28%22 stroke=%22%23806000%22/%3E%3Cpath d=%22M3 14h26v13H3z%22 fill=%22%23ffe066%22/%3E%3C/svg%3E") center / contain no-repeat;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+.mini-app-icon {
+  width: 14px;
+  height: 14px;
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%222%22 y=%222%22 width=%2228%22 height=%2228%22 fill=%22%23222%22 stroke=%22%23000%22/%3E%3Crect x=%224%22 y=%224%22 width=%2224%22 height=%227%22 fill=%22%23000%22 stroke=%22%23555%22/%3E%3Cpath d=%22M6 9v-3M8 9V7M10 9V5M12 9V6M14 9V8%22 stroke=%22%230f0%22/%3E%3Cpath d=%22M5 14h22v14H5z%22 fill=%22%23444%22 stroke=%22%23888%22/%3E%3Cpath d=%22M12 17l9 5-9 5z%22 fill=%22%23fc0%22/%3E%3Crect x=%2221%22 y=%225%22 width=%225%22 height=%223%22 fill=%22%23fc0%22/%3E%3C/svg%3E") center / contain no-repeat;
+  border: 0;
+}
+.tray-vol-icon {
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 shape-rendering=%22crispEdges%22%3E%3Cpath d=%22M4 12h6l8-7v22l-8-7H4z%22 fill=%22%23000%22/%3E%3Cpath d=%22M22 11q4 5 0 10M25 8q7 8 0 16%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22/%3E%3C/svg%3E") center / contain no-repeat;
+}
