@@ -1,44 +1,484 @@
-* { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; }
-body {
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  font-family: 'MS Sans Serif', Tahoma, Geneva, sans-serif;
+  font-size: 11px;
+}
+
+body, html {
+  width: 100%;
   height: 100dvh;
-  background: #10131a;
-  color: #d8dee9;
-  font: 13px/1.3 system-ui, sans-serif;
+  overflow: hidden;
+  background-color: #008080;
 }
-main { display: flex; flex-direction: row; height: 100dvh; }
-#stage { position: relative; flex: 1; min-width: 0; min-height: 0; }
-#board { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
-#hint {
-  position: absolute; left: 8px; bottom: 6px;
-  color: #7b8494; pointer-events: none; font-size: 11px;
+
+#desktop {
+  width: 100%;
+  height: 100dvh;
+  position: relative;
+  background-color: #008080;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
-#panel {
-  width: 270px; padding: 10px; overflow-y: auto;
-  background: #181c26; border-left: 1px solid #2a3040;
-  display: flex; flex-direction: column; gap: 10px;
+
+/* Desktop Icons */
+.desktop-icon {
+  width: 75px;
+  margin: 15px 0 0 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  color: white;
+  text-shadow: 1px 1px 1px #000;
+  padding: 4px;
 }
-.row { display: flex; gap: 6px; flex-wrap: wrap; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-label { display: flex; flex-direction: column; gap: 3px; color: #9aa4b5; }
-label.check { flex-direction: row; align-items: center; gap: 5px; }
-output { color: #e5e9f0; float: right; }
-input[type=text] {
-  background: #10131a; color: #e5e9f0; border: 1px solid #2a3040;
-  border-radius: 4px; padding: 4px 6px; width: 100%;
+
+.desktop-icon:focus, .desktop-icon.active-icon {
+  outline: 1px dotted #fff;
 }
-input[type=range] { width: 100%; margin: 0; }
-button {
-  background: #2b3550; color: #e5e9f0; border: 0; border-radius: 4px;
-  padding: 6px 10px; cursor: pointer; font: inherit;
+
+.icon-box {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+  border: 2px solid #000;
+  background: #c0c0c0;
+  position: relative;
 }
-button:hover { background: #38456a; }
-#toggle { min-width: 64px; }
-dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; }
-dt { color: #9aa4b5; }
-dd { margin: 0; text-align: right; color: #e5e9f0; font-variant-numeric: tabular-nums; }
-@media (max-width: 700px) {
-  main { flex-direction: column; }
-  #panel { width: 100%; max-height: 46dvh; border-left: 0; border-top: 1px solid #2a3040; }
-  #hint { display: none; }
+
+.icon-pc {
+  background: #000080;
+  border: 3px solid #c0c0c0;
+  box-shadow: inset 0 0 0 2px #000;
+}
+
+.icon-net {
+  background: #808080;
+  border: 3px double #000;
+}
+
+.icon-trash {
+  background: #a0a0a0;
+  border-radius: 0 0 4px 4px;
+  border: 2px solid #333;
+}
+
+.icon-winamp {
+  background: #222;
+  border: 2px solid #ffcc00;
+  box-shadow: inset 0 0 4px #00ff00;
+}
+
+/* Winamp Window Styling */
+.winamp-window {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  background: #282828;
+  border: 2px solid;
+  border-color: #555 #111 #111 #555;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.6);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.winamp-titlebar {
+  background: linear-gradient(90deg, #000080, #1084d0);
+  color: #fff;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  font-weight: bold;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.titlebar-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.win-btn {
+  width: 12px;
+  height: 12px;
+  background: #c0c0c0;
+  border: 1px solid;
+  border-color: #fff #808080 #808080 #fff;
+  font-size: 8px;
+  line-height: 10px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  color: #000;
+}
+
+.winamp-body {
+  padding: 6px;
+  background: #232323;
+}
+
+/* OLED / LCD Screen Display */
+.winamp-display {
+  background: #000;
+  border: 2px solid;
+  border-color: #111 #444 #444 #111;
+  padding: 4px;
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+.display-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.track-number {
+  font-size: 16px;
+  font-weight: bold;
+  color: #00ff00;
+  text-shadow: 0 0 3px #00ff00;
+}
+
+.time-display {
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #00ff00;
+  text-shadow: 0 0 4px #00ff00;
+}
+
+.kbps-info {
+  font-size: 8px;
+  color: #008800;
+  text-align: right;
+  line-height: 1.1;
+}
+
+.kbps-info .active-info {
+  color: #00ff00;
+}
+
+.display-marquee {
+  background: #051505;
+  border: 1px solid #003300;
+  height: 16px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 4px;
+}
+
+.marquee-text {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #00ff00;
+  line-height: 14px;
+  animation: scroll-text 10s linear infinite;
+}
+
+@keyframes scroll-text {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.display-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#visualizer {
+  background: #000;
+  border: 1px solid #113311;
+}
+
+.audio-indicators {
+  display: flex;
+  gap: 4px;
+}
+
+.ind {
+  font-size: 8px;
+  color: #004400;
+  padding: 1px 3px;
+  border: 1px solid #003300;
+}
+
+.ind.active {
+  color: #00ff00;
+  background: #003300;
+  box-shadow: 0 0 2px #00ff00;
+}
+
+/* Controls */
+.winamp-mid-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.volume-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #aaa;
+  font-size: 9px;
+}
+
+.volume-container input[type="range"] {
+  width: 100px;
+  accent-color: #00ff00;
+}
+
+.eq-pl-toggles {
+  display: flex;
+  gap: 4px;
+}
+
+.toggle-btn {
+  background: #444;
+  color: #888;
+  border: 1px solid;
+  border-color: #666 #222 #222 #666;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.toggle-btn.active {
+  color: #00ff00;
+  background: #222;
+  border-color: #111 #555 #555 #111;
+}
+
+/* Transport Buttons */
+.winamp-transport {
+  display: flex;
+  justify-content: space-between;
+  background: #1a1a1a;
+  padding: 4px;
+  border: 1px solid #333;
+}
+
+.trans-btn {
+  background: linear-gradient(180deg, #555, #333);
+  color: #fff;
+  border: 1px solid;
+  border-color: #777 #111 #111 #777;
+  width: 40px;
+  height: 22px;
+  font-size: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.trans-btn:active {
+  border-color: #111 #777 #777 #111;
+  background: #222;
+}
+
+/* Sub-Windows: Equalizer & Playlist */
+.sub-window {
+  position: relative;
+  top: 0;
+  left: 0;
+  transform: none;
+  width: 100%;
+  margin-top: 2px;
+  box-shadow: none;
+}
+
+.sub-titlebar {
+  background: #333;
+  color: #aaa;
+  font-size: 8px;
+}
+
+.eq-body {
+  padding: 4px;
+  background: #202020;
+}
+
+.eq-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.eq-btn {
+  background: #444;
+  color: #fff;
+  border: 1px solid #666;
+  font-size: 8px;
+  padding: 1px 4px;
+}
+
+.eq-title {
+  color: #888;
+  font-size: 8px;
+}
+
+.eq-sliders {
+  display: flex;
+  justify-content: space-between;
+}
+
+.eq-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #666;
+  font-size: 7px;
+}
+
+.eq-band input[type="range"] {
+  writing-mode: bt-lr;
+  appearance: slider-vertical;
+  width: 12px;
+  height: 35px;
+  margin-bottom: 2px;
+  accent-color: #00ff00;
+}
+
+/* Playlist Styling */
+.pl-body {
+  background: #000;
+  border: 1px solid #333;
+  padding: 4px;
+  max-height: 75px;
+  overflow-y: auto;
+}
+
+#playlist-items {
+  list-style: none;
+}
+
+.pl-item {
+  color: #00aa00;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  padding: 2px 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pl-item.active {
+  background: #000080;
+  color: #fff;
+}
+
+.pl-item:hover {
+  color: #00ff00;
+}
+
+/* Windows 95 Taskbar */
+#taskbar {
+  height: 30px;
+  background: #c0c0c0;
+  border-top: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  gap: 4px;
+  z-index: 100;
+}
+
+#start-button {
+  height: 22px;
+  padding: 2px 6px;
+  background: #c0c0c0;
+  border: 2px solid;
+  border-color: #fff #808080 #808080 #fff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #000;
+}
+
+#start-button:active {
+  border-color: #808080 #fff #fff #808080;
+}
+
+.win-flag {
+  width: 12px;
+  height: 12px;
+  background: #000080;
+  border: 1px solid #ffcc00;
+}
+
+.taskbar-divider {
+  width: 2px;
+  height: 20px;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #fff;
+}
+
+.taskbar-tasks {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+}
+
+.task-btn {
+  height: 22px;
+  max-width: 180px;
+  background: #c0c0c0;
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: bold;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #000;
+}
+
+.mini-app-icon {
+  width: 10px;
+  height: 10px;
+  background: #00ff00;
+  border: 1px solid #000;
+}
+
+.system-tray {
+  height: 22px;
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  gap: 6px;
+  color: #000;
+}
+
+.tray-vol-icon {
+  width: 10px;
+  height: 10px;
+  background: #333;
 }

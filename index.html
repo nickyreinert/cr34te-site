@@ -1,60 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Life Lab</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Winamp - Windows 95</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main>
-  <section id="stage">
-    <canvas id="board"></canvas>
-    <div id="hint">Draw with pointer. Space = play/pause (click the board first).</div>
-  </section>
-  <section id="panel">
-    <div class="row">
-      <button id="toggle">Play</button>
-      <button id="step">Step</button>
-      <button id="random">Random</button>
-      <button id="clear">Clear</button>
+  <div id="desktop">
+    <!-- Desktop Icons -->
+    <div class="desktop-icon" tabindex="0">
+      <div class="icon-box icon-pc"></div>
+      <span>My Computer</span>
     </div>
-    <label>Speed <output id="speedOut"></output>
-      <input id="speed" type="range" min="1" max="60" value="10">
-    </label>
-    <div class="grid">
-      <label>Birth (counts)
-        <input id="birth" type="text" value="3">
-      </label>
-      <label>Survive (counts)
-        <input id="survive" type="text" value="2,3">
-      </label>
-      <label>Radius <output id="radiusOut"></output>
-        <input id="radius" type="range" min="1" max="3" value="1">
-      </label>
-      <label>Max age <output id="maxAgeOut"></output>
-        <input id="maxAge" type="range" min="0" max="100" value="0">
-      </label>
-      <label>Mutation % <output id="mutOut"></output>
-        <input id="mut" type="range" min="0" max="2" step="0.05" value="0">
-      </label>
-      <label>Cell size <output id="cellOut"></output>
-        <input id="cell" type="range" min="4" max="20" value="8">
-      </label>
+    <div class="desktop-icon" tabindex="0">
+      <div class="icon-box icon-net"></div>
+      <span>Network</span>
     </div>
-    <div class="row">
-      <label class="check"><input id="wrap" type="checkbox" checked> Wrap edges</label>
-      <label class="check"><input id="ageColor" type="checkbox" checked> Color by age</label>
+    <div class="desktop-icon" tabindex="0">
+      <div class="icon-box icon-trash"></div>
+      <span>Recycle Bin</span>
     </div>
-    <dl id="stats">
-      <dt>Generation</dt><dd id="sGen">0</dd>
-      <dt>Alive</dt><dd id="sAlive">0</dd>
-      <dt>Born / Died</dt><dd id="sFlow">0 / 0</dd>
-      <dt>Peak alive</dt><dd id="sPeak">0</dd>
-      <dt>Avg / Oldest age</dt><dd id="sAge">0 / 0</dd>
-    </dl>
-  </section>
-</main>
-<script src="script.js"></script>
+    <div class="desktop-icon active-icon" tabindex="0">
+      <div class="icon-box icon-winamp"></div>
+      <span>Winamp</span>
+    </div>
+
+    <!-- Winamp Player Window -->
+    <div id="winamp-app" class="winamp-window">
+      <!-- Title Bar -->
+      <div class="winamp-titlebar">
+        <div class="titlebar-text">WINAMP</div>
+        <div class="titlebar-controls">
+          <button class="win-btn min-btn">_</button>
+          <button class="win-btn close-btn">X</button>
+        </div>
+      </div>
+
+      <!-- Main Player Body -->
+      <div class="winamp-body">
+        <!-- Display Screen -->
+        <div class="winamp-display">
+          <div class="display-top">
+            <div class="track-number" id="track-num">01</div>
+            <div class="time-display" id="time-display">00:00</div>
+            <div class="kbps-info">
+              <span class="active-info">128</span> kbps <span class="active-info">44</span> kHz
+              <br>
+              <span id="channel-mode">STEREO</span>
+            </div>
+          </div>
+          <div class="display-marquee">
+            <div class="marquee-text" id="marquee-text">1. Hyper Rave (8-Bit 20s)</div>
+          </div>
+          <div class="display-bottom">
+            <canvas id="visualizer" width="150" height="18"></canvas>
+            <div class="audio-indicators">
+              <span id="ind-play" class="ind">PLAY</span>
+              <span id="ind-pause" class="ind">PAUSE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle Controls: Volume / Equalizer Toggles -->
+        <div class="winamp-mid-controls">
+          <div class="volume-container">
+            <label for="vol-slider">VOL</label>
+            <input type="range" id="vol-slider" min="0" max="100" value="80">
+          </div>
+          <div class="eq-pl-toggles">
+            <button id="toggle-eq" class="toggle-btn active">EQ</button>
+            <button id="toggle-pl" class="toggle-btn active">PL</button>
+          </div>
+        </div>
+
+        <!-- Main Transport Buttons Bar -->
+        <div class="winamp-transport">
+          <button id="btn-prev" class="trans-btn" title="Previous Track">|&lt;&lt;</button>
+          <button id="btn-play" class="trans-btn" title="Play">&gt;</button>
+          <button id="btn-pause" class="trans-btn" title="Pause">||</button>
+          <button id="btn-stop" class="trans-btn" title="Stop">STOP</button>
+          <button id="btn-next" class="trans-btn" title="Next Track">&gt;&gt;|</button>
+          <button id="btn-eject" class="trans-btn" title="Eject">EJT</button>
+        </div>
+      </div>
+
+      <!-- Equalizer Sub-Window -->
+      <div id="winamp-eq" class="winamp-window sub-window">
+        <div class="winamp-titlebar sub-titlebar">
+          <span>WINAMP EQUALIZER</span>
+        </div>
+        <div class="eq-body">
+          <div class="eq-presets">
+            <button class="eq-btn">ON</button>
+            <button class="eq-btn">AUTO</button>
+            <span class="eq-title">PRESETS</span>
+          </div>
+          <div class="eq-sliders">
+            <div class="eq-band"><input type="range" min="-12" max="12" value="3"><span>60</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="5"><span>170</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="2"><span>310</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="0"><span>600</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="-2"><span>1K</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="3"><span>3K</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="6"><span>6K</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="4"><span>12K</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="2"><span>14K</span></div>
+            <div class="eq-band"><input type="range" min="-12" max="12" value="1"><span>16K</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Playlist Sub-Window -->
+      <div id="winamp-pl" class="winamp-window sub-window">
+        <div class="winamp-titlebar sub-titlebar">
+          <span>WINAMP PLAYLIST</span>
+        </div>
+        <div class="pl-body">
+          <ul id="playlist-items">
+            <li class="pl-item active" data-index="0">
+              <span class="pl-num">1.</span> Hyper Rave (8-Bit) <span class="pl-time">0:20</span>
+            </li>
+            <li class="pl-item" data-index="1">
+              <span class="pl-num">2.</span> Rainbow Dreams (8-Bit) <span class="pl-time">0:20</span>
+            </li>
+            <li class="pl-item" data-index="2">
+              <span class="pl-num">3.</span> Firestarter Beat (8-Bit) <span class="pl-time">0:20</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Windows 95 Taskbar -->
+    <div id="taskbar">
+      <button id="start-button">
+        <span class="win-flag"></span>
+        <strong>Start</strong>
+      </button>
+      <div class="taskbar-divider"></div>
+      <div class="taskbar-tasks">
+        <div class="task-btn active">
+          <span class="mini-app-icon"></span>
+          Winamp - 1. Hyper Rave
+        </div>
+      </div>
+      <div class="system-tray">
+        <span class="tray-vol-icon"></span>
+        <span id="clock">12:00</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
