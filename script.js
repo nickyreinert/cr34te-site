@@ -1,7 +1,8 @@
-// Web Audio 8-Bit Chiptune Player
+// Web Audio 8-Bit Chiptune Player & Windows 95 Simulation
 let audioCtx = null;
 let masterGain = null;
 let analyser = null;
+let eqFilters = [];
 let isPlaying = false;
 let isPaused = false;
 let currentTrackIndex = 0;
@@ -10,13 +11,17 @@ let pauseOffset = 0;
 let trackTimerInterval = null;
 let audioSchedulerInterval = null;
 
+// Real-Time EQ Frequencies
+const EQ_FREQS = [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000];
+
 const TRACKS = [
   {
-    title: "1. Hyper Rave (8-Bit 20s)",
+    title: "1. Hyper Rave (Scooter 8-Bit Hook)",
     num: "01",
     duration: 20,
     bpm: 165,
     notes: [
+      // Iconic Hyper Hyper Hook
       { note: "C4", dur: 0.25 }, { note: "C4", dur: 0.25 }, { note: "DS4", dur: 0.25 }, { note: "F4", dur: 0.25 },
       { note: "G4", dur: 0.5 }, { note: "DS4", dur: 0.25 }, { note: "F4", dur: 0.25 }, { note: "G4", dur: 0.5 },
       { note: "AS4", dur: 0.5 }, { note: "C5", dur: 0.5 }, { note: "AS4", dur: 0.25 }, { note: "G4", dur: 0.25 },
@@ -27,11 +32,12 @@ const TRACKS = [
     ]
   },
   {
-    title: "2. Rainbow Dreams (8-Bit 20s)",
+    title: "2. Rainbow Dreams (Marusha 8-Bit Hook)",
     num: "02",
     duration: 20,
     bpm: 172,
     notes: [
+      // Somewhere Over The Rainbow Rave Hook
       { note: "C5", dur: 0.5 }, { note: "C6", dur: 0.5 }, { note: "B5", dur: 0.25 }, { note: "G5", dur: 0.25 },
       { note: "A5", dur: 0.25 }, { note: "B5", dur: 0.25 }, { note: "C6", dur: 0.75 }, { note: "A5", dur: 0.25 },
       { note: "G5", dur: 0.5 }, { note: "E5", dur: 0.25 }, { note: "F5", dur: 0.25 }, { note: "G5", dur: 0.5 },
@@ -40,11 +46,12 @@ const TRACKS = [
     ]
   },
   {
-    title: "3. Firestarter Beat (8-Bit 20s)",
+    title: "3. Firestarter Beat (Prodigy 8-Bit Hook)",
     num: "03",
     duration: 20,
     bpm: 140,
     notes: [
+      // Firestarter Heavy Riff
       { note: "FS2", dur: 0.25 }, { note: "FS2", dur: 0.25 }, { note: "A2", dur: 0.25 }, { note: "GS2", dur: 0.25 },
       { note: "FS2", dur: 0.25 }, { note: "FS2", dur: 0.25 }, { note: "C3", dur: 0.25 }, { note: "B2", dur: 0.25 },
       { note: "FS2", dur: 0.25 }, { note: "FS2", dur: 0.25 }, { note: "A2", dur: 0.25 }, { note: "GS2", dur: 0.25 },
@@ -66,12 +73,40 @@ function initAudio() {
   if (!audioCtx) {
     const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
     audioCtx = new AudioCtxClass();
+    
+    // Create Equalizer Filters Chain
+    eqFilters = EQ_FREQS.map((freq, idx) => {
+      const filter = audioCtx.createBiquadFilter();
+      if (idx === 0) {
+        filter.type = 'lowshelf';
+      } else if (idx === EQ_FREQS.length - 1) {
+        filter.type = 'highshelf';
+      } else {
+        filter.type = 'peaking';
+        filter.Q.value = 1.4;
+      }
+      filter.frequency.value = freq;
+      filter.gain.value = 0;
+      return filter;
+    });
+
+    // Chain EQ Filters together
+    for (let i = 0; i < eqFilters.length - 1; i++) {
+      eqFilters[i].connect(eqFilters[i + 1]);
+    }
+
     masterGain = audioCtx.createGain();
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 32;
+
+    // Connect last EQ filter to masterGain -> analyser -> destination
+    eqFilters[eqFilters.length - 1].connect(masterGain);
     masterGain.connect(analyser);
     analyser.connect(audioCtx.destination);
     
+    // Connect sliders to real EQ
+    updateEqFromUI();
+
     const volInput = document.getElementById('vol-slider');
     if (volInput) {
       masterGain.gain.value = volInput.value / 100;
@@ -80,6 +115,16 @@ function initAudio() {
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
+}
+
+function updateEqFromUI() {
+  const sliders = document.querySelectorAll('.eq-slider');
+  sliders.forEach(slider => {
+    const bandIdx = parseInt(slider.getAttribute('data-band'));
+    if (eqFilters[bandIdx]) {
+      eqFilters[bandIdx].gain.value = parseFloat(slider.value);
+    }
+  });
 }
 
 function playNote(freq, duration, time) {
@@ -94,8 +139,9 @@ function playNote(freq, duration, time) {
   noteGain.gain.setValueAtTime(0.12, time);
   noteGain.gain.exponentialRampToValueAtTime(0.001, time + duration - 0.02);
   
+  // Connect through EQ chain
   osc.connect(noteGain);
-  noteGain.connect(masterGain);
+  noteGain.connect(eqFilters[0]);
   
   osc.start(time);
   osc.stop(time + duration);
@@ -109,7 +155,7 @@ function playNote(freq, duration, time) {
   bassGain.gain.exponentialRampToValueAtTime(0.001, time + duration - 0.01);
   
   bassOsc.connect(bassGain);
-  bassGain.connect(masterGain);
+  bassGain.connect(eqFilters[0]);
   
   bassOsc.start(time);
   bassOsc.stop(time + duration);
@@ -265,7 +311,127 @@ function renderVisualizer() {
   draw();
 }
 
+// Folder Navigation Logic
+const FOLDER_TREE = {
+  "Hausaufgaben": {
+    path: "C:\\Hausaufgaben",
+    items: [
+      { name: "Alte Fotos", target: "Alte Fotos" }
+    ]
+  },
+  "Alte Fotos": {
+    path: "C:\\Hausaufgaben\\Alte Fotos",
+    items: [
+      { name: "Systemdateien", target: "Systemdateien" }
+    ]
+  },
+  "Systemdateien": {
+    path: "C:\\Hausaufgaben\\...\\Systemdateien",
+    items: [
+      { name: "Komplizierter Technikkram", target: "Komplizierter Technikkram" }
+    ]
+  },
+  "Komplizierter Technikkram": {
+    path: "C:\\Hausaufgaben\\...\\Technikkram",
+    items: [
+      { name: "Spicy Spice Girls Fotos", target: "BSOD" }
+    ]
+  }
+};
+
+function openFolder(folderKey) {
+  const data = FOLDER_TREE[folderKey];
+  if (!data) return;
+  
+  document.getElementById('folder-title-text').innerText = data.path;
+  const area = document.getElementById('folder-content-area');
+  area.innerHTML = '';
+  
+  data.items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'folder-item';
+    div.innerHTML = `<div class="icon-box icon-folder"></div><span>${item.name}</span>`;
+    div.addEventListener('click', () => {
+      if (item.target === 'BSOD') {
+        triggerBSOD();
+      } else {
+        openFolder(item.target);
+      }
+    });
+    area.appendChild(div);
+  });
+
+  document.getElementById('win-folder-modal').style.display = 'block';
+}
+
+function triggerBSOD() {
+  document.getElementById('win-folder-modal').style.display = 'none';
+  document.getElementById('win-error-modal').style.display = 'none';
+  document.getElementById('bsod-screen').style.display = 'flex';
+}
+
+function resetFromBSOD() {
+  document.getElementById('bsod-screen').style.display = 'none';
+  document.getElementById('win-folder-modal').style.display = 'none';
+  document.getElementById('win-error-modal').style.display = 'none';
+  currentTrackIndex = 0;
+  stopPlayback();
+  startPlayback(0);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  // Start audio on user interaction to handle browser autoplay policies
+  document.addEventListener('click', () => {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }, { once: true });
+
+  // Auto-start playback on load
+  startPlayback(0);
+
+  // Desktop Icons error triggers
+  ['icon-pc', 'icon-net', 'icon-trash'].forEach(id => {
+    document.getElementById(id).addEventListener('click', () => {
+      document.getElementById('win-error-modal').style.display = 'block';
+    });
+  });
+
+  document.getElementById('close-error-btn').addEventListener('click', () => {
+    document.getElementById('win-error-modal').style.display = 'none';
+  });
+  document.getElementById('ok-error-btn').addEventListener('click', () => {
+    document.getElementById('win-error-modal').style.display = 'none';
+  });
+
+  // Homework folder trigger
+  document.getElementById('icon-homework').addEventListener('click', () => {
+    openFolder("Hausaufgaben");
+  });
+
+  document.getElementById('close-folder-btn').addEventListener('click', () => {
+    document.getElementById('win-folder-modal').style.display = 'none';
+  });
+
+  // BSOD Click to Restart
+  document.getElementById('bsod-screen').addEventListener('click', () => {
+    resetFromBSOD();
+  });
+
+  // EQ Sliders Event Listeners
+  const sliders = document.querySelectorAll('.eq-slider');
+  sliders.forEach(slider => {
+    slider.addEventListener('input', () => {
+      updateEqFromUI();
+    });
+  });
+
+  document.getElementById('eq-reset-btn').addEventListener('click', () => {
+    sliders.forEach(s => s.value = 0);
+    updateEqFromUI();
+  });
+
+  // Transport Controls
   document.getElementById('btn-play').addEventListener('click', () => {
     if (isPaused) {
       startPlayback(pauseOffset);
@@ -335,5 +501,4 @@ document.addEventListener('DOMContentLoaded', () => {
   updateClock();
 
   renderVisualizer();
-  updateUIState();
 });
