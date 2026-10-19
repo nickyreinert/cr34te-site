@@ -403,11 +403,304 @@
     return body;
   }
 
+  // Meta Versa: procedural world raymarched in a WebGPU fragment shader
+  const MV_SHADER = `
+struct U { pos: vec3f, time: f32, yaw: f32, pitch: f32, res: vec2f };
+@group(0) @binding(0) var<uniform> u: U;
+
+const CELL = 14.0;
+
+fn hash2(p: vec2f) -> f32 {
+  return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453);
+}
+
+fn ground(x: f32, z: f32) -> f32 {
+  return 1.6 * sin(x * 0.11) * cos(z * 0.09) + 0.8 * sin(x * 0.31 + z * 0.27);
+}
+
+fn avPos(k: i32) -> vec3f {
+  let fk = f32(k);
+  let a = u.time * (0.25 + 0.1 * fk) + fk * 1.7;
+  let x = -12.0 + 9.0 * fk + 4.0 * cos(a);
+  let z = -16.0 - 12.0 * fract(fk * 0.37) + 4.0 * sin(a);
+  return vec3f(x, ground(x, z) + 1.3 + 0.15 * sin(u.time * 2.0 + fk), z);
+}
+
+fn un(a: vec2f, b: vec2f) -> vec2f {
+  if (b.x < a.x) { return b; }
+  return a;
+}
+
+fn boxes(p: vec3f) -> vec2f {
+  let c = floor(p.xz / CELL);
+  let h = hash2(c);
+  let h2 = hash2(c + 17.0);
+  let center = (c + 0.5) * CELL + (vec2f(h, h2) - 0.5) * 4.0;
+  let hgt = 6.0 + 9.0 * hash2(c + 41.0);
+  let hw = 1.5 + 1.5 * h2;
+  let q = vec3f(p.x - center.x, p.y - (hgt * 0.5 - 4.0), p.z - center.y);
+  let b = abs(q) - vec3f(hw, hgt * 0.5, hw);
+  var d = length(max(b, vec3f(0.0))) + min(max(b.x, max(b.y, b.z)), 0.0);
+  if (h < 0.35) { d = 1000.0; }
+  return vec2f(d, 1.0);
+}
+
+// Legless torso, floating hands and a round head, material 10+k body and 20+k head
+fn avatar(p: vec3f, k: i32) -> vec2f {
+  let q = p - avPos(k);
+  let head = length(q - vec3f(0.0, 1.0, 0.0)) - 0.32;
+  var t = q - vec3f(0.0, 0.1, 0.0);
+  t.y = t.y - clamp(t.y, -0.3, 0.3);
+  let torso = length(t) - 0.38;
+  let hands = min(length(q - vec3f(0.75, 0.3, 0.2)), length(q - vec3f(-0.75, 0.3, 0.2))) - 0.14;
+  let low = min(torso, hands);
+  if (head < low) { return vec2f(head, 20.0 + f32(k)); }
+  return vec2f(low, 10.0 + f32(k));
+}
+
+fn map(p: vec3f) -> vec2f {
+  var r = vec2f((p.y - ground(p.x, p.z)) * 0.7, 0.0);
+  r = un(r, boxes(p));
+  for (var k = 0; k < 4; k++) {
+    r = un(r, avatar(p, k));
+  }
+  return r;
+}
+
+fn skyCol(rd: vec3f) -> vec3f {
+  let g = clamp(rd.y * 1.5 + 0.3, 0.0, 1.0);
+  return floor(mix(vec3f(1.0, 0.45, 0.9), vec3f(0.2, 0.9, 1.0), g) * 6.0) / 6.0;
+}
+
+@vertex
+fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  return vec4f(p[i], 0.0, 1.0);
+}
+
+@fragment
+fn fs(@builtin(position) frag: vec4f) -> @location(0) vec4f {
+  let uv = vec2f(frag.x - 0.5 * u.res.x, 0.5 * u.res.y - frag.y) / u.res.y;
+  let fwd = vec3f(sin(u.yaw) * cos(u.pitch), sin(u.pitch), -cos(u.yaw) * cos(u.pitch));
+  let right = vec3f(cos(u.yaw), 0.0, sin(u.yaw));
+  let up = cross(right, fwd);
+  let rd = normalize(right * uv.x + up * uv.y + fwd * 0.9);
+
+  var t = 0.0;
+  var m = -1.0;
+  for (var i = 0; i < 90; i++) {
+    let r = map(u.pos + rd * t);
+    if (r.x < 0.01 * (1.0 + t * 0.05)) {
+      m = r.y;
+      break;
+    }
+    t += clamp(r.x * 0.8, 0.02, 1.9);
+    if (t > 160.0) { break; }
+  }
+
+  let sky = skyCol(rd);
+  if (m < 0.0) { return vec4f(sky, 1.0); }
+
+  let p = u.pos + rd * t;
+  let d0 = map(p).x;
+  let e = vec2f(0.05, 0.0);
+  let n = normalize(vec3f(map(p + e.xyy).x - d0, map(p + e.yxy).x - d0, map(p + e.yyx).x - d0));
+
+  var col = vec3f(0.5);
+  if (m < 0.5) {
+    let g = floor(p.x * 0.5) + floor(p.z * 0.5);
+    col = mix(vec3f(0.1, 0.9, 0.2), vec3f(0.9, 0.2, 0.9), step(0.25, fract(g * 0.5)));
+  } else if (m < 5.0) {
+    let c = floor(p.xz / CELL);
+    col = vec3f(hash2(c + 3.0), hash2(c + 5.0), hash2(c + 9.0));
+    col = col * (0.6 + 0.4 * step(0.5, fract(p.y * 0.8)));
+  } else if (m < 15.0) {
+    let k = m - 10.0;
+    col = vec3f(hash2(vec2f(k, 1.0)), hash2(vec2f(k, 2.0)), hash2(vec2f(k, 3.0))) * 0.5 + 0.5;
+  } else {
+    col = vec3f(1.0, 0.8, 0.6);
+  }
+
+  let diff = max(dot(n, normalize(vec3f(0.5, 0.8, 0.3))), 0.0);
+  col = col * (0.35 + 0.65 * diff);
+  col = mix(col, sky, 1.0 - exp(-t * 0.012));
+  return vec4f(floor(col * 5.0) / 5.0, 1.0);
+}
+`;
+
+  // Same formula as ground() in the shader, keeps the camera above the terrain
+  function mvGround(x, z) {
+    return 1.6 * Math.sin(x * 0.11) * Math.cos(z * 0.09) + 0.8 * Math.sin(x * 0.31 + z * 0.27);
+  }
+
+  const MV_KEYS = {
+    w: 'fwd', arrowup: 'fwd', s: 'back', arrowdown: 'back',
+    a: 'sl', d: 'sr', arrowleft: 'tl', arrowright: 'tr'
+  };
+
+  function buildMetaVersa() {
+    const body = el('div', 'app-body');
+    body.tabIndex = 0;
+    body.style.outline = 'none';
+
+    const title = el('div', '', 'Meta Versa  -  Horizon Welt 1  -  4 Avatare online');
+    Object.assign(title.style, { background: '#0866ff', color: '#fff', fontWeight: 'bold', padding: '3px 6px', marginBottom: '4px' });
+
+    const canvas = el('canvas');
+    canvas.width = 320;
+    canvas.height = 200;
+    Object.assign(canvas.style, {
+      display: 'block',
+      width: '100%',
+      height: 'max(120px, min(325px, calc(100dvh - 150px)))',
+      imageRendering: 'pixelated',
+      touchAction: 'none',
+      cursor: 'grab',
+      background: '#000'
+    });
+
+    const pad = el('div');
+    Object.assign(pad.style, { display: 'flex', alignItems: 'center', gap: '3px', marginTop: '4px' });
+    const status = el('span', '', 'Klicken, dann WASD / Pfeiltasten. Ziehen = umsehen.');
+    status.style.marginLeft = '4px';
+
+    // Movement state is a set of held actions, so no key press is dropped between frames
+    const keys = new Set();
+
+    [['<', 'tl'], ['^', 'fwd'], ['v', 'back'], ['>', 'tr']].forEach(([label, action]) => {
+      const btn = el('button', 'app-btn', label);
+      btn.style.width = '28px';
+      btn.style.padding = '0';
+      btn.addEventListener('pointerdown', (e) => {
+        btn.setPointerCapture(e.pointerId);
+        keys.add(action);
+      });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((type) => {
+        btn.addEventListener(type, () => keys.delete(action));
+      });
+      pad.appendChild(btn);
+    });
+    pad.appendChild(status);
+    body.append(title, canvas, pad);
+
+    body.addEventListener('keydown', (e) => {
+      const action = MV_KEYS[e.key.toLowerCase()];
+      if (!action) return;
+      keys.add(action);
+      e.preventDefault();
+    });
+    body.addEventListener('keyup', (e) => {
+      const action = MV_KEYS[e.key.toLowerCase()];
+      if (action) keys.delete(action);
+    });
+    body.addEventListener('focusout', (e) => {
+      if (!body.contains(e.relatedTarget)) keys.clear();
+    });
+
+    let yaw = 0;
+    let pitch = -0.1;
+    const pos = [0, mvGround(0, 10) + 3, 10];
+
+    canvas.addEventListener('pointerdown', (e) => {
+      body.focus();
+      canvas.setPointerCapture(e.pointerId);
+      let lx = e.clientX;
+      let ly = e.clientY;
+      const move = (ev) => {
+        yaw += (ev.clientX - lx) * 0.006;
+        pitch = Math.max(-1.4, Math.min(1.4, pitch - (ev.clientY - ly) * 0.006));
+        lx = ev.clientX;
+        ly = ev.clientY;
+      };
+      canvas.addEventListener('pointermove', move);
+      canvas.addEventListener('lostpointercapture', () => canvas.removeEventListener('pointermove', move), { once: true });
+    });
+
+    async function run() {
+      if (!navigator.gpu) throw new Error('WebGPU wird von diesem Browser nicht unterstützt.');
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) throw new Error('Kein WebGPU-Adapter gefunden.');
+      const device = await adapter.requestDevice();
+      device.addEventListener('uncapturederror', (e) => {
+        status.textContent = 'GPU-Fehler: ' + e.error.message;
+      });
+
+      const gpuCtx = canvas.getContext('webgpu');
+      const format = navigator.gpu.getPreferredCanvasFormat();
+      gpuCtx.configure({ device, format, alphaMode: 'opaque' });
+
+      const shader = device.createShaderModule({ code: MV_SHADER });
+      const pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module: shader, entryPoint: 'vs' },
+        fragment: { module: shader, entryPoint: 'fs', targets: [{ format }] },
+        primitive: { topology: 'triangle-list' }
+      });
+      const ubo = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      const bind = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: ubo } }]
+      });
+
+      const uniforms = new Float32Array(8);
+      let last = performance.now();
+
+      function frame(now) {
+        // Closing the window ends the loop and frees the GPU device
+        if (!body.isConnected) {
+          device.destroy();
+          return;
+        }
+        requestAnimationFrame(frame);
+        const dt = Math.min((now - last) / 1000, 0.1);
+        last = now;
+        if (!body.offsetParent) return;
+
+        const turn = (keys.has('tr') ? 1 : 0) - (keys.has('tl') ? 1 : 0);
+        const fwd = (keys.has('fwd') ? 1 : 0) - (keys.has('back') ? 1 : 0);
+        const side = (keys.has('sr') ? 1 : 0) - (keys.has('sl') ? 1 : 0);
+        const step = 9 * dt;
+        yaw += turn * 1.6 * dt;
+        pos[0] += (Math.sin(yaw) * Math.cos(pitch) * fwd + Math.cos(yaw) * side) * step;
+        pos[1] += Math.sin(pitch) * fwd * step;
+        pos[2] += (-Math.cos(yaw) * Math.cos(pitch) * fwd + Math.sin(yaw) * side) * step;
+        pos[1] = Math.max(pos[1], mvGround(pos[0], pos[2]) + 0.8);
+
+        uniforms.set([pos[0], pos[1], pos[2], now / 1000, yaw, pitch, canvas.width, canvas.height]);
+        device.queue.writeBuffer(ubo, 0, uniforms);
+
+        const enc = device.createCommandEncoder();
+        const pass = enc.beginRenderPass({
+          colorAttachments: [{
+            view: gpuCtx.getCurrentTexture().createView(),
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            loadOp: 'clear',
+            storeOp: 'store'
+          }]
+        });
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bind);
+        pass.draw(3);
+        pass.end();
+        device.queue.submit([enc.finish()]);
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    run().catch((err) => {
+      status.textContent = err.message;
+    });
+
+    return body;
+  }
+
   const APPS = {
     notepad: { title: 'Editor', width: 270, build: buildNotepad, color: '#ffffff' },
     calc: { title: 'Rechner', width: 180, build: buildCalculator, color: '#808080' },
     paint: { title: 'Paint', width: 260, build: buildPaint, color: '#ff00ff' },
-    mines: { title: 'Minesweeper', width: 200, build: buildMinesweeper, color: '#00aa00' }
+    mines: { title: 'Minesweeper', width: 200, build: buildMinesweeper, color: '#00aa00' },
+    meta: { title: 'Meta Versa', width: 520, build: buildMetaVersa, color: '#0866ff', top: true }
   };
 
   function launch(id) {
@@ -485,7 +778,7 @@
 
   const programs = menuItem('Programme', '#ffcc00');
   const sub = el('div', 'sm-sub');
-  Object.keys(APPS).forEach((id) => {
+  Object.keys(APPS).filter((id) => !APPS[id].top).forEach((id) => {
     sub.appendChild(menuItem(APPS[id].title, APPS[id].color, () => launch(id)));
   });
   programs.append(el('span', 'sm-arrow', '>'), sub);
@@ -494,6 +787,7 @@
   list.append(
     programs,
     menuItem('Dokumente', '#ffcc00', () => openFolder('Hausaufgaben')),
+    menuItem('Meta Versa', APPS.meta.color, () => launch('meta')),
     el('div', 'sm-sep'),
     menuItem('Herunterfahren...', '#c00000', shutdown)
   );
