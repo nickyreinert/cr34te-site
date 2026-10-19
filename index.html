@@ -1,207 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Winamp - Windows 95</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="assets/startmenu.css">
-  <link rel="stylesheet" href="assets/clippy.css">
-  <link rel="stylesheet" href="assets/icons.css">
-  <link rel="stylesheet" href="assets/explorer.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="Jack-in-the-Box in 3D: Tippen zieht auf, die Figur springt heraus. Gerechnet mit eigenem WebGL-Renderer.">
+<title>Jack-in-the-Box</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%23e8452c'/%3E%3Ccircle cx='16' cy='13' r='6' fill='%23ffe0a3'/%3E%3Ccircle cx='13.5' cy='12' r='2.6' fill='%23fff'/%3E%3Ccircle cx='18.5' cy='12' r='2.6' fill='%23fff'/%3E%3Ccircle cx='13.5' cy='12' r='1.1' fill='%23111'/%3E%3Ccircle cx='18.5' cy='12' r='1.1' fill='%23111'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="desktop">
-    <!-- Desktop Icons -->
-    <div class="desktop-icon" id="icon-pc" tabindex="0">
-      <div class="icon-box icon-pc"></div>
-      <span>My Computer</span>
-    </div>
-    <div class="desktop-icon" id="icon-net" tabindex="0">
-      <div class="icon-box icon-net"></div>
-      <span>Network</span>
-    </div>
-    <div class="desktop-icon" id="icon-trash" tabindex="0">
-      <div class="icon-box icon-trash"></div>
-      <span>Recycle Bin</span>
-    </div>
-    <div class="desktop-icon active-icon" id="icon-winamp" tabindex="0">
-      <div class="icon-box icon-winamp"></div>
-      <span>Winamp</span>
-    </div>
 
-    <!-- Folder Icon on Desktop (Homework) -->
-    <div class="desktop-icon folder-icon-pos" id="icon-homework" tabindex="0">
-      <div class="icon-box icon-folder"></div>
-      <span>Hausaufgaben</span>
-    </div>
-
-    <!-- Winamp Player Window -->
-    <div id="winamp-app" class="winamp-window">
-      <div class="winamp-titlebar">
-        <div class="titlebar-text">WINAMP</div>
-        <div class="titlebar-controls">
-          <button class="win-btn min-btn">_</button>
-          <button class="win-btn close-btn">X</button>
-        </div>
-      </div>
-
-      <div class="winamp-body">
-        <div class="winamp-display">
-          <div class="display-top">
-            <div class="track-number" id="track-num">01</div>
-            <div class="time-display" id="time-display">00:00</div>
-            <div class="kbps-info">
-              <span class="active-info">128</span> kbps <span class="active-info">44</span> kHz
-              <br>
-              <span id="channel-mode">STEREO</span>
-            </div>
-          </div>
-          <div class="display-marquee">
-            <div class="marquee-text" id="marquee-text">1. Hyper Rave (8-Bit 20s)</div>
-          </div>
-          <div class="display-bottom">
-            <canvas id="visualizer" width="150" height="18"></canvas>
-            <div class="audio-indicators">
-              <span id="ind-play" class="ind">PLAY</span>
-              <span id="ind-pause" class="ind">PAUSE</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="winamp-mid-controls">
-          <div class="volume-container">
-            <label for="vol-slider">VOL</label>
-            <input type="range" id="vol-slider" min="0" max="100" value="80">
-          </div>
-          <div class="eq-pl-toggles">
-            <button id="toggle-eq" class="toggle-btn active">EQ</button>
-            <button id="toggle-pl" class="toggle-btn active">PL</button>
-          </div>
-        </div>
-
-        <div class="winamp-transport">
-          <button id="btn-prev" class="trans-btn" title="Previous Track">|&lt;&lt;</button>
-          <button id="btn-play" class="trans-btn" title="Play">&gt;</button>
-          <button id="btn-pause" class="trans-btn" title="Pause">||</button>
-          <button id="btn-stop" class="trans-btn" title="Stop">STOP</button>
-          <button id="btn-next" class="trans-btn" title="Next Track">&gt;&gt;|</button>
-          <button id="btn-eject" class="trans-btn" title="Eject">EJT</button>
-        </div>
-      </div>
-
-      <!-- Equalizer Sub-Window -->
-      <div id="winamp-eq" class="winamp-window sub-window">
-        <div class="winamp-titlebar sub-titlebar">
-          <span>WINAMP EQUALIZER</span>
-        </div>
-        <div class="eq-body">
-          <div class="eq-presets">
-            <button class="eq-btn" id="eq-on-btn">ON</button>
-            <button class="eq-btn" id="eq-reset-btn">FLAT</button>
-            <span class="eq-title">REAL-TIME EQ</span>
-          </div>
-          <div class="eq-sliders">
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="0" min="-12" max="12" value="4"><span>60</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="1" min="-12" max="12" value="6"><span>170</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="2" min="-12" max="12" value="2"><span>310</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="3" min="-12" max="12" value="0"><span>600</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="4" min="-12" max="12" value="-2"><span>1K</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="5" min="-12" max="12" value="3"><span>3K</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="6" min="-12" max="12" value="5"><span>6K</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="7" min="-12" max="12" value="4"><span>12K</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="8" min="-12" max="12" value="2"><span>14K</span></div>
-            <div class="eq-band"><input type="range" class="eq-slider" data-band="9" min="-12" max="12" value="1"><span>16K</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Playlist Sub-Window -->
-      <div id="winamp-pl" class="winamp-window sub-window">
-        <div class="winamp-titlebar sub-titlebar">
-          <span>WINAMP PLAYLIST</span>
-        </div>
-        <div class="pl-body">
-          <ul id="playlist-items">
-            <li class="pl-item active" data-index="0">
-              <span class="pl-num">1.</span> Hyper Rave (8-Bit Hook) <span class="pl-time">0:20</span>
-            </li>
-            <li class="pl-item" data-index="1">
-              <span class="pl-num">2.</span> Rainbow Dreams (8-Bit Hook) <span class="pl-time">0:20</span>
-            </li>
-            <li class="pl-item" data-index="2">
-              <span class="pl-num">3.</span> Firestarter Beat (8-Bit Hook) <span class="pl-time">0:20</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <!-- Windows 95 Error Dialog -->
-    <div id="win-error-modal" class="win-dialog" style="display: none;">
-      <div class="dialog-titlebar">
-        <span>Systemhinweis</span>
-        <button class="win-btn" id="close-error-btn">X</button>
-      </div>
-      <div class="dialog-body">
-        <div class="error-icon">!</div>
-        <div class="error-msg" id="error-msg-text">Funktion nicht verfügbar. Systemressource gesperrt.</div>
-      </div>
-      <div class="dialog-footer">
-        <button id="ok-error-btn" class="dialog-btn">OK</button>
-      </div>
-    </div>
-
-    <!-- Windows 95 Folder Browser Window -->
-    <div id="win-folder-modal" class="win-dialog folder-dialog" style="display: none;">
-      <div class="dialog-titlebar">
-        <span id="folder-title-text">C:\Hausaufgaben</span>
-        <button class="win-btn" id="close-folder-btn">X</button>
-      </div>
-      <div class="dialog-menu">
-        <span>Datei</span><span>Bearbeiten</span><span>Ansicht</span><span>Hilfe</span>
-      </div>
-      <div class="folder-content" id="folder-content-area">
-        <!-- Inner folder items dynamically rendered -->
-      </div>
-    </div>
-
-    <!-- Windows 95 Blue Screen of Death (BSOD) -->
-    <div id="bsod-screen" style="display: none;">
-      <div class="bsod-content">
-        <p class="bsod-title">Windows</p>
-        <p>Ein Ausnahmefehler 0E ist aufgetreten an 0028:C0011E36 in VXD VMM(01) + 00010E36. Die aktuelle Anwendung wird abgebrochen.</p>
-        <br>
-        <p>* Drücken Sie eine beliebige Taste oder klicken Sie, um fortzufahren.</p>
-        <p>* Wenn Sie ungespeicherte Daten verlieren, starten Sie das System neu.</p>
-        <br>
-        <p class="bsod-action">Klicken Sie hier, um Windows neu zu starten...</p>
-      </div>
-    </div>
-
-    <!-- Windows 95 Taskbar -->
-    <div id="taskbar">
-      <button id="start-button">
-        <span class="win-flag"></span>
-        <strong>Start</strong>
-      </button>
-      <div class="taskbar-divider"></div>
-      <div class="taskbar-tasks">
-        <div class="task-btn active">
-          <span class="mini-app-icon"></span>
-          Winamp - 1. Hyper Rave
-        </div>
-      </div>
-      <div class="system-tray">
-        <span class="tray-vol-icon"></span>
-        <span id="clock">12:00</span>
-      </div>
-    </div>
+<main class="buehne">
+  <canvas id="buehne" aria-label="Jack-in-the-Box in 3D. Tippen, Leertaste oder Eingabetaste zieht auf und lässt die Figur herausspringen."></canvas>
+  <div class="hinweis" id="hinweis" hidden>
+    <p>Für die 3D-Ansicht fehlt WebGL in diesem Browser.</p>
   </div>
+</main>
 
-  <script src="script.js"></script>
-  <script src="assets/startmenu.js"></script>
-  <script src="assets/clippy.js"></script>
-  <script src="assets/explorer.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
