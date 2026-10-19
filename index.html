@@ -1,22 +1,16 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="description" content="Jack-in-the-Box in 3D: Tippen zieht auf, die Figur springt heraus. Gerechnet mit eigenem WebGL-Renderer.">
-<title>Jack-in-the-Box</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%23e8452c'/%3E%3Ccircle cx='16' cy='13' r='6' fill='%23ffe0a3'/%3E%3Ccircle cx='13.5' cy='12' r='2.6' fill='%23fff'/%3E%3Ccircle cx='18.5' cy='12' r='2.6' fill='%23fff'/%3E%3Ccircle cx='13.5' cy='12' r='1.1' fill='%23111'/%3E%3Ccircle cx='18.5' cy='12' r='1.1' fill='%23111'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brick Pile</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-<main class="buehne">
-  <canvas id="buehne" aria-label="Jack-in-the-Box in 3D. Tippen, Leertaste oder Eingabetaste zieht auf und lässt die Figur herausspringen."></canvas>
-  <div class="hinweis" id="hinweis" hidden>
-    <p>Für die 3D-Ansicht fehlt WebGL in diesem Browser.</p>
+  <div id="stage">
+    <canvas id="view"></canvas>
+    <div id="hint">Tap anywhere (or press Space)</div>
   </div>
-</main>
-
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
