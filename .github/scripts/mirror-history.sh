@@ -7,8 +7,10 @@ last_version="$(find "$history_root" -maxdepth 1 -type d -name 'v[0-9][0-9][0-9]
 last_commit=""
 if [[ -n "$last_version" ]]; then
   last_commit="$(node -e 'const fs=require("node:fs"); const data=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(data.sourceCommit)' "$last_version/version.json")"
-  git cat-file -e "${last_commit}^{commit}"
-  git merge-base --is-ancestor "$last_commit" origin/main
+  if ! git cat-file -e "${last_commit}^{commit}" || ! git merge-base --is-ancestor "$last_commit" origin/main; then
+    echo "cr34te-history and cr34te-site have diverged: $(basename "$last_version")/version.json names sourceCommit $last_commit, which is not a commit on origin/main. A history cleanup probably rewrote cr34te-site without repairing cr34te-history. See docs/spec/history-repair.md in cr34te-platform. Nothing was archived." >&2
+    exit 1
+  fi
 fi
 
 working="$(mktemp -d)"
