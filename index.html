@@ -1,22 +1,10 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="description" content="Wurst-in-the-Box in 3D: Tippen zieht auf, die Wurst springt an der Feder heraus. Gerechnet mit eigenem WebGL-Renderer.">
-<title>Wurst-in-the-Box</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%23e8452c'/%3E%3Crect x='10' y='6' width='12' height='20' rx='6' fill='%23c4634e'/%3E%3Ccircle cx='13.5' cy='13' r='3.2' fill='%23fff'/%3E%3Ccircle cx='18.5' cy='13' r='3.2' fill='%23fff'/%3E%3Ccircle cx='13.8' cy='13' r='1.3' fill='%23111'/%3E%3Ccircle cx='18.2' cy='13' r='1.3' fill='%23111'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
-
-<main class="buehne">
-  <canvas id="buehne" aria-label="Wurst-in-the-Box in 3D. Tippen, Leertaste oder Eingabetaste zieht auf und lässt die Wurst herausspringen."></canvas>
-  <div class="hinweis" id="hinweis" hidden>
-    <p>Für die 3D-Ansicht fehlt WebGL in diesem Browser.</p>
-  </div>
-</main>
-
-<script src="script.js"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>ALPINE / An infinite elsewhere</title><link rel="stylesheet" href="styles.css"></head>
+<body><canvas id="world" aria-label="Procedural mountain flight. Drag to look; W A S D to fly; Q and E to change altitude."></canvas><div class="vignette"></div>
+<header><a class="brand" href="#" aria-label="Alpine home">A<span> / </span>ALPINE</a><div class="edition">PROCEDURAL EXPLORER <i></i> LIVE WORLD</div><button id="help" aria-label="Toggle flight instructions">?</button></header>
+<section class="intro"><div class="eyebrow">46° NORTH · NO TWO HORIZONS ALIKE</div><h1>An infinite<br><em>elsewhere.</em></h1><p>Find a little distance from everything.</p><button id="start">Take flight <span>↗</span></button></section>
+<div id="status" role="status">Preparing your mountain range…</div>
+<aside id="instructions" hidden><strong>Your way through the wilderness</strong><p>Click or touch the landscape, then drag to look.</p><p><b>W A S D</b> move · <b>Q / E</b> descend / ascend<br><b>Shift</b> fly faster · <b>Space</b> hover / resume<br><b>R</b> return to the overlook</p><p>On touch screens, use the flight pad and height buttons. The arrow buttons turn your view.</p></aside>
+<div class="instruments"><div><small>ALTITUDE</small><strong id="altitude">—<span> M</span></strong></div><div><small>FLIGHT MODE</small><strong id="mode">DRIFT</strong></div><div class="compass"><small>BEARING</small><strong id="bearing">000°</strong></div></div>
+<div class="flightpad"><button data-key="arrowleft" aria-label="Look left">↶</button><button data-key="w" aria-label="Fly forward">↑</button><button data-key="arrowright" aria-label="Look right">↷</button><button data-key="a" aria-label="Fly left">←</button><button data-key="s" aria-label="Fly backward">↓</button><button data-key="d" aria-label="Fly right">→</button></div><div class="heightpad"><button data-key="e" aria-label="Ascend">＋</button><button data-key="q" aria-label="Descend">−</button></div>
+<footer><div class="hint">DRAG TO LOOK <span> / </span> WASD TO EXPLORE</div><div class="actions"><button id="drift">Pause drift</button><button id="seed">New world ↻</button><button id="quality">Quality: balanced</button></div><span id="engine">WEBGPU · REALTIME</span></footer><script src="script.js"></script></body></html>
