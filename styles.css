@@ -17,25 +17,66 @@ html, body {
 }
 
 .container {
-  height: 50dvh;
+  min-height: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
   padding: 1rem;
+  position: relative;
+  z-index: 1;
 }
-
 .main-text {
   font-size: clamp(1.5rem, 5vw, 4rem);
   font-weight: bold;
   line-height: 1.2;
   margin-bottom: 1rem;
   color: #fff;
+  max-width: 100%;
 }
 
+.letter-line { white-space: nowrap; }
+.explodable-letter {
+  display: inline-block;
+  position: relative;
+  cursor: crosshair;
+  border-radius: .08em;
+  outline: none;
+  transform-origin: center;
+  transition: color 120ms ease, text-shadow 120ms ease, transform 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.explodable-letter:hover,
+.explodable-letter:focus-visible {
+  color: #a6f7ff;
+  text-shadow: 0 0 .22em #64eaff, 0 0 .7em #7e63ff;
+}
+.explodable-letter.letter-pop { animation: letter-pop 260ms ease-out; }
+@keyframes letter-pop {
+  0% { transform: scale(1); color: #fff; }
+  35% { transform: scale(1.3) rotate(-8deg); color: #ff4fd8; text-shadow: 0 0 .5em #ff4fd8; }
+  100% { transform: scale(.85); color: #fff; }
+}
 .subline {
   font-size: clamp(0.75rem, 2vw, 1.25rem);
   font-weight: normal;
   color: #fff;
+}
+.explosion-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+@media (max-width: 480px) {
+  .main-text { font-size: clamp(1.15rem, 5.3vw, 1.8rem); }
+  .container { padding: .5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .explodable-letter { transition: none; }
+  .explodable-letter.letter-pop { animation-duration: 1ms; }
 }
