@@ -1,20 +1,16 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="de">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>DEMO CREATOR</title><link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cr34te</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main class="app">
-<header class="top"><div class="logo">DEMO <span>CREATOR</span></div><div class="tagline">OLD SCHOOL VIBES. MODERN BROWSER.<br>GENERATIVE GRAPHICS + 8 BIT SOUND</div><div class="topmark">● LIVE / NO UPLOAD</div></header>
-<section class="workspace">
-<div class="screen" id="screen"><canvas id="visual" aria-label="Procedurally generated demo animation"></canvas><div class="screen-hint" id="hint">CLICK TO PLAY SOUND · DRAG TO CUT TEXT</div><div class="demo-text" id="demoText">SMALL CODE. BIG DREAMS.</div><div class="scanlines"></div></div>
-<aside class="panel">
-<section class="group"><h2>GRAPHICS</h2><label>Pattern<select id="pattern"><option value="tunnel">Tunnel</option><option value="plasma">Plasma</option><option value="rings">Rings</option><option value="stars">Starfield</option></select></label><label>Speed <input id="speed" type="range" min="0" max="2" step="0.05" value="0.8"><output for="speed">0.80</output></label><label>Scale <input id="scale" type="range" min="0.4" max="2" step="0.05" value="1"><output for="scale">1.00</output></label><label>Rotation <input id="rotation" type="range" min="0" max="2" step="0.05" value="0.5"><output for="rotation">0.50</output></label><label>Color cycle <input id="color" type="range" min="0" max="1" step="0.02" value="0.7"><output for="color">0.70</output></label></section>
-<section class="group"><h2>TEXT</h2><label>Message<input id="message" maxlength="80" value="SMALL CODE.
-BIG DREAMS."></label><label>Font<select id="font"><option value="pixel">Retro 8x8</option><option value="mono">Mono terminal</option><option value="wide">Wide pixel</option></select></label><label>Size <input id="textSize" type="range" min="0.5" max="2" step="0.05" value="1"><output for="textSize">1.00</output></label><label>Text speed <input id="textSpeed" type="range" min="0" max="3" step="0.1" value="0.5"><output for="textSpeed">0.50</output></label><label>Position<select id="position"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select></label></section>
-<section class="group"><h2>SOUND <small>(8 BIT)</small></h2><label>Waveform<select id="wave"><option value="square">Square</option><option value="pulse">Pulse</option><option value="triangle">Triangle</option><option value="sawtooth">Sawtooth</option></select></label><label>Tempo <input id="tempo" type="range" min="0.2" max="1.5" step="0.05" value="0.6"><output for="tempo">0.60</output></label><label>Volume <input id="volume" type="range" min="0" max="0.5" step="0.01" value="0.18"><output for="volume">0.18</output></label><label>Arpeggio<select id="arp"><option value="on">On</option><option value="off">Off</option></select></label></section>
-<section class="group presets"><h2>PRESETS</h2><div class="preset-grid"><button data-preset="default">Default</button><button data-preset="tunnel">Tunnel</button><button data-preset="plasma">Plasma</button><button data-preset="rings">Rings</button><button data-preset="stars">Stars</button><button data-preset="custom">Custom</button></div></section>
-</aside></section>
-<footer class="bottom"><div class="transport"><button id="play" class="big" aria-label="Play">▶</button><button id="stop" class="big" aria-label="Stop">■</button><div><div id="status">READY</div><small id="fps">PROCEDURAL / CANVAS</small></div></div><section class="sequence"><h2>TEXT SEQUENCE</h2><div class="addline"><input id="newMessage" maxlength="80" placeholder="Type a message..."><button id="add">ADD</button></div></section><section class="queue"><div id="queueItems"></div></section><button id="generate" class="generate">GENERATE</button></footer>
-</main><script src="script.js"></script><script src="assets/letter-cut.js"></script>
-</body></html>
+  <main class="container">
+    <h1 class="main-text">DIESE SEITE<br>HAT DAS INTERNET<br>KAPUTT GEMACHT.</h1>
+    <p class="subline">Bittesch&ouml;n, gern geschehen. Phperlaphapp.</p>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
