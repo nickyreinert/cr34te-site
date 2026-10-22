@@ -1,4 +1,4 @@
-// Interactive letter explosions, slicing physics, synthesized sound and procedural endless text loop.
+// Interactive letter explosions, pointer-anywhere slicing, visual cut trail and endless text loop.
 (() => {
   const heading = document.querySelector('.main-text');
   const subline = document.querySelector('.subline');
@@ -41,31 +41,18 @@
     previousMessage = message;
     return message;
   }
+
   let cycleRunning = false;
-  function checkCompletion() {
-    if (cycleRunning || letters().length !== 0) return;
-    cycleRunning = true;
-    subline.classList.remove('subline-shake');
-    void subline.offsetWidth;
-    subline.classList.add('subline-shake');
-    window.setTimeout(() => {
-      subline.classList.remove('subline-shake');
-      subline.textContent = generateMessage();
-      window.setTimeout(() => {
-        heading.querySelectorAll('.explodable-letter').forEach(letter => letter.classList.remove('gone'));
-        cycleRunning = false;
-      }, 500);
-    }, 650);
-  }
   const canvas = document.createElement('canvas');
   canvas.className = 'explosion-canvas';
   canvas.setAttribute('aria-hidden', 'true');
   document.body.append(canvas);
-  let ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d');
   let width = 0, height = 0, dpr = 1, lastFrame = 0, audio = null;
-  const particles = [];
+  const particles = [], fragments = [], trail = [];
   const colors = ['#ffffff', '#a6f7ff', '#ff4fd8', '#ffe66d', '#8b7bff', '#ff875e'];
   const letters = () => [...heading.querySelectorAll('.explodable-letter:not(.gone)')];
+
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     width = window.innerWidth; height = window.innerHeight;
@@ -84,8 +71,25 @@
       osc.frequency.exponentialRampToValueAtTime(big ? 38 : 95, now + (big ? .42 : .16));
       gain.gain.setValueAtTime(big ? .16 : .07, now);
       gain.gain.exponentialRampToValueAtTime(.001, now + (big ? .44 : .18));
-      osc.connect(gain); gain.connect(audio.destination); osc.start(now); osc.stop(now + (big ? .45 : .19));
+      osc.connect(gain); gain.connect(audio.destination);
+      osc.start(now); osc.stop(now + (big ? .45 : .19));
     } catch (_) {}
+  }
+  function animate() { if (!lastFrame) requestAnimationFrame(frame); }
+  function checkCompletion() {
+    if (cycleRunning || letters().length !== 0) return;
+    cycleRunning = true;
+    subline.classList.remove('subline-shake');
+    void subline.offsetWidth;
+    subline.classList.add('subline-shake');
+    window.setTimeout(() => {
+      subline.classList.remove('subline-shake');
+      subline.textContent = generateMessage();
+      window.setTimeout(() => {
+        heading.querySelectorAll('.explodable-letter').forEach(letter => letter.classList.remove('gone'));
+        cycleRunning = false;
+      }, 500);
+    }, 650);
   }
   function burstAt(cx, cy, big = false, source = null) {
     if (cycleRunning) return;
@@ -95,10 +99,8 @@
       return { el, x: r.left + r.width / 2, y: r.top + r.height / 2 };
     }).filter(p => Math.hypot(p.x - cx, p.y - cy) <= radius);
     if (source && !source.classList.contains('gone') && !targets.some(p => p.el === source)) {
-      const r = source.getBoundingClientRect(); targets.push({ el: source, x: r.left + r.width / 2, y: r.top + r.height / 2 });
-    }
-    if (!targets.length && source && !source.classList.contains('gone')) {
-      const r = source.getBoundingClientRect(); targets.push({ el: source, x: r.left + r.width / 2, y: r.top + r.height / 2 });
+      const r = source.getBoundingClientRect();
+      targets.push({ el: source, x: r.left + r.width / 2, y: r.top + r.height / 2 });
     }
     for (const target of targets) {
       const el = target.el;
@@ -109,16 +111,18 @@
       for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = (big ? 3.2 : 1.8) + Math.random() * (big ? 12 : 7);
-        particles.push({ x: target.x + (Math.random() - .5) * r.width, y: target.y + (Math.random() - .5) * r.height,
+        particles.push({
+          x: target.x + (Math.random() - .5) * r.width, y: target.y + (Math.random() - .5) * r.height,
           vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - Math.random() * 2,
           size: 1.5 + Math.random() * (big ? 6 : 4), rotation: Math.random() * Math.PI,
           spin: (Math.random() - .5) * .25, life: 1, decay: .009 + Math.random() * .014,
-          color: colors[Math.floor(Math.random() * colors.length)], shape: Math.random() > .7 });
+          color: colors[Math.floor(Math.random() * colors.length)], shape: Math.random() > .7
+        });
       }
     }
     if (targets.length) sound(big);
     if (particles.length > 1800) particles.splice(0, particles.length - 1800);
-    if (particles.length && !lastFrame) requestAnimationFrame(frame);
+    animate();
     checkCompletion();
   }
   function burst(letter, big = false) {
@@ -127,13 +131,8 @@
     burstAt(r.left + r.width / 2, r.top + r.height / 2, big, letter);
   }
 
-  // Slice letters with a held pointer. Each cut letter becomes two independently
-  // clipped fragments that slide apart, rotate and fall under simulated gravity.
-  let slicing = false;
-  let lastPointer = null;
   const sliced = new WeakSet();
-  const fragments = [];
-  function makeSlice(letter, x, y, dx, dy) {
+  function makeSlice(letter, dx, dy) {
     if (!letter || letter.classList.contains('gone') || sliced.has(letter) || cycleRunning) return;
     const r = letter.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) return;
@@ -142,64 +141,62 @@
     const cutAngle = Math.atan2(dy, dx);
     const direction = Math.random() < .5 ? -1 : 1;
     for (let side = 0; side < 2; side++) {
-      const piece = {
+      fragments.push({
         x: r.left, y: r.top, w: r.width, h: r.height,
         vx: Math.cos(cutAngle) * direction * (2.4 + Math.random() * 2.5) + (side ? 1 : -1) * .8,
-        vy: -1.8 - Math.random() * 2.2,
-        angle: 0, spin: (Math.random() - .5) * .14,
-        life: 1, char: letter.textContent,
-        font: getComputedStyle(letter).font,
-        color: getComputedStyle(letter).color,
-        side
-      };
-      piece.clip = side === 0
-        ? [[0,0],[100,0],[0,100]]
-        : [[100,0],[100,100],[0,100]];
-      fragments.push(piece);
+        vy: -1.8 - Math.random() * 2.2, angle: 0, spin: (Math.random() - .5) * .14,
+        life: 1, char: letter.textContent, font: getComputedStyle(letter).font,
+        color: getComputedStyle(letter).color, side
+      });
     }
     sound(false);
-    if (!lastFrame) requestAnimationFrame(frame);
+    animate();
     checkCompletion();
   }
   function sliceAt(x, y, dx, dy) {
-    if (!slicing || cycleRunning) return;
+    if (cycleRunning) return;
     const el = document.elementFromPoint(x, y);
     const letter = el && el.closest ? el.closest('.explodable-letter') : null;
-    if (letter && heading.contains(letter)) makeSlice(letter, x, y, dx, dy);
+    if (letter && heading.contains(letter)) makeSlice(letter, dx, dy);
   }
-  heading.addEventListener('pointerdown', event => {
+
+  // A drag can begin anywhere in the page, not only on top of a letter.
+  let slicing = false, moved = false, lastPointer = null;
+  document.addEventListener('pointerdown', event => {
     if (event.button !== 0 || cycleRunning) return;
     slicing = true;
+    moved = false;
     lastPointer = { x: event.clientX, y: event.clientY };
-    heading.setPointerCapture?.(event.pointerId);
   });
-  heading.addEventListener('pointermove', event => {
+  document.addEventListener('pointermove', event => {
     if (!slicing || !lastPointer) return;
-    const dx = event.clientX - lastPointer.x;
-    const dy = event.clientY - lastPointer.y;
+    const dx = event.clientX - lastPointer.x, dy = event.clientY - lastPointer.y;
     const distance = Math.hypot(dx, dy);
-    const steps = Math.max(1, Math.ceil(distance / 4));
-    for (let i = 1; i <= steps; i++) {
-      const x = lastPointer.x + dx * i / steps;
-      const y = lastPointer.y + dy * i / steps;
-      sliceAt(x, y, dx || 1, dy || 1);
+    if (distance > 1) moved = true;
+    if (distance > 0) {
+      trail.push({ x1: lastPointer.x, y1: lastPointer.y, x2: event.clientX, y2: event.clientY, life: 1 });
+      const steps = Math.max(1, Math.ceil(distance / 3));
+      for (let i = 1; i <= steps; i++) {
+        const x = lastPointer.x + dx * i / steps, y = lastPointer.y + dy * i / steps;
+        sliceAt(x, y, dx || 1, dy || 1);
+      }
+      animate();
     }
     lastPointer = { x: event.clientX, y: event.clientY };
   });
   function stopSlicing() { slicing = false; lastPointer = null; }
-  heading.addEventListener('pointerup', stopSlicing);
-  heading.addEventListener('pointercancel', stopSlicing);
-  heading.addEventListener('lostpointercapture', stopSlicing);
-
-  heading.addEventListener('click', event => {
-    const letter = event.target.closest('.explodable-letter');
-    if (letter && !sliced.has(letter)) burst(letter);
+  document.addEventListener('pointerup', stopSlicing);
+  document.addEventListener('pointercancel', stopSlicing);
+  document.addEventListener('click', event => {
+    const letter = event.target.closest && event.target.closest('.explodable-letter');
+    if (letter && !moved && !sliced.has(letter)) burst(letter);
+    moved = false;
   });
-  heading.addEventListener('contextmenu', event => {
+  document.addEventListener('contextmenu', event => {
+    const letter = event.target.closest && event.target.closest('.explodable-letter');
+    if (!heading.contains(event.target)) return;
     event.preventDefault();
-    if (cycleRunning) return;
-    const letter = event.target.closest('.explodable-letter');
-    burstAt(event.clientX, event.clientY, true, letter);
+    if (!cycleRunning) burstAt(event.clientX, event.clientY, true, letter);
   });
   heading.addEventListener('keydown', event => {
     if ((event.key === 'Enter' || event.key === ' ') && event.target.classList.contains('explodable-letter')) {
@@ -207,7 +204,6 @@
     }
   });
 
-  const originalFrame = frame;
   function frame(time) {
     if (time - lastFrame < 16 && lastFrame) { requestAnimationFrame(frame); return; }
     const dt = lastFrame ? Math.min(2, (time - lastFrame) / 16.67) : 1;
@@ -226,29 +222,31 @@
     }
     for (let i = fragments.length - 1; i >= 0; i--) {
       const p = fragments[i];
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      p.vy += .22 * dt; p.vx *= Math.pow(.995, dt);
-      p.angle += p.spin * dt; p.life -= .008 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += .22 * dt;
+      p.vx *= Math.pow(.995, dt); p.angle += p.spin * dt; p.life -= .008 * dt;
       if (p.life <= 0 || p.y > height + 100 || p.x < -150 || p.x > width + 150) {
         fragments.splice(i, 1); continue;
       }
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, p.life * 1.5);
-      ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
-      ctx.rotate(p.angle);
-      ctx.font = p.font; ctx.fillStyle = p.color;
-      ctx.beginPath();
+      ctx.save(); ctx.globalAlpha = Math.min(1, p.life * 1.5);
+      ctx.translate(p.x + p.w / 2, p.y + p.h / 2); ctx.rotate(p.angle);
+      ctx.font = p.font; ctx.fillStyle = p.color; ctx.beginPath();
       const points = p.side === 0
         ? [[-p.w/2,-p.h/2],[p.w/2,-p.h/2],[-p.w/2,p.h/2]]
         : [[p.w/2,-p.h/2],[p.w/2,p.h/2],[-p.w/2,p.h/2]];
-      ctx.moveTo(points[0][0], points[0][1]);
-      ctx.lineTo(points[1][0], points[1][1]);
+      ctx.moveTo(points[0][0], points[0][1]); ctx.lineTo(points[1][0], points[1][1]);
       ctx.lineTo(points[2][0], points[2][1]); ctx.closePath(); ctx.clip();
-      ctx.fillText(p.char, -p.w / 2, p.h * .34);
-      ctx.restore();
+      ctx.fillText(p.char, -p.w / 2, p.h * .34); ctx.restore();
+    }
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const t = trail[i]; t.life -= .055 * dt;
+      if (t.life <= 0) { trail.splice(i, 1); continue; }
+      ctx.save(); ctx.globalAlpha = t.life; ctx.strokeStyle = '#a6f7ff';
+      ctx.shadowColor = '#64eaff'; ctx.shadowBlur = 14; ctx.lineWidth = 3;
+      ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2);
+      ctx.stroke(); ctx.restore();
     }
     ctx.globalAlpha = 1;
-    if (particles.length || fragments.length) requestAnimationFrame(frame);
+    if (particles.length || fragments.length || trail.length) requestAnimationFrame(frame);
     else { lastFrame = 0; ctx.clearRect(0, 0, width, height); }
   }
   window.addEventListener('resize', resize);
