@@ -1,14 +1,52 @@
-<!doctype html>
-<html lang="de">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lichtwirbel</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#10101d">
+<title>BIT//BEAT - 8 Bit Drum Computer</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<canvas id="c"></canvas>
-<p id="h">Bewegen oder tippen</p>
+<main class="machine">
+<header class="topbar">
+  <div class="brand"><span class="brand-icon">▦</span> BIT<span>//</span>BEAT</div>
+  <div class="system"><span class="led"></span> AUDIO SYSTEM READY</div>
+</header>
+<section class="intro">
+  <div><div class="eyebrow">CHIPTUNE RHYTHM LAB · NO. 001</div><h1>MAKE SOME<br><span>NOISE.</span></h1></div>
+  <div class="pixel-art" aria-hidden="true">♪<br>▟▛▜▙</div>
+</section>
+<section class="transport panel">
+  <div class="transport-buttons">
+    <button id="play" class="play-button" aria-label="Play">▶ PLAY</button>
+    <button id="stop" class="stop-button" aria-label="Stop">■ STOP</button>
+  </div>
+  <div class="tempo-control"><label for="tempo">TEMPO <strong id="tempoValue">120</strong> <small>BPM</small></label><input id="tempo" type="range" min="60" max="180" value="120"><div class="range-labels"><span>60</span><span>180</span></div></div>
+  <div class="beat-display"><span class="eyebrow">PLAYHEAD</span><strong id="position">--</strong></div>
+</section>
+<section class="sequencer panel">
+  <div class="section-heading"><div><span class="eyebrow">01 / PATTERN EDITOR</span><h2>STEP SEQUENCER<span class="accent">_</span></h2></div><span class="step-count">16 STEPS</span></div>
+  <div class="step-numbers" id="stepNumbers"><span></span></div>
+  <div id="tracks" class="tracks" aria-label="Drum pattern"></div>
+  <div class="sequencer-footer"><span><i class="legend-on"></i> ACTIVE</span><span><i class="legend-off"></i> EMPTY</span><span>CLICK CELLS TO EDIT</span></div>
+</section>
+<section class="bottom-grid">
+  <div class="panel kit-panel">
+    <div class="section-heading"><div><span class="eyebrow">02 / SOUND KIT</span><h2>THE MACHINES</h2></div><span class="tiny-tag">4 VOICES</span></div>
+    <div id="volumes" class="volumes"></div>
+  </div>
+  <div class="panel preset-panel">
+    <div class="section-heading"><div><span class="eyebrow">03 / QUICK START</span><h2>PRESETS</h2></div></div>
+    <button class="preset" data-preset="basic">01 <span>CLASSIC BEAT</span><b>↗</b></button>
+    <button class="preset" data-preset="break">02 <span>CHIP BREAK</span><b>↗</b></button>
+    <button class="preset" data-preset="minimal">03 <span>MINIMAL WAVE</span><b>↗</b></button>
+    <button class="preset" data-preset="random">04 <span>CHAOS MODE</span><b>↗</b></button>
+  </div>
+</section>
+<footer><span>BIT//BEAT <b>v1.0</b></span><span>CLICK TO PLAY · MAKE IT YOURS</span><span class="footer-pixel">▦ ▦ ▦</span></footer>
+<div id="hint" class="hint" role="status">CLICK PLAY TO START YOUR BEAT</div>
+</main>
 <script src="script.js"></script>
 </body>
 </html>
