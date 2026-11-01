@@ -1,52 +1,47 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#10101d">
-<title>BIT//BEAT - 8 Bit Drum Computer</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Still Life? — Art off duty</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="assets/drama.css">
+<script src="assets/drama.js" defer></script>
+<script src="script.js" defer></script>
 </head>
 <body>
-<main class="machine">
-<header class="topbar">
-  <div class="brand"><span class="brand-icon">▦</span> BIT<span>//</span>BEAT</div>
-  <div class="system"><span class="led"></span> AUDIO SYSTEM READY</div>
-</header>
-<section class="intro">
-  <div><div class="eyebrow">CHIPTUNE RHYTHM LAB · NO. 001</div><h1>MAKE SOME<br><span>NOISE.</span></h1></div>
-  <div class="pixel-art" aria-hidden="true">♪<br>▟▛▜▙</div>
+<main class="museum">
+<header><h1>STILL LIFE<span>?</span></h1><span class="tagline">ART. OFF DUTY.</span><select id="gallerySelect" class="gallery-select" aria-label="Choose a gallery"><option value="0">Mona + Scream</option><option value="1">Pearl + Van Gogh</option></select></header>
+<section class="gallery" aria-label="Animated cartoon museum">
+<div class="gallery-bar"><span class="live-dot">GALLERY LIVE</span><span id="sceneName">Sitting pretty</span></div>
+<div class="stage" id="stage" tabindex="0" role="region" aria-label="Interactive painting. Press Space to play or pause, R to replay, Q for wisdom.">
+<div class="world" id="world" aria-hidden="true">
+<div class="wall-line one"></div><div class="wall-line two"></div><div class="floor"></div>
+<div class="painting"><div class="landscape"><div class="mountain"></div><div class="mountain near"></div><div class="river"></div></div></div>
+<div class="plaque"></div>
+<div class="rope"></div><div class="post left"></div><div class="post right"></div>
+<div id="disco" hidden><div class="ray one"></div><div class="ray two"></div><div class="ray three"></div><div class="ball-cord"></div><div class="ball"></div></div>
+<div id="security" class="security" hidden></div>
+<div id="scream" class="character scream"></div><div id="mona" class="character mona"></div>
+<div id="back" class="back" hidden>BACK IN 5</div>
+</div>
+<button id="start" class="start">▶ Play the painting</button>
+<div id="bubble" class="bubble" role="status" hidden></div>
+
+</div>
+<div class="caption-row"><p id="caption" aria-live="polite">She has been sitting here since 1503.</p><span id="time" aria-label="Elapsed time">0:00 / 0:30</span></div>
+<div class="progress" aria-hidden="true"><div id="progress"></div></div>
 </section>
-<section class="transport panel">
-  <div class="transport-buttons">
-    <button id="play" class="play-button" aria-label="Play">▶ PLAY</button>
-    <button id="stop" class="stop-button" aria-label="Stop">■ STOP</button>
-  </div>
-  <div class="tempo-control"><label for="tempo">TEMPO <strong id="tempoValue">120</strong> <small>BPM</small></label><input id="tempo" type="range" min="60" max="180" value="120"><div class="range-labels"><span>60</span><span>180</span></div></div>
-  <div class="beat-display"><span class="eyebrow">PLAYHEAD</span><strong id="position">--</strong></div>
-</section>
-<section class="sequencer panel">
-  <div class="section-heading"><div><span class="eyebrow">01 / PATTERN EDITOR</span><h2>STEP SEQUENCER<span class="accent">_</span></h2></div><span class="step-count">16 STEPS</span></div>
-  <div class="step-numbers" id="stepNumbers"><span></span></div>
-  <div id="tracks" class="tracks" aria-label="Drum pattern"></div>
-  <div class="sequencer-footer"><span><i class="legend-on"></i> ACTIVE</span><span><i class="legend-off"></i> EMPTY</span><span>CLICK CELLS TO EDIT</span></div>
-</section>
-<section class="bottom-grid">
-  <div class="panel kit-panel">
-    <div class="section-heading"><div><span class="eyebrow">02 / SOUND KIT</span><h2>THE MACHINES</h2></div><span class="tiny-tag">4 VOICES</span></div>
-    <div id="volumes" class="volumes"></div>
-  </div>
-  <div class="panel preset-panel">
-    <div class="section-heading"><div><span class="eyebrow">03 / QUICK START</span><h2>PRESETS</h2></div></div>
-    <button class="preset" data-preset="basic">01 <span>CLASSIC BEAT</span><b>↗</b></button>
-    <button class="preset" data-preset="break">02 <span>CHIP BREAK</span><b>↗</b></button>
-    <button class="preset" data-preset="minimal">03 <span>MINIMAL WAVE</span><b>↗</b></button>
-    <button class="preset" data-preset="random">04 <span>CHAOS MODE</span><b>↗</b></button>
-  </div>
-</section>
-<footer><span>BIT//BEAT <b>v1.0</b></span><span>CLICK TO PLAY · MAKE IT YOURS</span><span class="footer-pixel">▦ ▦ ▦</span></footer>
-<div id="hint" class="hint" role="status">CLICK PLAY TO START YOUR BEAT</div>
+<nav class="controls" aria-label="Painting controls">
+<div class="transport"><button id="play" class="primary">▶ Play</button><button id="replay" class="secondary">↺ Replay</button><button id="skip" class="secondary">Skip →</button></div><button id="drama" class="drama-button">Add drama ↗</button><button id="inspire" class="inspire" aria-label="Dubious wisdom">✦ Wisdom</button><button id="sound" class="sound-button" aria-pressed="true">Sound: ON</button>
+</nav>
+<footer><span>Original 8-bit dance track<span id="meter" class="audio-meter" role="meter" aria-label="Audio output level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></span></span><span class="key-hint">Space: play / pause · Q: wisdom</span></footer>
+<div id="wisdom" class="wisdom" role="dialog" aria-modal="true" aria-labelledby="wisdomTitle" hidden>
+<div class="news-head"><span id="wisdomTitle">BREAKING: PHILOSOPHY</span><span>LIVE!</span></div>
+<blockquote id="quote"></blockquote>
+<div class="source">SOURCE: TRUST ME.</div>
+<div class="quote-actions"><button id="nextQuote">More nonsense ↗</button><button id="closeQuote">Back to art ×</button></div>
+</div>
 </main>
-<script src="script.js"></script>
 </body>
 </html>
