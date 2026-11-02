@@ -1,47 +1,17 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Still Life? — Art off duty</title>
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="assets/drama.css">
-<script src="assets/drama.js" defer></script>
-<script src="script.js" defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Matterhorn & Swimming Bear</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main class="museum">
-<header><h1>STILL LIFE<span>?</span></h1><span class="tagline">ART. OFF DUTY.</span><select id="gallerySelect" class="gallery-select" aria-label="Choose a gallery"><option value="0">Mona + Scream</option><option value="1">Pearl + Van Gogh</option></select></header>
-<section class="gallery" aria-label="Animated cartoon museum">
-<div class="gallery-bar"><span class="live-dot">GALLERY LIVE</span><span id="sceneName">Sitting pretty</span></div>
-<div class="stage" id="stage" tabindex="0" role="region" aria-label="Interactive painting. Press Space to play or pause, R to replay, Q for wisdom.">
-<div class="world" id="world" aria-hidden="true">
-<div class="wall-line one"></div><div class="wall-line two"></div><div class="floor"></div>
-<div class="painting"><div class="landscape"><div class="mountain"></div><div class="mountain near"></div><div class="river"></div></div></div>
-<div class="plaque"></div>
-<div class="rope"></div><div class="post left"></div><div class="post right"></div>
-<div id="disco" hidden><div class="ray one"></div><div class="ray two"></div><div class="ray three"></div><div class="ball-cord"></div><div class="ball"></div></div>
-<div id="security" class="security" hidden></div>
-<div id="scream" class="character scream"></div><div id="mona" class="character mona"></div>
-<div id="back" class="back" hidden>BACK IN 5</div>
-</div>
-<button id="start" class="start">▶ Play the painting</button>
-<div id="bubble" class="bubble" role="status" hidden></div>
-
-</div>
-<div class="caption-row"><p id="caption" aria-live="polite">She has been sitting here since 1503.</p><span id="time" aria-label="Elapsed time">0:00 / 0:30</span></div>
-<div class="progress" aria-hidden="true"><div id="progress"></div></div>
-</section>
-<nav class="controls" aria-label="Painting controls">
-<div class="transport"><button id="play" class="primary">▶ Play</button><button id="replay" class="secondary">↺ Replay</button><button id="skip" class="secondary">Skip →</button></div><button id="drama" class="drama-button">Add drama ↗</button><button id="inspire" class="inspire" aria-label="Dubious wisdom">✦ Wisdom</button><button id="sound" class="sound-button" aria-pressed="true">Sound: ON</button>
-</nav>
-<footer><span>Original 8-bit dance track<span id="meter" class="audio-meter" role="meter" aria-label="Audio output level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></span></span><span class="key-hint">Space: play / pause · Q: wisdom</span></footer>
-<div id="wisdom" class="wisdom" role="dialog" aria-modal="true" aria-labelledby="wisdomTitle" hidden>
-<div class="news-head"><span id="wisdomTitle">BREAKING: PHILOSOPHY</span><span>LIVE!</span></div>
-<blockquote id="quote"></blockquote>
-<div class="source">SOURCE: TRUST ME.</div>
-<div class="quote-actions"><button id="nextQuote">More nonsense ↗</button><button id="closeQuote">Back to art ×</button></div>
-</div>
-</main>
+  <div id="container">
+    <canvas id="canvas"></canvas>
+    <div id="speech-bubble">relax, relax</div>
+    <div id="hint">Tippe auf den Bären 🐻</div>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>
