@@ -1,16 +1,33 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Matterhorn & Swimming Bear</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MimicGPT</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="container">
-    <canvas id="canvas"></canvas>
-    <div id="speech-bubble">relax, relax</div>
-    <div id="hint">Tippe auf den Bären 🐻</div>
+  <div id="app">
+    <div id="backdrop"></div>
+    <aside id="sidebar">
+      <button id="new-chat" type="button">+ New chat</button>
+      <div id="sessions-label">Chats</div>
+      <nav id="sessions"></nav>
+    </aside>
+    <main id="main">
+      <header id="topbar">
+        <button id="menu" type="button" aria-label="Toggle sidebar">&#9776;</button>
+        <span id="model">MimicGPT</span>
+      </header>
+      <section id="messages"></section>
+      <footer id="composer">
+        <div id="box">
+          <textarea id="input" rows="1" placeholder="Message MimicGPT"></textarea>
+          <button id="send" type="button" aria-label="Send">&#8593;</button>
+        </div>
+        <div id="disclaimer">Canned answers. Nothing here is a real model.</div>
+      </footer>
+    </main>
   </div>
   <script src="script.js"></script>
 </body>
