@@ -1,257 +1,689 @@
-/* Fake ChatGPT clone. Everything lives in one closure: no globals, no storage, no network. */
 (function () {
   'use strict';
 
-  var FENCE = '`'.repeat(3);
-
-  /* Canned knowledge base. keys are matched against the lowercased user message. */
-  var KB = [
-    { keys: ['binary', 'search', 'sorted'], title: 'Binary search', lang: 'python',
-      text: 'Binary search halves the search range on every step. It needs a sorted array.',
-      code: 'def binary_search(a, target):\n    lo, hi = 0, len(a) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if a[mid] == target:\n            return mid\n        if a[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1',
-      note: 'Time: O(log n). Space: O(1).' },
-    { keys: ['quicksort', 'quick', 'pivot', 'sort'], title: 'Quicksort', lang: 'javascript',
-      text: 'Quicksort picks a pivot, partitions the rest around it and recurses. This version favors clarity over in-place speed.',
-      code: 'function quicksort(a) {\n  if (a.length <= 1) return a;\n  const p = a[a.length >> 1];\n  const lt = a.filter(x => x < p);\n  const eq = a.filter(x => x === p);\n  const gt = a.filter(x => x > p);\n  return [...quicksort(lt), ...eq, ...quicksort(gt)];\n}',
-      note: 'Average O(n log n), worst case O(n^2) with bad pivots. This version uses O(n) extra memory.' },
-    { keys: ['merge', 'stable'], title: 'Merge sort', lang: 'python',
-      text: 'Merge sort splits the list in half, sorts both halves and merges them. It is stable and has no bad inputs.',
-      code: 'def merge_sort(a):\n    if len(a) <= 1:\n        return a\n    m = len(a) // 2\n    l, r = merge_sort(a[:m]), merge_sort(a[m:])\n    out, i, j = [], 0, 0\n    while i < len(l) and j < len(r):\n        if l[i] <= r[j]:\n            out.append(l[i])\n            i += 1\n        else:\n            out.append(r[j])\n            j += 1\n    return out + l[i:] + r[j:]',
-      note: 'Time: O(n log n) always. Space: O(n).' },
-    { keys: ['dijkstra', 'shortest', 'path', 'route', 'weighted'], title: "Dijkstra's shortest path", lang: 'python',
-      text: "Dijkstra's algorithm expands the closest unvisited node first, using a min-heap. Edge weights must not be negative.",
-      code: "import heapq\n\ndef dijkstra(graph, src):\n    dist = {src: 0}\n    heap = [(0, src)]\n    while heap:\n        d, u = heapq.heappop(heap)\n        if d > dist.get(u, float('inf')):\n            continue\n        for v, w in graph[u]:\n            nd = d + w\n            if nd < dist.get(v, float('inf')):\n                dist[v] = nd\n                heapq.heappush(heap, (nd, v))\n    return dist",
-      note: 'Time: O((V + E) log V). For negative weights use Bellman-Ford.' },
-    { keys: ['bfs', 'breadth', 'graph', 'traverse', 'queue'], title: 'Breadth-first search', lang: 'python',
-      text: 'BFS visits nodes level by level with a queue. On unweighted graphs it finds shortest paths.',
-      code: 'from collections import deque\n\ndef bfs(graph, start):\n    seen, q, order = {start}, deque([start]), []\n    while q:\n        u = q.popleft()\n        order.append(u)\n        for v in graph[u]:\n            if v not in seen:\n                seen.add(v)\n                q.append(v)\n    return order',
-      note: 'Time: O(V + E). Space: O(V).' },
-    { keys: ['dynamic', 'dp', 'knapsack', 'memo', 'optimal'], title: '0/1 knapsack', lang: 'python',
-      text: 'Dynamic programming stores answers to subproblems. For 0/1 knapsack, dp[c] is the best value at capacity c. Iterating capacity downwards makes sure each item is used once.',
-      code: 'def knapsack(items, cap):\n    dp = [0] * (cap + 1)\n    for w, v in items:\n        for c in range(cap, w - 1, -1):\n            dp[c] = max(dp[c], dp[c - w] + v)\n    return dp[cap]',
-      note: 'Time: O(n * cap). Space: O(cap). This is pseudo-polynomial, not truly polynomial.' },
-    { keys: ['prime', 'sieve', 'eratosthenes'], title: 'Sieve of Eratosthenes', lang: 'javascript',
-      text: 'The sieve crosses out multiples of each prime, starting at its square. Whatever remains is prime.',
-      code: 'function sieve(n) {\n  const is = new Uint8Array(n + 1).fill(1);\n  is[0] = is[1] = 0;\n  for (let i = 2; i * i <= n; i++)\n    if (is[i]) for (let j = i * i; j <= n; j += i) is[j] = 0;\n  return [...is.keys()].filter(i => is[i]);\n}',
-      note: 'Time: O(n log log n). Space: O(n).' },
-    { keys: ['union', 'find', 'disjoint', 'connected', 'component'], title: 'Union-find', lang: 'python',
-      text: 'Union-find tracks which elements belong to the same set. Path halving keeps trees almost flat.',
-      code: 'class DSU:\n    def __init__(self, n):\n        self.p = list(range(n))\n\n    def find(self, x):\n        while self.p[x] != x:\n            self.p[x] = self.p[self.p[x]]\n            x = self.p[x]\n        return x\n\n    def union(self, a, b):\n        self.p[self.find(a)] = self.find(b)',
-      note: 'Amortized near O(1) per operation. Adding union by size gives the inverse Ackermann bound.' },
-    { keys: ['gcd', 'euclid', 'divisor', 'greatest'], title: 'Euclidean algorithm', lang: 'python',
-      text: 'The GCD of a and b equals the GCD of b and a mod b. Repeat until the remainder is zero.',
-      code: 'def gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a',
-      note: 'Time: O(log min(a, b)).' }
+  const TIERS = 6;
+  const POOLS = [
+    [['Spark', 'Kindler'], ['Dust', 'Sifter'], ['Drop', 'Dripper']],
+    [['Ore', 'Smelter'], ['Ember', 'Furnace'], ['Shard', 'Crusher']],
+    [['Alloy', 'Foundry'], ['Glass', 'Kiln'], ['Resin', 'Press']],
+    [['Core', 'Reactor'], ['Lattice', 'Weaver'], ['Gear', 'Assembler']],
+    [['Prism', 'Refractor'], ['Plasma', 'Collider'], ['Nectar', 'Distillery']],
+    [['Essence', 'Nexus'], ['Aether', 'Spire'], ['Void', 'Engine']]
   ];
-
-  var INTROS = ['Here is how it works.', 'Short version below.', 'This is the usual approach.', 'A standard way to do this:'];
-  var FALLBACKS = ['I am not sure what you mean, but this is related and might help.', 'No exact match for that. A common algorithm you may want instead:'];
-
-  /* Pick a KB entry by keyword hits; random if nothing matches. */
-  function pick(msg) {
-    var low = msg.toLowerCase(), best = null, bestHits = 0;
-    KB.forEach(function (e) {
-      var hits = e.keys.filter(function (k) { return low.indexOf(k) !== -1; }).length;
-      if (hits > bestHits) { best = e; bestHits = hits; }
-    });
-    if (best) return { entry: best, matched: true };
-    return { entry: KB[Math.floor(Math.random() * KB.length)], matched: false };
-  }
-
-  function rand(list) { return list[Math.floor(Math.random() * list.length)]; }
-
-  function buildAnswer(msg) {
-    var r = pick(msg), e = r.entry;
-    var intro = r.matched ? rand(INTROS) : rand(FALLBACKS);
-    return intro + '\n\n' + e.text + '\n\n' + FENCE + e.lang + '\n' + e.code + '\n' + FENCE + '\n\n' + e.note;
-  }
-
-  /* Pre-existing sessions, built from the KB so the content is real. */
-  var SEED = [
-    ['How does binary search work?', 0],
-    ['Sort a list fast in JavaScript', 1],
-    ['Find the shortest route in a weighted graph', 3],
-    ['Generate all primes below a million', 6],
-    ['Solve knapsack with dynamic programming', 5]
+  const GLYPHS = ['\u2726', '\u25C6', '\u25B2', '\u25CF', '\u25A0', '\u2605'];
+  const ADJ = ['Gilded', 'Hollow', 'Resonant', 'Brittle', 'Humming', 'Obsidian', 'Woven', 'Tidal', 'Static', 'Lucid'];
+  const NOUN = ['Lens', 'Anvil', 'Loom', 'Sigil', 'Cog', 'Chalice', 'Prism', 'Vessel', 'Idol', 'Compass'];
+  const TH = [10, 25, 50, 100, 150, 200];
+  const KINDS = ['out', 'cost', 'eff', 'click', 'glob'];
+  const MAX_FUSE = 10;
+  const PERKS = [
+    { id: 'head', name: 'Head Start', desc: 'Begin each run with 250 of the first resource per level', base: 1, max: 10 },
+    { id: 'thrift', name: 'Thrift', desc: 'Building cost growth -0.002 per level', base: 2, max: 5 },
+    { id: 'auto', name: 'Auto-Clicker', desc: '1 automatic click per second per level', base: 3, max: 5 },
+    { id: 'seer', name: 'Seer', desc: 'Golden orbs appear 12% sooner per level', base: 2, max: 4 },
+    { id: 'mind', name: 'Scholar', desc: '+10% Insight gained per level', base: 3, max: 5 }
   ];
+  const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
 
-  var nextId = 1;
-  var sessions = SEED.map(function (s) {
-    var e = KB[s[1]];
-    return {
-      id: nextId++,
-      title: s[0],
-      messages: [
-        { role: 'user', text: s[0] },
-        { role: 'bot', text: rand(INTROS) + '\n\n' + e.text + '\n\n' + FENCE + e.lang + '\n' + e.code + '\n' + FENCE + '\n\n' + e.note }
-      ]
+  const $ = id => document.getElementById(id);
+  const appEl = $('app');
+  const topEl = $('top');
+  const stageEl = $('stage');
+  const orbitEl = $('orbit');
+  const coreEl = $('core');
+  const cnameEl = $('cname');
+  const cpowEl = $('cpow');
+  const orbEl = $('orb');
+  const msgEl = $('msg');
+  const i1El = $('i1');
+  const i2El = $('i2');
+  const modeEl = $('mode');
+  const pwrEl = $('pwr');
+  const sideEl = $('side');
+  const tabsEl = $('tabs');
+  const panelEl = $('panel');
+  const tabBtns = Array.prototype.slice.call(tabsEl.querySelectorAll('button'));
+
+  const meta = {
+    insight: 0,
+    insightTotal: 0,
+    ascensions: 0,
+    perks: { head: 0, thrift: 0, auto: 0, seer: 0, mind: 0 }
+  };
+  let run = null;
+  let mode = 1;
+  let tab = 'up';
+  let armed = false;
+  let lastHtml = '';
+  let resEls = [];
+  let nodes = [];
+  let insEl = null;
+  let panelCount = 0;
+
+  function rng(a) {
+    return function () {
+      a |= 0;
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-  });
-  var activeId = sessions[0].id;
-  var busy = false;
-  var timer = null;
-
-  var app = document.getElementById('app');
-  var listEl = document.getElementById('sessions');
-  var msgEl = document.getElementById('messages');
-  var inputEl = document.getElementById('input');
-  var sendEl = document.getElementById('send');
-
-  function active() {
-    return sessions.filter(function (s) { return s.id === activeId; })[0];
   }
 
-  /* Turn raw text with fenced code blocks into DOM. Uses textContent only. */
-  function renderText(target, text) {
-    target.textContent = '';
-    text.split(FENCE).forEach(function (part, i) {
-      if (i % 2 === 0) {
-        part.split('\n\n').forEach(function (para) {
-          if (!para.trim()) return;
-          var p = document.createElement('p');
-          p.textContent = para.trim();
-          target.appendChild(p);
-        });
-      } else {
-        var nl = part.indexOf('\n');
-        var lang = nl === -1 ? part : part.slice(0, nl);
-        var code = nl === -1 ? '' : part.slice(nl + 1);
-        var box = document.createElement('div');
-        box.className = 'code';
-        var head = document.createElement('div');
-        head.className = 'code-head';
-        head.textContent = lang;
-        var pre = document.createElement('pre');
-        var c = document.createElement('code');
-        c.textContent = code;
-        pre.appendChild(c);
-        box.appendChild(head);
-        box.appendChild(pre);
-        target.appendChild(box);
-      }
-    });
+  function fmt(n) {
+    if (!isFinite(n)) return '\u221E';
+    if (n < 0) n = 0;
+    if (n < 1000) return String(Math.floor(n * 10) / 10);
+    const e = Math.floor(Math.log10(n) / 3);
+    if (e >= SUF.length) return n.toExponential(2);
+    return (n / Math.pow(1000, e)).toFixed(2) + SUF[e];
   }
 
-  function addRow(role) {
-    var row = document.createElement('div');
-    row.className = 'row ' + role;
-    var b = document.createElement('div');
-    b.className = 'bubble';
-    row.appendChild(b);
-    msgEl.appendChild(row);
-    return b;
+  function fmtRate(r) {
+    return (r >= 0 ? '+' : '-') + fmt(Math.abs(r));
   }
 
-  function renderSidebar() {
-    listEl.textContent = '';
-    sessions.forEach(function (s) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'session' + (s.id === activeId ? ' active' : '');
-      b.textContent = s.title;
-      b.addEventListener('click', function () {
-        stream(null);
-        activeId = s.id;
-        app.classList.remove('open');
-        renderAll();
+  function genWorld(seed) {
+    const r = rng(seed);
+    const tiers = [];
+    for (let t = 0; t < TIERS; t++) {
+      const p = POOLS[t][Math.floor(r() * POOLS[t].length)];
+      tiers.push({
+        res: p[0],
+        bld: p[1],
+        glyph: GLYPHS[t],
+        base: t === 0 ? 15 : Math.round(100 * Math.pow(2.5 + r() * 0.3, t - 1)),
+        growth: 1.13 + r() * 0.04,
+        ratio: t === 0 ? 0 : 1.8 + r() * 0.6
       });
-      listEl.appendChild(b);
-    });
-  }
-
-  function renderMessages() {
-    msgEl.textContent = '';
-    var s = active();
-    if (!s.messages.length) {
-      var e = document.createElement('div');
-      e.id = 'empty';
-      e.textContent = 'What can I help with?';
-      msgEl.appendChild(e);
-      return;
     }
-    s.messages.forEach(function (m) {
-      var b = addRow(m.role);
-      if (m.role === 'bot') renderText(b, m.text); else b.textContent = m.text;
+    const kinds = KINDS.slice();
+    for (let i = kinds.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      const x = kinds[i];
+      kinds[i] = kinds[j];
+      kinds[j] = x;
+    }
+    const recipes = kinds.map((kind, i) => {
+      const target = kind === 'eff' ? 1 + Math.floor(r() * (TIERS - 1)) : Math.floor(r() * TIERS);
+      const name = ADJ[Math.floor(r() * ADJ.length)] + ' ' + NOUN[Math.floor(r() * NOUN.length)];
+      return { kind: kind, a: i, b: i + 1, target: target, name: name };
     });
-    msgEl.scrollTop = msgEl.scrollHeight;
+    return { seed: seed, tiers: tiers, recipes: recipes };
   }
 
-  function renderAll() {
-    renderSidebar();
-    renderMessages();
+  function nextOrb() {
+    return (40 + Math.random() * 50) * Math.max(0.3, 1 - 0.12 * meta.perks.seer);
   }
 
-  function setBusy(v) {
-    busy = v;
-    sendEl.disabled = v;
+  function newRun(seed) {
+    const z = () => new Array(TIERS).fill(0);
+    run = {
+      seed: seed,
+      world: genWorld(seed),
+      stock: z(),
+      total: z(),
+      owned: z(),
+      on: new Array(TIERS).fill(true),
+      eff: z(),
+      rate: z(),
+      revealed: [true, false, false, false, false, false],
+      upOut: z(),
+      upSyn: z(),
+      upClick: 0,
+      upReson: 0,
+      fuse: [0, 0, 0, 0, 0],
+      buffs: [],
+      time: 0,
+      clicks: 0,
+      autoAcc: 0,
+      orbIn: nextOrb(),
+      orbLeft: 0,
+      sel: 0,
+      note: 'Click the core.'
+    };
+    run.stock[0] = 250 * meta.perks.head;
   }
 
-  /* Reveal text in chunks. Passing null cancels a running stream. */
-  function stream(job) {
-    if (timer) { clearInterval(timer); timer = null; }
-    if (!job) { setBusy(false); return; }
-    var pos = 0;
-    setBusy(true);
-    job.bubble.classList.add('cursor');
-    timer = setInterval(function () {
-      pos = Math.min(job.text.length, pos + 3 + Math.floor(Math.random() * 5));
-      renderText(job.bubble, job.text.slice(0, pos));
-      msgEl.scrollTop = msgEl.scrollHeight;
-      if (pos >= job.text.length) {
-        clearInterval(timer);
-        timer = null;
-        job.bubble.classList.remove('cursor');
-        setBusy(false);
+  function say(text) {
+    run.note = text;
+  }
+
+  function fuseLvl(kind, target) {
+    let s = 0;
+    run.world.recipes.forEach((rc, i) => {
+      if (rc.kind === kind && (target === undefined || rc.target === target)) s += run.fuse[i];
+    });
+    return s;
+  }
+
+  function hasBuff(k) {
+    return run.buffs.some(b => b.k === k);
+  }
+
+  function gm() {
+    return (1 + 0.08 * meta.insightTotal) * (1 + 0.12 * fuseLvl('glob'));
+  }
+
+  function unit(t) {
+    let m = Math.pow(2, run.upOut[t]) * (1 + 0.35 * fuseLvl('out', t)) * gm();
+    if (t > 0 && run.upSyn[t]) m *= 1 + 0.02 * run.owned[t - 1];
+    if (hasBuff('frenzy')) m *= 5;
+    return m;
+  }
+
+  function need(t) {
+    return run.world.tiers[t].ratio * Math.max(0.4, 1 - 0.08 * fuseLvl('eff', t));
+  }
+
+  function prod0() {
+    return run.owned[0] * unit(0);
+  }
+
+  function clickPower() {
+    let c = (Math.pow(2, run.upClick) * gm() + 0.04 * run.upReson * prod0()) * (1 + 0.5 * fuseLvl('click'));
+    if (hasBuff('storm')) c *= 25;
+    return c;
+  }
+
+  function growth(t) {
+    return Math.max(1.05, run.world.tiers[t].growth - 0.002 * meta.perks.thrift);
+  }
+
+  function costMult(t) {
+    return Math.max(0.25, 1 - 0.07 * fuseLvl('cost', t));
+  }
+
+  function resOf(t) {
+    return t === 0 ? 0 : t - 1;
+  }
+
+  function firstCost(t) {
+    return run.world.tiers[t].base * Math.pow(growth(t), run.owned[t]) * costMult(t);
+  }
+
+  function bulkCost(t, k) {
+    const g = growth(t);
+    const f = firstCost(t);
+    return k === 1 ? f : f * (Math.pow(g, k) - 1) / (g - 1);
+  }
+
+  function maxBuy(t) {
+    const s = run.stock[resOf(t)];
+    const f = firstCost(t);
+    const g = growth(t);
+    if (s < f) return 0;
+    let k = Math.floor(Math.log(1 + s * (g - 1) / f) / Math.log(g));
+    while (k > 0 && bulkCost(t, k) > s) k--;
+    return k;
+  }
+
+  function buyCount(t) {
+    return mode === 'max' ? Math.max(1, maxBuy(t)) : mode;
+  }
+
+  function buy(t) {
+    const k = buyCount(t);
+    const c = bulkCost(t, k);
+    const rs = resOf(t);
+    if (run.stock[rs] < c) return false;
+    run.stock[rs] -= c;
+    run.owned[t] += k;
+    return true;
+  }
+
+  function doClick() {
+    const c = clickPower();
+    run.stock[0] += c;
+    run.total[0] += c;
+    run.clicks++;
+    return c;
+  }
+
+  function upgrades() {
+    const T = run.world.tiers;
+    const L = [];
+    const cc = 80 * Math.pow(6, run.upClick);
+    if (run.upClick < 8) {
+      L.push({
+        id: 'click', name: 'Reinforced Core', desc: 'Click power x2',
+        cost: [0, cc], vis: run.total[0] >= cc * 0.3,
+        apply: () => { run.upClick++; }
+      });
+    }
+    const rc = 300 * Math.pow(5, run.upReson);
+    if (run.upReson < 10) {
+      L.push({
+        id: 'reson', name: 'Resonance', desc: 'Clicks add 4% of ' + T[0].res + ' per second',
+        cost: [0, rc], vis: run.owned[0] >= 5 && run.total[0] >= rc * 0.3,
+        apply: () => { run.upReson++; }
+      });
+    }
+    for (let t = 0; t < TIERS; t++) {
+      const u = run.upOut[t];
+      if (u < TH.length) {
+        L.push({
+          id: 'out' + t, name: T[t].bld + ' Tuning ' + (u + 1), desc: T[t].bld + ' output x2',
+          cost: [t, 100 * Math.pow(5, u) * Math.pow(3.2, t)], vis: run.owned[t] >= TH[u],
+          apply: () => { run.upOut[t]++; }
+        });
       }
-    }, 20);
+      if (t > 0 && !run.upSyn[t]) {
+        L.push({
+          id: 'syn' + t, name: 'Chain: ' + T[t].bld, desc: T[t].bld + ' output +2% per ' + T[t - 1].bld,
+          cost: [t, 100 * Math.pow(3.5, t)], vis: run.owned[t] >= 1 && run.owned[t - 1] >= 10,
+          apply: () => { run.upSyn[t] = 1; }
+        });
+      }
+    }
+    return L;
   }
 
-  function send() {
-    var text = inputEl.value.trim();
-    if (!text || busy) return;
-    var s = active();
-    var first = !s.messages.length;
-    s.messages.push({ role: 'user', text: text });
-    if (first) s.title = text.length > 40 ? text.slice(0, 40) + '...' : text;
-    var answer = buildAnswer(text);
-    s.messages.push({ role: 'bot', text: answer });
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
-    renderSidebar();
-    if (first) msgEl.textContent = '';
-    /* Re-render history except the new answer, then stream the answer into place */
-    var empty = msgEl.querySelector('#empty');
-    if (empty) empty.remove();
-    var ub = addRow('user');
-    ub.textContent = text;
-    var bb = addRow('bot');
-    msgEl.scrollTop = msgEl.scrollHeight;
-    /* Short delay imitates "thinking" */
-    setBusy(true);
-    timer = setTimeout(function () { timer = null; stream({ bubble: bb, text: answer }); }, 400);
+  function fuseCost(i) {
+    const rc = run.world.recipes[i];
+    const m = Math.pow(2.4, run.fuse[i]);
+    return [Math.round(25 * Math.pow(2.8, rc.a) * m), Math.round(12 * Math.pow(2.8, rc.b) * m)];
   }
 
-  document.getElementById('new-chat').addEventListener('click', function () {
-    if (timer) { clearTimeout(timer); clearInterval(timer); timer = null; }
-    setBusy(false);
-    var s = { id: nextId++, title: 'New chat', messages: [] };
-    sessions.unshift(s);
-    activeId = s.id;
-    app.classList.remove('open');
-    renderAll();
-    inputEl.focus();
+  function recipeDesc(rc) {
+    const T = run.world.tiers;
+    if (rc.kind === 'out') return T[rc.target].bld + ' output +35% per level';
+    if (rc.kind === 'cost') return T[rc.target].bld + ' cost -7% per level';
+    if (rc.kind === 'eff') return T[rc.target].bld + ' input need -8% per level';
+    if (rc.kind === 'click') return 'Click power +50% per level';
+    return 'All production +12% per level';
+  }
+
+  function gainInsight() {
+    return Math.floor(Math.sqrt(run.total[0] / 2e5) * (1 + 0.1 * meta.perks.mind));
+  }
+
+  function spawnOrb() {
+    orbEl.style.left = (8 + Math.random() * 72) + '%';
+    orbEl.style.top = (8 + Math.random() * 72) + '%';
+    orbEl.hidden = false;
+    run.orbLeft = 9;
+  }
+
+  function addBuff(k, label, secs) {
+    run.buffs = run.buffs.filter(b => b.k !== k);
+    run.buffs.push({ k: k, label: label, until: run.time + secs });
+  }
+
+  function orbReward() {
+    const r = Math.random();
+    if (r < 0.4) {
+      addBuff('frenzy', 'Frenzy x5', 25);
+      say('Frenzy: production x5 for 25s');
+    } else if (r < 0.7) {
+      const g = Math.max(100, prod0() * 90, clickPower() * 30);
+      run.stock[0] += g;
+      run.total[0] += g;
+      say('Windfall: +' + fmt(g) + ' ' + run.world.tiers[0].res);
+    } else {
+      addBuff('storm', 'Click storm x25', 15);
+      say('Click storm: click power x25 for 15s');
+    }
+  }
+
+  function tick(dt) {
+    const T = run.world.tiers;
+    run.time += dt;
+    run.buffs = run.buffs.filter(b => b.until > run.time);
+    const flow = new Array(TIERS).fill(0);
+    const made0 = prod0() * dt;
+    run.stock[0] += made0;
+    run.total[0] += made0;
+    flow[0] += made0;
+    for (let t = 1; t < TIERS; t++) {
+      const n = run.owned[t];
+      if (!n || !run.on[t]) {
+        run.eff[t] = 0;
+        continue;
+      }
+      const want = n * need(t) * dt;
+      const have = run.stock[t - 1];
+      const f = want > 0 ? Math.min(1, have / want) : 0;
+      const used = want * f;
+      const made = n * unit(t) * f * dt;
+      run.stock[t - 1] = Math.max(0, have - used);
+      flow[t - 1] -= used;
+      run.stock[t] += made;
+      run.total[t] += made;
+      flow[t] += made;
+      run.eff[t] = f;
+    }
+    for (let t = 0; t < TIERS; t++) {
+      run.rate[t] += (flow[t] / dt - run.rate[t]) * Math.min(1, dt * 3);
+      if (t > 0 && !run.revealed[t] && run.total[t - 1] >= T[t].base * 0.5) {
+        run.revealed[t] = true;
+        say(T[t].bld + ' unlocked');
+      }
+    }
+    run.autoAcc += meta.perks.auto * dt;
+    while (run.autoAcc >= 1) {
+      run.autoAcc -= 1;
+      doClick();
+    }
+    if (orbEl.hidden) {
+      run.orbIn -= dt;
+      if (run.orbIn <= 0) spawnOrb();
+    } else {
+      run.orbLeft -= dt;
+      if (run.orbLeft <= 0) {
+        orbEl.hidden = true;
+        run.orbIn = nextOrb();
+      }
+    }
+  }
+
+  function buildStatic() {
+    const T = run.world.tiers;
+    topEl.innerHTML = '';
+    resEls = T.map(t => {
+      const d = document.createElement('div');
+      d.className = 'res';
+      d.hidden = true;
+      d.innerHTML = '<span></span><b></b><i></i>';
+      d.children[0].textContent = t.res;
+      topEl.appendChild(d);
+      return { d: d, v: d.children[1], r: d.children[2] };
+    });
+    const id = document.createElement('div');
+    id.className = 'res';
+    id.hidden = true;
+    id.innerHTML = '<span>Insight</span><b></b><i></i>';
+    topEl.appendChild(id);
+    insEl = { d: id, v: id.children[1], r: id.children[2] };
+
+    nodes.forEach(n => n.el.remove());
+    nodes = T.map((t, i) => {
+      const a = -Math.PI / 2 + i * 2 * Math.PI / TIERS;
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'node';
+      el.hidden = true;
+      el.title = t.bld;
+      el.style.left = (50 + 39 * Math.cos(a)) + '%';
+      el.style.top = (50 + 39 * Math.sin(a)) + '%';
+      el.innerHTML = '<span class="g"></span><span class="c"></span><span class="p"></span>';
+      el.children[0].textContent = t.glyph;
+      el.addEventListener('click', () => {
+        run.sel = i;
+        buy(i);
+        updateAll();
+      });
+      orbitEl.appendChild(el);
+      return { el: el, c: el.children[1], p: el.children[2] };
+    });
+    cnameEl.textContent = T[0].res;
+    orbEl.hidden = true;
+    lastHtml = '';
+  }
+
+  function updateTop() {
+    resEls.forEach((e, t) => {
+      const show = t === 0 || run.total[t] > 0 || run.stock[t] > 0;
+      e.d.hidden = !show;
+      if (!show) return;
+      e.v.textContent = fmt(run.stock[t]);
+      const net = run.rate[t];
+      e.r.textContent = fmtRate(net) + '/s';
+      e.r.className = net < -0.005 ? 'neg' : '';
+    });
+    insEl.d.hidden = meta.insightTotal < 1;
+    insEl.v.textContent = fmt(meta.insight);
+    insEl.r.textContent = '+' + Math.round(meta.insightTotal * 8) + '%';
+  }
+
+  function updateNodes() {
+    nodes.forEach((n, t) => {
+      n.el.hidden = !run.revealed[t];
+      if (!run.revealed[t]) return;
+      const k = buyCount(t);
+      const c = bulkCost(t, k);
+      n.c.textContent = run.owned[t];
+      n.p.textContent = fmt(c);
+      n.el.classList.toggle('can', run.stock[resOf(t)] >= c);
+      n.el.classList.toggle('off', t > 0 && run.owned[t] > 0 && !run.on[t]);
+      n.el.classList.toggle('starve', t > 0 && run.owned[t] > 0 && run.on[t] && run.eff[t] < 0.95);
+      n.el.classList.toggle('sel', run.sel === t);
+    });
+  }
+
+  function updateInfo() {
+    const t = run.sel;
+    const W = run.world.tiers;
+    const T = W[t];
+    const n = run.owned[t];
+    const k = buyCount(t);
+    i1El.textContent = T.bld + ' x' + n + ' | buy x' + k + ': ' + fmt(bulkCost(t, k)) + ' ' + W[resOf(t)].res;
+    let s;
+    if (t === 0) {
+      s = 'makes ' + fmt(unit(0)) + ' ' + T.res + '/s each';
+    } else {
+      s = 'eats ' + fmt(need(t)) + ' ' + W[t - 1].res + '/s, makes ' + fmt(unit(t)) + ' ' + T.res + '/s each';
+      if (n) s += run.on[t] ? ', running ' + Math.round(run.eff[t] * 100) + '%' : ', paused';
+    }
+    i2El.textContent = s;
+    modeEl.textContent = mode === 'max' ? 'Max' : 'x' + mode;
+    pwrEl.hidden = t === 0 || n === 0;
+    pwrEl.textContent = run.on[t] ? 'Pause' : 'Run';
+  }
+
+  function updateCore() {
+    cpowEl.textContent = '+' + fmt(clickPower()) + ' / click';
+  }
+
+  function updateMsg() {
+    const b = run.buffs.map(x => x.label + ' ' + Math.ceil(x.until - run.time) + 's').join(' | ');
+    msgEl.textContent = b || run.note;
+  }
+
+  function item(attrs, can, title, desc, cost) {
+    return '<button type="button" class="item' + (can ? ' can' : '') + '" ' + attrs + '><b>' + title +
+      '</b><em>' + cost + '</em><span>' + desc + '</span></button>';
+  }
+
+  function htmlUp() {
+    const T = run.world.tiers;
+    const list = upgrades().filter(u => u.vis);
+    if (!list.length) return '<p class="empty">No upgrades available yet. Build more.</p>';
+    return list.map(u => item(
+      'data-a="up" data-id="' + u.id + '"',
+      run.stock[u.cost[0]] >= u.cost[1],
+      u.name, u.desc, fmt(u.cost[1]) + ' ' + T[u.cost[0]].res
+    )).join('');
+  }
+
+  function htmlFuse() {
+    const T = run.world.tiers;
+    let h = '';
+    run.world.recipes.forEach((rc, i) => {
+      const L = run.fuse[i];
+      if (!(run.total[rc.b] > 0 || L > 0)) return;
+      const c = fuseCost(i);
+      const can = L < MAX_FUSE && run.stock[rc.a] >= c[0] && run.stock[rc.b] >= c[1];
+      const cost = L < MAX_FUSE ? fmt(c[0]) + ' ' + T[rc.a].res + ' + ' + fmt(c[1]) + ' ' + T[rc.b].res : 'Maxed';
+      h += item('data-a="fuse" data-i="' + i + '"', can, rc.name + ' (Lv ' + L + ')', recipeDesc(rc), cost);
+    });
+    return h || '<p class="empty">Nothing to fuse yet. Produce more resources.</p>';
+  }
+
+  function htmlAsc() {
+    const T = run.world.tiers;
+    const g = gainInsight();
+    let h = '<div class="asc"><p>Ascending resets this run and rerolls the world. Insight is kept and gives +8% production each.</p>';
+    h += item(
+      'data-a="asc"', g > 0,
+      armed ? 'Confirm: reset run' : 'Ascend',
+      g > 0 ? 'Gain ' + g + ' Insight' : 'Needs ' + fmt(2e5) + ' ' + T[0].res + ' earned in this run',
+      fmt(run.total[0]) + ' ' + T[0].res + ' earned'
+    );
+    PERKS.forEach((p, i) => {
+      const L = meta.perks[p.id];
+      const c = p.base * (L + 1);
+      h += item(
+        'data-a="perk" data-i="' + i + '"', L < p.max && meta.insight >= c,
+        p.name + ' (Lv ' + L + '/' + p.max + ')', p.desc, L < p.max ? c + ' Insight' : 'Maxed'
+      );
+    });
+    h += '<p class="meta">Seed ' + run.seed + ' | ' + Math.floor(run.time / 60) + ' min</p></div>';
+    return h;
+  }
+
+  function refreshPanel() {
+    const vis = { up: run.total[0] >= 25, fuse: run.total[1] >= 30, asc: run.total[0] >= 1e5 || meta.ascensions > 0 };
+    const any = vis.up || vis.fuse || vis.asc;
+    sideEl.hidden = !any;
+    appEl.classList.toggle('noside', !any);
+    if (!any) return;
+    if (!vis[tab]) tab = vis.up ? 'up' : vis.fuse ? 'fuse' : 'asc';
+    if (tab !== 'asc') armed = false;
+    tabBtns.forEach(b => {
+      b.hidden = !vis[b.dataset.tab];
+      b.classList.toggle('on', b.dataset.tab === tab);
+    });
+    const html = tab === 'up' ? htmlUp() : tab === 'fuse' ? htmlFuse() : htmlAsc();
+    if (html !== lastHtml) {
+      const st = panelEl.scrollTop;
+      panelEl.innerHTML = html;
+      panelEl.scrollTop = st;
+      lastHtml = html;
+    }
+  }
+
+  function updateAll() {
+    updateTop();
+    updateNodes();
+    updateInfo();
+    updateCore();
+    updateMsg();
+    panelCount++;
+    if (panelCount >= 5) {
+      panelCount = 0;
+      refreshPanel();
+    }
+  }
+
+  function pop(txt, x, y) {
+    if (stageEl.querySelectorAll('.pop').length > 14) return;
+    const d = document.createElement('div');
+    d.className = 'pop';
+    d.textContent = txt;
+    d.style.left = x + 'px';
+    d.style.top = y + 'px';
+    d.addEventListener('animationend', () => d.remove());
+    stageEl.appendChild(d);
+  }
+
+  coreEl.addEventListener('click', e => {
+    const c = doClick();
+    const r = stageEl.getBoundingClientRect();
+    let x;
+    let y;
+    if (e.clientX || e.clientY) {
+      x = e.clientX - r.left;
+      y = e.clientY - r.top;
+    } else {
+      const q = coreEl.getBoundingClientRect();
+      x = q.left - r.left + q.width / 2;
+      y = q.top - r.top + q.height / 2;
+    }
+    pop('+' + fmt(c), x, y);
+    updateAll();
   });
 
-  document.getElementById('menu').addEventListener('click', function () { app.classList.toggle('open'); });
-  document.getElementById('backdrop').addEventListener('click', function () { app.classList.remove('open'); });
-  sendEl.addEventListener('click', send);
-  inputEl.addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); }
-  });
-  inputEl.addEventListener('input', function () {
-    inputEl.style.height = 'auto';
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+  orbEl.addEventListener('click', () => {
+    orbEl.hidden = true;
+    run.orbIn = nextOrb();
+    orbReward();
+    updateAll();
   });
 
-  renderAll();
+  modeEl.addEventListener('click', () => {
+    mode = mode === 1 ? 10 : mode === 10 ? 'max' : 1;
+    updateAll();
+  });
+
+  pwrEl.addEventListener('click', () => {
+    const t = run.sel;
+    if (t > 0 && run.owned[t] > 0) run.on[t] = !run.on[t];
+    updateAll();
+  });
+
+  tabsEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-tab]');
+    if (!b) return;
+    tab = b.dataset.tab;
+    armed = false;
+    lastHtml = '';
+    refreshPanel();
+  });
+
+  panelEl.addEventListener('click', e => {
+    const el = e.target.closest('[data-a]');
+    if (!el) return;
+    const a = el.dataset.a;
+    if (a === 'up') {
+      const u = upgrades().find(x => x.id === el.dataset.id);
+      if (u && u.vis && run.stock[u.cost[0]] >= u.cost[1]) {
+        run.stock[u.cost[0]] -= u.cost[1];
+        u.apply();
+      }
+    } else if (a === 'fuse') {
+      const i = Number(el.dataset.i);
+      const rc = run.world.recipes[i];
+      const c = fuseCost(i);
+      if (run.fuse[i] < MAX_FUSE && run.stock[rc.a] >= c[0] && run.stock[rc.b] >= c[1]) {
+        run.stock[rc.a] -= c[0];
+        run.stock[rc.b] -= c[1];
+        run.fuse[i]++;
+        say(rc.name + ' reached level ' + run.fuse[i]);
+      }
+    } else if (a === 'perk') {
+      const p = PERKS[Number(el.dataset.i)];
+      const L = meta.perks[p.id];
+      const c = p.base * (L + 1);
+      if (L < p.max && meta.insight >= c) {
+        meta.insight -= c;
+        meta.perks[p.id]++;
+      }
+    } else if (a === 'asc') {
+      const g = gainInsight();
+      if (g >= 1) {
+        if (!armed) {
+          armed = true;
+        } else {
+          armed = false;
+          meta.insight += g;
+          meta.insightTotal += g;
+          meta.ascensions++;
+          newRun(Math.floor(Math.random() * 2147483646) + 1);
+          buildStatic();
+          say('Ascended. New world, seed ' + run.seed);
+        }
+      }
+    }
+    refreshPanel();
+    updateAll();
+  });
+
+  let last = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    let dt = Math.min(30, (now - last) / 1000);
+    last = now;
+    while (dt > 0) {
+      const s = Math.min(0.25, dt);
+      tick(s);
+      dt -= s;
+    }
+    updateAll();
+  }, 100);
+
+  newRun(Math.floor(Math.random() * 2147483646) + 1);
+  buildStatic();
+  updateAll();
+  refreshPanel();
 })();
