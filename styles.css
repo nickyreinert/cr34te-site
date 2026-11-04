@@ -1,4 +1,5 @@
 html,body{margin:0;height:100%;overflow:hidden;background:#0b0c0f}
 #c{display:block;width:100%;height:100dvh;touch-action:none}
 #drop{position:fixed;left:12px;bottom:12px;padding:10px 16px;border:1px solid #555;border-radius:8px;background:#1d1f24;color:#ddd;font:14px sans-serif}
-#hint{position:fixed;left:50%;top:12px;transform:translateX(-50%);color:#9a9ca3;font:13px sans-serif;pointer-events:none}
+#hud{position:fixed;left:12px;right:12px;top:10px;color:#c9cbd2;font:12px/1.4 sans-serif;pointer-events:none}
+#hint{position:fixed;left:50%;top:52px;transform:translateX(-50%);width:92vw;text-align:center;color:#9a9ca3;font:13px sans-serif;pointer-events:none}
