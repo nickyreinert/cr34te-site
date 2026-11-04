@@ -1,689 +1,470 @@
+// Useless box: raymarched WebGL1 scene, state derived from a timeline, procedural Web Audio
 (function () {
-  'use strict';
+'use strict';
+const VS = `attribute vec2 aP;
+void main(){gl_Position=vec4(aP,0.0,1.0);}`;
+const FS = `#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uRes;
+uniform vec3 uCam;
+uniform vec3 uFw;
+uniform vec3 uRt;
+uniform vec3 uUp;
+uniform vec3 uS;
+uniform vec3 uE;
+uniform vec3 uF;
+uniform vec2 uLC;
+uniform vec2 uLD;
+uniform vec4 uOA[8];
+uniform vec4 uOB[8];
+const vec3 LD=vec3(-0.433,0.736,0.520);
+const vec3 SB=vec3(0.30,0.70,-0.65);
+float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vn(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h21(i),h21(i+vec2(1.0,0.0)),f.x),mix(h21(i+vec2(0.0,1.0)),h21(i+vec2(1.0,1.0)),f.x),f.y);}
+float fbm(vec2 p){float a=0.5;float s=0.0;for(int i=0;i<4;i++){s+=a*vn(p);p=p*2.03+vec2(17.1,3.7);a*=0.5;}return s;}
+float sdBox(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.0))+min(max(q.x,max(q.y,q.z)),0.0);}
+float sdRB(vec3 p,vec3 b,float r){return sdBox(p,b-r)-r;}
+float sdCap(vec3 p,vec3 a,vec3 b,float r){vec3 pa=p-a;vec3 ba=b-a;float h=clamp(dot(pa,ba)/(dot(ba,ba)+0.000001),0.0,1.0);return length(pa-ba*h)-r;}
+vec2 map(vec3 p){
+  float bx=sdRB(p,vec3(0.8,0.3,0.55),0.03);
+  float cd=-sdBox(p-vec3(0.35,0.03,0.0),vec3(0.17,0.28,0.17));
+  float d=max(bx,cd);
+  float m=cd>bx?6.0:1.0;
+  vec3 q=p-vec3(0.35,0.3,-0.17);
+  vec3 l=vec3(q.x,q.y*uLC.x-q.z*uLC.y,q.y*uLC.y+q.z*uLC.x);
+  float dl=sdRB(l-vec3(0.0,-0.012,0.17),vec3(0.164,0.012,0.164),0.004);
+  if(dl<d){d=dl;m=1.0;}
+  vec3 pv=vec3(-0.3,0.345,0.0);
+  vec3 ld=vec3(uLD.x,uLD.y,0.0);
+  float dr=sdCap(p,pv,pv+ld*0.17,0.011);
+  if(dr<d){d=dr;m=5.0;}
+  float dk=length(p-pv-ld*0.17)-0.034;
+  if(dk<d){d=dk;m=4.0;}
+  float dp=sdRB(p-vec3(-0.3,0.312,0.0),vec3(0.1,0.012,0.06),0.006);
+  dp=min(dp,sdCap(p,vec3(-0.3,0.345,-0.045),vec3(-0.3,0.345,0.045),0.027));
+  if(dp<d){d=dp;m=3.0;}
+  float da=min(sdCap(p,uS,uE,0.024),sdCap(p,uE,uF,0.019));
+  if(da<d){d=da;m=5.0;}
+  float dj=min(length(p-uS)-0.036,length(p-uE)-0.031);
+  dj=min(dj,length(p-uF)-0.024);
+  if(dj<d){d=dj;m=3.0;}
+  for(int i=0;i<8;i++){
+    vec4 a=uOA[i];vec4 b=uOB[i];
+    if(b.x>0.5){
+      vec3 o=p-a.xyz;float dO;
+      if(b.x<1.5){dO=length(o)-a.w;}
+      else{
+        float cy=cos(b.z);float sy=sin(b.z);
+        o=vec3(o.x*cy+o.z*sy,o.y,-o.x*sy+o.z*cy);
+        if(b.x<2.5){dO=sdRB(o,vec3(a.w*0.8),a.w*0.12);}
+        else{vec2 dd=vec2(length(o.xz)-a.w+0.01,abs(o.y)-a.w*0.7+0.01);dO=min(max(dd.x,dd.y),0.0)+length(max(dd,0.0))-0.01;}
+      }
+      if(dO<d){d=dO;m=7.0+float(i);}
+    }
+  }
+  return vec2(d,m);
+}
+vec2 trace(vec3 ro,vec3 rd,float t0,float t1){float t=t0;float m=-1.0;for(int i=0;i<96;i++){vec2 h=map(ro+rd*t);if(h.x<0.0005*t){m=h.y;break;}t+=h.x*0.9;if(t>t1)break;}return vec2(t,m);}
+vec3 nor(vec3 p){vec2 e=vec2(1.0,-1.0)*0.0006;return normalize(e.xyy*map(p+e.xyy).x+e.yyx*map(p+e.yyx).x+e.yxy*map(p+e.yxy).x+e.xxx*map(p+e.xxx).x);}
+float shadow(vec3 ro,vec3 rd){float res=1.0;float t=0.01;for(int i=0;i<32;i++){float h=map(ro+rd*t).x;res=min(res,10.0*h/t);t+=clamp(h,0.01,0.2);if(res<0.003||t>3.0)break;}res=clamp(res,0.0,1.0);return res*res*(3.0-2.0*res);}
+float occ(vec3 p,vec3 n){float o=0.0;float s=1.0;for(int i=0;i<5;i++){float h=0.01+0.12*float(i)/4.0;float d=map(p+n*h).x;o+=(h-d)*s;s*=0.85;}return clamp(1.0-2.0*o,0.0,1.0);}
+vec3 wood(vec2 u){
+  float w=fbm(vec2(u.x*1.3,u.y*5.0));
+  float r=0.5+0.5*sin(u.y*22.0+w*9.0);
+  float fine=fbm(vec2(u.x*2.0,u.y*90.0));
+  vec3 c=mix(vec3(0.30,0.15,0.06),vec3(0.62,0.38,0.18),smoothstep(0.1,0.9,r*0.65+fine*0.5));
+  return c*(0.85+0.3*fine);
+}
+vec2 wuv(vec3 p,vec3 n){vec3 a=abs(n);if(a.y>0.7)return vec2(p.x,p.z);if(a.z>0.7)return vec2(p.x,p.y);return vec2(p.z,p.y);}
+vec3 env(vec3 r){
+  vec3 c=mix(vec3(0.06,0.055,0.05),vec3(0.3,0.36,0.48),smoothstep(-0.2,0.9,r.y));
+  float s=dot(r,SB);
+  c+=vec3(5.0,4.4,3.5)*smoothstep(0.92,0.975,s);
+  c+=vec3(1.0,0.8,0.6)*pow(max(s,0.0),6.0)*0.8;
+  return c;
+}
+vec3 shade(vec3 p,vec3 n,vec3 rd,float m){
+  vec3 al=vec3(0.5);float rg=0.5;float mt=0.0;
+  if(m<1.5){al=wood(wuv(p,n));rg=0.3;}
+  else if(m<2.5){al=vec3(0.07,0.075,0.085)*(0.75+0.5*fbm(p.xz*5.0));rg=0.55;}
+  else if(m<3.5){al=vec3(0.95,0.64,0.30);rg=0.3;mt=1.0;}
+  else if(m<4.5){al=vec3(0.55,0.02,0.02);rg=0.15;}
+  else if(m<5.5){al=vec3(0.78,0.8,0.82);rg=0.28;mt=1.0;}
+  else if(m<6.5){al=vec3(0.015,0.014,0.013);rg=0.7;}
+  else{float k=m-7.0;al=0.5+0.5*cos(6.2832*(k*0.37+vec3(0.0,0.33,0.67)));al=al*al*0.8;rg=0.35;}
+  vec3 f0=mix(vec3(0.04),al,mt);
+  vec3 dif=al*(1.0-mt);
+  float sh=shadow(p+n*0.003,LD);
+  float ao=occ(p,n);
+  float nl=max(dot(n,LD),0.0);
+  float spot=1.0/(1.0+0.12*dot(p.xz,p.xz));
+  vec3 v=-rd;
+  vec3 h=normalize(LD+v);
+  float nh=max(dot(n,h),0.0);
+  float a2=pow(rg,4.0);
+  float dd=nh*nh*(a2-1.0)+1.0;
+  float D=min(a2/(3.14159*dd*dd),30.0);
+  vec3 F=f0+(1.0-f0)*pow(1.0-max(dot(n,v),0.0),5.0);
+  vec3 key=vec3(1.0,0.88,0.72)*3.4*spot;
+  vec3 amb=mix(vec3(0.05,0.045,0.04),vec3(0.2,0.24,0.33),0.5+0.5*n.y);
+  float nf=max(dot(n,vec3(0.45,0.25,0.85)),0.0);
+  vec3 col=dif*(key*nl*sh+amb*ao*1.6+vec3(0.28,0.3,0.36)*nf*ao);
+  col+=key*D*F*nl*sh*0.25;
+  col+=env(reflect(rd,n))*F*ao*mix(1.0,0.25,rg);
+  if(m>5.5&&m<6.5)col+=vec3(0.25,0.12,0.04)*ao*0.5;
+  return col;
+}
+vec2 aabb(vec3 ro,vec3 rd){
+  vec3 inv=1.0/rd;
+  vec3 t1=(vec3(-2.4,-0.35,-2.0)-ro)*inv;
+  vec3 t2=(vec3(2.4,3.4,2.0)-ro)*inv;
+  vec3 tn=min(t1,t2);vec3 tf=max(t1,t2);
+  return vec2(max(max(tn.x,tn.y),max(tn.z,0.0)),min(tf.x,min(tf.y,tf.z)));
+}
+vec3 bg(vec2 uv){
+  float v=1.0-clamp(length(uv)*0.55,0.0,1.0);
+  return mix(vec3(0.02,0.022,0.028),vec3(0.16,0.17,0.2),v*v);
+}
+void main(){
+  vec2 uv=(2.0*gl_FragCoord.xy-uRes)/uRes.y;
+  vec3 rd=normalize(uFw*1.6+uRt*uv.x+uUp*uv.y);
+  vec3 ro=uCam;
+  vec3 col=bg(uv);
+  float tT=rd.y<-0.0001?(-0.3-ro.y)/rd.y:1e9;
+  vec2 bb=aabb(ro,rd);
+  float tb=1e9;float m=-1.0;
+  if(bb.y>bb.x){vec2 r=trace(ro,rd,bb.x,min(bb.y,tT));tb=r.x;m=r.y;}
+  if(m>0.0&&tb<tT){
+    vec3 p=ro+rd*tb;
+    col=shade(p,nor(p),rd,m);
+  }else if(tT<1e8){
+    vec3 c=shade(ro+rd*tT,vec3(0.0,1.0,0.0),rd,2.0);
+    col=mix(c,col,clamp(1.0-exp(-0.06*max(tT-4.0,0.0)),0.0,1.0));
+  }
+  col*=1.0-0.2*dot(uv*0.5,uv*0.5);
+  col=(col*(2.51*col+0.03))/(col*(2.43*col+0.59)+0.14);
+  col=pow(clamp(col,0.0,1.0),vec3(1.0/2.2));
+  col+=(h21(gl_FragCoord.xy)-0.5)/255.0;
+  gl_FragColor=vec4(col,1.0);
+}`;
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl', { antialias: false, alpha: false });
+if (!gl) { document.body.textContent = 'WebGL not available'; return; }
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { document.body.textContent = gl.getShaderInfoLog(s); throw new Error('shader'); }
+  return s;
+}
+const pg = gl.createProgram();
+gl.attachShader(pg, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(pg, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(pg);
+gl.useProgram(pg);
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(pg, 'aP');
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+const U = {};
+['uRes', 'uCam', 'uFw', 'uRt', 'uUp', 'uS', 'uE', 'uF', 'uLC', 'uLD', 'uOA', 'uOB'].forEach(n => { U[n] = gl.getUniformLocation(pg, n); });
 
-  const TIERS = 6;
-  const POOLS = [
-    [['Spark', 'Kindler'], ['Dust', 'Sifter'], ['Drop', 'Dripper']],
-    [['Ore', 'Smelter'], ['Ember', 'Furnace'], ['Shard', 'Crusher']],
-    [['Alloy', 'Foundry'], ['Glass', 'Kiln'], ['Resin', 'Press']],
-    [['Core', 'Reactor'], ['Lattice', 'Weaver'], ['Gear', 'Assembler']],
-    [['Prism', 'Refractor'], ['Plasma', 'Collider'], ['Nectar', 'Distillery']],
-    [['Essence', 'Nexus'], ['Aether', 'Spire'], ['Void', 'Engine']]
-  ];
-  const GLYPHS = ['\u2726', '\u25C6', '\u25B2', '\u25CF', '\u25A0', '\u2605'];
-  const ADJ = ['Gilded', 'Hollow', 'Resonant', 'Brittle', 'Humming', 'Obsidian', 'Woven', 'Tidal', 'Static', 'Lucid'];
-  const NOUN = ['Lens', 'Anvil', 'Loom', 'Sigil', 'Cog', 'Chalice', 'Prism', 'Vessel', 'Idol', 'Compass'];
-  const TH = [10, 25, 50, 100, 150, 200];
-  const KINDS = ['out', 'cost', 'eff', 'click', 'glob'];
-  const MAX_FUSE = 10;
-  const PERKS = [
-    { id: 'head', name: 'Head Start', desc: 'Begin each run with 250 of the first resource per level', base: 1, max: 10 },
-    { id: 'thrift', name: 'Thrift', desc: 'Building cost growth -0.002 per level', base: 2, max: 5 },
-    { id: 'auto', name: 'Auto-Clicker', desc: '1 automatic click per second per level', base: 3, max: 5 },
-    { id: 'seer', name: 'Seer', desc: 'Golden orbs appear 12% sooner per level', base: 2, max: 4 },
-    { id: 'mind', name: 'Scholar', desc: '+10% Insight gained per level', base: 3, max: 5 }
-  ];
-  const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+// Timeline constants (seconds after the random delay) and lever geometry
+const OFF = -0.55, ON = 0.55, PV = [-0.3, 0.345], L = 0.42;
+const TM = { open: [0, 0.35], rise: [0.3, 0.95], r1: [0.95, 1.5], r2: [1.5, 1.7], pull: [1.8, 2.4], ret: [2.5, 3.0], low: [3.0, 3.6], close: [3.55, 3.9], end: 4.0 };
+const now = () => performance.now() / 1000;
+const cl = (x, a, b) => Math.min(Math.max(x, a), b);
+const sg = (t, r) => { const x = cl((t - r[0]) / (r[1] - r[0]), 0, 1); return x * x * (3 - 2 * x); };
+const mx = (a, b, t) => a + (b - a) * t;
+const mv = (a, b, t) => [mx(a[0], b[0], t), mx(a[1], b[1], t)];
+let flipAt = null, delay = 0;
 
-  const $ = id => document.getElementById(id);
-  const appEl = $('app');
-  const topEl = $('top');
-  const stageEl = $('stage');
-  const orbitEl = $('orbit');
-  const coreEl = $('core');
-  const cnameEl = $('cname');
-  const cpowEl = $('cpow');
-  const orbEl = $('orb');
-  const msgEl = $('msg');
-  const i1El = $('i1');
-  const i2El = $('i2');
-  const modeEl = $('mode');
-  const pwrEl = $('pwr');
-  const sideEl = $('side');
-  const tabsEl = $('tabs');
-  const panelEl = $('panel');
-  const tabBtns = Array.prototype.slice.call(tabsEl.querySelectorAll('button'));
+// Finger contact point on the lever for lever angle a
+function fpt(a) {
+  const s = Math.sin(a), c = Math.cos(a);
+  return [PV[0] + s * 0.1224 + c * 0.05, PV[1] + c * 0.1224 - s * 0.05];
+}
 
-  const meta = {
-    insight: 0,
-    insightTotal: 0,
-    ascensions: 0,
-    perks: { head: 0, thrift: 0, auto: 0, seer: 0, mind: 0 }
+// Whole pose is a pure function of time since the flip
+function pose(t) {
+  const tt = flipAt === null ? -1 : t - flipAt - delay;
+  let a = OFF;
+  if (flipAt !== null) {
+    a = mx(OFF, ON, sg(t - flipAt, [0, 0.12]));
+    a = mx(a, OFF, sg(tt, TM.pull));
+  }
+  const phi = 1.95 * sg(tt, TM.open) * (1 - sg(tt, TM.close));
+  const S = [0.35, -0.6 + 0.94 * sg(tt, TM.rise) - 0.94 * sg(tt, TM.low)];
+  const up = [S[0], S[1] + 0.82];
+  const tip = [PV[0] + Math.sin(ON) * 0.17 + 0.11, PV[1] + Math.cos(ON) * 0.17 + 0.1];
+  let F = mv(up, tip, sg(tt, TM.r1));
+  F = mv(F, fpt(ON), sg(tt, TM.r2));
+  if (tt >= TM.pull[0]) F = fpt(a);
+  F = mv(F, up, sg(tt, TM.ret));
+  const dx = F[0] - S[0], dy = F[1] - S[1], len = Math.hypot(dx, dy) || 1e-6;
+  const d = cl(len, 0.05, 2 * L - 0.001), ux = dx / len, uy = dy / len, h = Math.sqrt(L * L - d * d / 4);
+  return {
+    tt, a, phi, S,
+    E: [S[0] + ux * d / 2 + uy * h, S[1] + uy * d / 2 - ux * h],
+    F: [S[0] + ux * d, S[1] + uy * d]
   };
-  let run = null;
-  let mode = 1;
-  let tab = 'up';
-  let armed = false;
-  let lastHtml = '';
-  let resEls = [];
-  let nodes = [];
-  let insEl = null;
-  let panelCount = 0;
+}
 
-  function rng(a) {
-    return function () {
-      a |= 0;
-      a = (a + 0x6D2B79F5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
+// Camera and projection (used for picking the lever)
+const nrm = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const crs = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+function cam() {
+  const W = cv.clientWidth, H = cv.clientHeight, D = Math.max(2.1, 1.7 * H / W);
+  const T = [0, 0.25, 0], pos = [T[0] + D * 0.22, T[1] + D * 0.42, T[2] + D * 0.88];
+  const fw = nrm([T[0] - pos[0], T[1] - pos[1], T[2] - pos[2]]);
+  const rt = nrm(crs(fw, [0, 1, 0]));
+  return { W, H, pos, fw, rt, up: crs(rt, fw) };
+}
+function proj(c, p) {
+  const r = [p[0] - c.pos[0], p[1] - c.pos[1], p[2] - c.pos[2]], z = dot(r, c.fw);
+  return [(1.6 * dot(r, c.rt) / z * c.H + c.W) / 2, c.H * (1 - 1.6 * dot(r, c.up) / z) / 2, z];
+}
+
+// Obstacles: simple falling bodies, inert with respect to the mechanism
+const obs = [];
+let nObs = 0;
+function spawn() {
+  const type = 1 + Math.floor(Math.random() * 3), r = 0.06 + Math.random() * 0.05;
+  let x, z, k = 0;
+  do { x = (Math.random() * 2 - 1) * 0.7; z = (Math.random() * 2 - 1) * 0.45; k++; } while (k < 20 && Math.abs(x + 0.3) < 0.25 && Math.abs(z) < 0.2);
+  obs[nObs % 8] = { type, r, h: [0, r, r * 0.8, r * 0.7][type], x, y: 2.6 + Math.random() * 0.4, z, vx: 0, vy: 0, vz: 0, yaw: Math.random() * 6.28 };
+  nObs++;
+}
+function pushOut(o, cx, cz, m, dt, k) {
+  const dx = o.x - cx, dz = o.z - cz;
+  if (Math.abs(dx) < m && Math.abs(dz) < m) {
+    const l = Math.hypot(dx, dz) || 1e-3;
+    o.vx += dx / l * k * dt;
+    o.vz += dz / l * k * dt;
   }
-
-  function fmt(n) {
-    if (!isFinite(n)) return '\u221E';
-    if (n < 0) n = 0;
-    if (n < 1000) return String(Math.floor(n * 10) / 10);
-    const e = Math.floor(Math.log10(n) / 3);
-    if (e >= SUF.length) return n.toExponential(2);
-    return (n / Math.pow(1000, e)).toFixed(2) + SUF[e];
-  }
-
-  function fmtRate(r) {
-    return (r >= 0 ? '+' : '-') + fmt(Math.abs(r));
-  }
-
-  function genWorld(seed) {
-    const r = rng(seed);
-    const tiers = [];
-    for (let t = 0; t < TIERS; t++) {
-      const p = POOLS[t][Math.floor(r() * POOLS[t].length)];
-      tiers.push({
-        res: p[0],
-        bld: p[1],
-        glyph: GLYPHS[t],
-        base: t === 0 ? 15 : Math.round(100 * Math.pow(2.5 + r() * 0.3, t - 1)),
-        growth: 1.13 + r() * 0.04,
-        ratio: t === 0 ? 0 : 1.8 + r() * 0.6
-      });
+}
+function step(dt, P) {
+  const pts = [P.E, P.F, [(P.E[0] + P.F[0]) / 2, (P.E[1] + P.F[1]) / 2], [(P.S[0] + P.E[0]) / 2, (P.S[1] + P.E[1]) / 2]];
+  for (const o of obs) {
+    o.vy -= 9 * dt; o.x += o.vx * dt; o.y += o.vy * dt; o.z += o.vz * dt;
+    const top = Math.abs(o.x) < 0.82 && Math.abs(o.z) < 0.57;
+    const g = (top ? 0.3 : -0.3) + o.h;
+    if (o.y < g) {
+      if (o.vy < -0.6) hit(o, -o.vy, top);
+      o.y = g;
+      o.vy = o.vy < -0.6 ? -o.vy * 0.3 : 0;
+      const f = Math.exp(-5 * dt);
+      o.vx *= f; o.vz *= f;
     }
-    const kinds = KINDS.slice();
-    for (let i = kinds.length - 1; i > 0; i--) {
-      const j = Math.floor(r() * (i + 1));
-      const x = kinds[i];
-      kinds[i] = kinds[j];
-      kinds[j] = x;
+    if (top && o.y < 0.3 + o.h + 0.15) {
+      if (P.phi > 0.05) pushOut(o, 0.35, 0, 0.2 + o.r * 0.5, dt, 14);
+      pushOut(o, -0.3, 0, 0.14 + o.r * 0.5, dt, 14);
     }
-    const recipes = kinds.map((kind, i) => {
-      const target = kind === 'eff' ? 1 + Math.floor(r() * (TIERS - 1)) : Math.floor(r() * TIERS);
-      const name = ADJ[Math.floor(r() * ADJ.length)] + ' ' + NOUN[Math.floor(r() * NOUN.length)];
-      return { kind: kind, a: i, b: i + 1, target: target, name: name };
-    });
-    return { seed: seed, tiers: tiers, recipes: recipes };
-  }
-
-  function nextOrb() {
-    return (40 + Math.random() * 50) * Math.max(0.3, 1 - 0.12 * meta.perks.seer);
-  }
-
-  function newRun(seed) {
-    const z = () => new Array(TIERS).fill(0);
-    run = {
-      seed: seed,
-      world: genWorld(seed),
-      stock: z(),
-      total: z(),
-      owned: z(),
-      on: new Array(TIERS).fill(true),
-      eff: z(),
-      rate: z(),
-      revealed: [true, false, false, false, false, false],
-      upOut: z(),
-      upSyn: z(),
-      upClick: 0,
-      upReson: 0,
-      fuse: [0, 0, 0, 0, 0],
-      buffs: [],
-      time: 0,
-      clicks: 0,
-      autoAcc: 0,
-      orbIn: nextOrb(),
-      orbLeft: 0,
-      sel: 0,
-      note: 'Click the core.'
-    };
-    run.stock[0] = 250 * meta.perks.head;
-  }
-
-  function say(text) {
-    run.note = text;
-  }
-
-  function fuseLvl(kind, target) {
-    let s = 0;
-    run.world.recipes.forEach((rc, i) => {
-      if (rc.kind === kind && (target === undefined || rc.target === target)) s += run.fuse[i];
-    });
-    return s;
-  }
-
-  function hasBuff(k) {
-    return run.buffs.some(b => b.k === k);
-  }
-
-  function gm() {
-    return (1 + 0.08 * meta.insightTotal) * (1 + 0.12 * fuseLvl('glob'));
-  }
-
-  function unit(t) {
-    let m = Math.pow(2, run.upOut[t]) * (1 + 0.35 * fuseLvl('out', t)) * gm();
-    if (t > 0 && run.upSyn[t]) m *= 1 + 0.02 * run.owned[t - 1];
-    if (hasBuff('frenzy')) m *= 5;
-    return m;
-  }
-
-  function need(t) {
-    return run.world.tiers[t].ratio * Math.max(0.4, 1 - 0.08 * fuseLvl('eff', t));
-  }
-
-  function prod0() {
-    return run.owned[0] * unit(0);
-  }
-
-  function clickPower() {
-    let c = (Math.pow(2, run.upClick) * gm() + 0.04 * run.upReson * prod0()) * (1 + 0.5 * fuseLvl('click'));
-    if (hasBuff('storm')) c *= 25;
-    return c;
-  }
-
-  function growth(t) {
-    return Math.max(1.05, run.world.tiers[t].growth - 0.002 * meta.perks.thrift);
-  }
-
-  function costMult(t) {
-    return Math.max(0.25, 1 - 0.07 * fuseLvl('cost', t));
-  }
-
-  function resOf(t) {
-    return t === 0 ? 0 : t - 1;
-  }
-
-  function firstCost(t) {
-    return run.world.tiers[t].base * Math.pow(growth(t), run.owned[t]) * costMult(t);
-  }
-
-  function bulkCost(t, k) {
-    const g = growth(t);
-    const f = firstCost(t);
-    return k === 1 ? f : f * (Math.pow(g, k) - 1) / (g - 1);
-  }
-
-  function maxBuy(t) {
-    const s = run.stock[resOf(t)];
-    const f = firstCost(t);
-    const g = growth(t);
-    if (s < f) return 0;
-    let k = Math.floor(Math.log(1 + s * (g - 1) / f) / Math.log(g));
-    while (k > 0 && bulkCost(t, k) > s) k--;
-    return k;
-  }
-
-  function buyCount(t) {
-    return mode === 'max' ? Math.max(1, maxBuy(t)) : mode;
-  }
-
-  function buy(t) {
-    const k = buyCount(t);
-    const c = bulkCost(t, k);
-    const rs = resOf(t);
-    if (run.stock[rs] < c) return false;
-    run.stock[rs] -= c;
-    run.owned[t] += k;
-    return true;
-  }
-
-  function doClick() {
-    const c = clickPower();
-    run.stock[0] += c;
-    run.total[0] += c;
-    run.clicks++;
-    return c;
-  }
-
-  function upgrades() {
-    const T = run.world.tiers;
-    const L = [];
-    const cc = 80 * Math.pow(6, run.upClick);
-    if (run.upClick < 8) {
-      L.push({
-        id: 'click', name: 'Reinforced Core', desc: 'Click power x2',
-        cost: [0, cc], vis: run.total[0] >= cc * 0.3,
-        apply: () => { run.upClick++; }
-      });
-    }
-    const rc = 300 * Math.pow(5, run.upReson);
-    if (run.upReson < 10) {
-      L.push({
-        id: 'reson', name: 'Resonance', desc: 'Clicks add 4% of ' + T[0].res + ' per second',
-        cost: [0, rc], vis: run.owned[0] >= 5 && run.total[0] >= rc * 0.3,
-        apply: () => { run.upReson++; }
-      });
-    }
-    for (let t = 0; t < TIERS; t++) {
-      const u = run.upOut[t];
-      if (u < TH.length) {
-        L.push({
-          id: 'out' + t, name: T[t].bld + ' Tuning ' + (u + 1), desc: T[t].bld + ' output x2',
-          cost: [t, 100 * Math.pow(5, u) * Math.pow(3.2, t)], vis: run.owned[t] >= TH[u],
-          apply: () => { run.upOut[t]++; }
-        });
-      }
-      if (t > 0 && !run.upSyn[t]) {
-        L.push({
-          id: 'syn' + t, name: 'Chain: ' + T[t].bld, desc: T[t].bld + ' output +2% per ' + T[t - 1].bld,
-          cost: [t, 100 * Math.pow(3.5, t)], vis: run.owned[t] >= 1 && run.owned[t - 1] >= 10,
-          apply: () => { run.upSyn[t] = 1; }
-        });
-      }
-    }
-    return L;
-  }
-
-  function fuseCost(i) {
-    const rc = run.world.recipes[i];
-    const m = Math.pow(2.4, run.fuse[i]);
-    return [Math.round(25 * Math.pow(2.8, rc.a) * m), Math.round(12 * Math.pow(2.8, rc.b) * m)];
-  }
-
-  function recipeDesc(rc) {
-    const T = run.world.tiers;
-    if (rc.kind === 'out') return T[rc.target].bld + ' output +35% per level';
-    if (rc.kind === 'cost') return T[rc.target].bld + ' cost -7% per level';
-    if (rc.kind === 'eff') return T[rc.target].bld + ' input need -8% per level';
-    if (rc.kind === 'click') return 'Click power +50% per level';
-    return 'All production +12% per level';
-  }
-
-  function gainInsight() {
-    return Math.floor(Math.sqrt(run.total[0] / 2e5) * (1 + 0.1 * meta.perks.mind));
-  }
-
-  function spawnOrb() {
-    orbEl.style.left = (8 + Math.random() * 72) + '%';
-    orbEl.style.top = (8 + Math.random() * 72) + '%';
-    orbEl.hidden = false;
-    run.orbLeft = 9;
-  }
-
-  function addBuff(k, label, secs) {
-    run.buffs = run.buffs.filter(b => b.k !== k);
-    run.buffs.push({ k: k, label: label, until: run.time + secs });
-  }
-
-  function orbReward() {
-    const r = Math.random();
-    if (r < 0.4) {
-      addBuff('frenzy', 'Frenzy x5', 25);
-      say('Frenzy: production x5 for 25s');
-    } else if (r < 0.7) {
-      const g = Math.max(100, prod0() * 90, clickPower() * 30);
-      run.stock[0] += g;
-      run.total[0] += g;
-      say('Windfall: +' + fmt(g) + ' ' + run.world.tiers[0].res);
-    } else {
-      addBuff('storm', 'Click storm x25', 15);
-      say('Click storm: click power x25 for 15s');
-    }
-  }
-
-  function tick(dt) {
-    const T = run.world.tiers;
-    run.time += dt;
-    run.buffs = run.buffs.filter(b => b.until > run.time);
-    const flow = new Array(TIERS).fill(0);
-    const made0 = prod0() * dt;
-    run.stock[0] += made0;
-    run.total[0] += made0;
-    flow[0] += made0;
-    for (let t = 1; t < TIERS; t++) {
-      const n = run.owned[t];
-      if (!n || !run.on[t]) {
-        run.eff[t] = 0;
-        continue;
-      }
-      const want = n * need(t) * dt;
-      const have = run.stock[t - 1];
-      const f = want > 0 ? Math.min(1, have / want) : 0;
-      const used = want * f;
-      const made = n * unit(t) * f * dt;
-      run.stock[t - 1] = Math.max(0, have - used);
-      flow[t - 1] -= used;
-      run.stock[t] += made;
-      run.total[t] += made;
-      flow[t] += made;
-      run.eff[t] = f;
-    }
-    for (let t = 0; t < TIERS; t++) {
-      run.rate[t] += (flow[t] / dt - run.rate[t]) * Math.min(1, dt * 3);
-      if (t > 0 && !run.revealed[t] && run.total[t - 1] >= T[t].base * 0.5) {
-        run.revealed[t] = true;
-        say(T[t].bld + ' unlocked');
-      }
-    }
-    run.autoAcc += meta.perks.auto * dt;
-    while (run.autoAcc >= 1) {
-      run.autoAcc -= 1;
-      doClick();
-    }
-    if (orbEl.hidden) {
-      run.orbIn -= dt;
-      if (run.orbIn <= 0) spawnOrb();
-    } else {
-      run.orbLeft -= dt;
-      if (run.orbLeft <= 0) {
-        orbEl.hidden = true;
-        run.orbIn = nextOrb();
+    if (P.tt > 0.3 && P.tt < 3.7) {
+      for (const q of pts) {
+        const dx = o.x - q[0], dy = o.y - q[1], dz = o.z, dd = Math.hypot(dx, dy, dz);
+        if (dd < o.r + 0.05 && dd > 1e-4) { o.vx = dx / dd * 2.5; o.vy = Math.max(o.vy, dy / dd * 2.5 + 1); o.vz = dz / dd * 2.5; }
       }
     }
   }
-
-  function buildStatic() {
-    const T = run.world.tiers;
-    topEl.innerHTML = '';
-    resEls = T.map(t => {
-      const d = document.createElement('div');
-      d.className = 'res';
-      d.hidden = true;
-      d.innerHTML = '<span></span><b></b><i></i>';
-      d.children[0].textContent = t.res;
-      topEl.appendChild(d);
-      return { d: d, v: d.children[1], r: d.children[2] };
-    });
-    const id = document.createElement('div');
-    id.className = 'res';
-    id.hidden = true;
-    id.innerHTML = '<span>Insight</span><b></b><i></i>';
-    topEl.appendChild(id);
-    insEl = { d: id, v: id.children[1], r: id.children[2] };
-
-    nodes.forEach(n => n.el.remove());
-    nodes = T.map((t, i) => {
-      const a = -Math.PI / 2 + i * 2 * Math.PI / TIERS;
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'node';
-      el.hidden = true;
-      el.title = t.bld;
-      el.style.left = (50 + 39 * Math.cos(a)) + '%';
-      el.style.top = (50 + 39 * Math.sin(a)) + '%';
-      el.innerHTML = '<span class="g"></span><span class="c"></span><span class="p"></span>';
-      el.children[0].textContent = t.glyph;
-      el.addEventListener('click', () => {
-        run.sel = i;
-        buy(i);
-        updateAll();
-      });
-      orbitEl.appendChild(el);
-      return { el: el, c: el.children[1], p: el.children[2] };
-    });
-    cnameEl.textContent = T[0].res;
-    orbEl.hidden = true;
-    lastHtml = '';
-  }
-
-  function updateTop() {
-    resEls.forEach((e, t) => {
-      const show = t === 0 || run.total[t] > 0 || run.stock[t] > 0;
-      e.d.hidden = !show;
-      if (!show) return;
-      e.v.textContent = fmt(run.stock[t]);
-      const net = run.rate[t];
-      e.r.textContent = fmtRate(net) + '/s';
-      e.r.className = net < -0.005 ? 'neg' : '';
-    });
-    insEl.d.hidden = meta.insightTotal < 1;
-    insEl.v.textContent = fmt(meta.insight);
-    insEl.r.textContent = '+' + Math.round(meta.insightTotal * 8) + '%';
-  }
-
-  function updateNodes() {
-    nodes.forEach((n, t) => {
-      n.el.hidden = !run.revealed[t];
-      if (!run.revealed[t]) return;
-      const k = buyCount(t);
-      const c = bulkCost(t, k);
-      n.c.textContent = run.owned[t];
-      n.p.textContent = fmt(c);
-      n.el.classList.toggle('can', run.stock[resOf(t)] >= c);
-      n.el.classList.toggle('off', t > 0 && run.owned[t] > 0 && !run.on[t]);
-      n.el.classList.toggle('starve', t > 0 && run.owned[t] > 0 && run.on[t] && run.eff[t] < 0.95);
-      n.el.classList.toggle('sel', run.sel === t);
-    });
-  }
-
-  function updateInfo() {
-    const t = run.sel;
-    const W = run.world.tiers;
-    const T = W[t];
-    const n = run.owned[t];
-    const k = buyCount(t);
-    i1El.textContent = T.bld + ' x' + n + ' | buy x' + k + ': ' + fmt(bulkCost(t, k)) + ' ' + W[resOf(t)].res;
-    let s;
-    if (t === 0) {
-      s = 'makes ' + fmt(unit(0)) + ' ' + T.res + '/s each';
-    } else {
-      s = 'eats ' + fmt(need(t)) + ' ' + W[t - 1].res + '/s, makes ' + fmt(unit(t)) + ' ' + T.res + '/s each';
-      if (n) s += run.on[t] ? ', running ' + Math.round(run.eff[t] * 100) + '%' : ', paused';
-    }
-    i2El.textContent = s;
-    modeEl.textContent = mode === 'max' ? 'Max' : 'x' + mode;
-    pwrEl.hidden = t === 0 || n === 0;
-    pwrEl.textContent = run.on[t] ? 'Pause' : 'Run';
-  }
-
-  function updateCore() {
-    cpowEl.textContent = '+' + fmt(clickPower()) + ' / click';
-  }
-
-  function updateMsg() {
-    const b = run.buffs.map(x => x.label + ' ' + Math.ceil(x.until - run.time) + 's').join(' | ');
-    msgEl.textContent = b || run.note;
-  }
-
-  function item(attrs, can, title, desc, cost) {
-    return '<button type="button" class="item' + (can ? ' can' : '') + '" ' + attrs + '><b>' + title +
-      '</b><em>' + cost + '</em><span>' + desc + '</span></button>';
-  }
-
-  function htmlUp() {
-    const T = run.world.tiers;
-    const list = upgrades().filter(u => u.vis);
-    if (!list.length) return '<p class="empty">No upgrades available yet. Build more.</p>';
-    return list.map(u => item(
-      'data-a="up" data-id="' + u.id + '"',
-      run.stock[u.cost[0]] >= u.cost[1],
-      u.name, u.desc, fmt(u.cost[1]) + ' ' + T[u.cost[0]].res
-    )).join('');
-  }
-
-  function htmlFuse() {
-    const T = run.world.tiers;
-    let h = '';
-    run.world.recipes.forEach((rc, i) => {
-      const L = run.fuse[i];
-      if (!(run.total[rc.b] > 0 || L > 0)) return;
-      const c = fuseCost(i);
-      const can = L < MAX_FUSE && run.stock[rc.a] >= c[0] && run.stock[rc.b] >= c[1];
-      const cost = L < MAX_FUSE ? fmt(c[0]) + ' ' + T[rc.a].res + ' + ' + fmt(c[1]) + ' ' + T[rc.b].res : 'Maxed';
-      h += item('data-a="fuse" data-i="' + i + '"', can, rc.name + ' (Lv ' + L + ')', recipeDesc(rc), cost);
-    });
-    return h || '<p class="empty">Nothing to fuse yet. Produce more resources.</p>';
-  }
-
-  function htmlAsc() {
-    const T = run.world.tiers;
-    const g = gainInsight();
-    let h = '<div class="asc"><p>Ascending resets this run and rerolls the world. Insight is kept and gives +8% production each.</p>';
-    h += item(
-      'data-a="asc"', g > 0,
-      armed ? 'Confirm: reset run' : 'Ascend',
-      g > 0 ? 'Gain ' + g + ' Insight' : 'Needs ' + fmt(2e5) + ' ' + T[0].res + ' earned in this run',
-      fmt(run.total[0]) + ' ' + T[0].res + ' earned'
-    );
-    PERKS.forEach((p, i) => {
-      const L = meta.perks[p.id];
-      const c = p.base * (L + 1);
-      h += item(
-        'data-a="perk" data-i="' + i + '"', L < p.max && meta.insight >= c,
-        p.name + ' (Lv ' + L + '/' + p.max + ')', p.desc, L < p.max ? c + ' Insight' : 'Maxed'
-      );
-    });
-    h += '<p class="meta">Seed ' + run.seed + ' | ' + Math.floor(run.time / 60) + ' min</p></div>';
-    return h;
-  }
-
-  function refreshPanel() {
-    const vis = { up: run.total[0] >= 25, fuse: run.total[1] >= 30, asc: run.total[0] >= 1e5 || meta.ascensions > 0 };
-    const any = vis.up || vis.fuse || vis.asc;
-    sideEl.hidden = !any;
-    appEl.classList.toggle('noside', !any);
-    if (!any) return;
-    if (!vis[tab]) tab = vis.up ? 'up' : vis.fuse ? 'fuse' : 'asc';
-    if (tab !== 'asc') armed = false;
-    tabBtns.forEach(b => {
-      b.hidden = !vis[b.dataset.tab];
-      b.classList.toggle('on', b.dataset.tab === tab);
-    });
-    const html = tab === 'up' ? htmlUp() : tab === 'fuse' ? htmlFuse() : htmlAsc();
-    if (html !== lastHtml) {
-      const st = panelEl.scrollTop;
-      panelEl.innerHTML = html;
-      panelEl.scrollTop = st;
-      lastHtml = html;
+  for (let i = 0; i < obs.length; i++) for (let j = i + 1; j < obs.length; j++) {
+    const a = obs[i], b = obs[j], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1e-3, m = (a.r + b.r) * 0.85;
+    if (l < m && Math.abs(a.y - b.y) < a.h + b.h) {
+      const p = (m - l) * 0.5 / l;
+      a.x -= dx * p; a.z -= dz * p; b.x += dx * p; b.z += dz * p;
     }
   }
+}
 
-  function updateAll() {
-    updateTop();
-    updateNodes();
-    updateInfo();
-    updateCore();
-    updateMsg();
-    panelCount++;
-    if (panelCount >= 5) {
-      panelCount = 0;
-      refreshPanel();
-    }
+// Audio
+let ac = null, bus, nb;
+const mt = {};
+let pp = { S: [0.35, -0.6], F: [0.35, 0.22], phi: 0 };
+function ir(sec) {
+  const n = ac.sampleRate * sec | 0, b = ac.createBuffer(2, n, ac.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); }
+  return b;
+}
+function initAudio() {
+  if (ac) { ac.resume(); return; }
+  const A = window.AudioContext || window.webkitAudioContext;
+  if (!A) return;
+  ac = new A();
+  const comp = ac.createDynamicsCompressor(), master = ac.createGain();
+  master.gain.value = 0.8;
+  master.connect(comp); comp.connect(ac.destination);
+  bus = ac.createGain(); bus.connect(master);
+  const rv = ac.createConvolver(), wg = ac.createGain();
+  rv.buffer = ir(1.2); wg.gain.value = 0.25;
+  bus.connect(wg); wg.connect(rv); rv.connect(master);
+  nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+  const d = nb.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 650; lp.Q.value = 2;
+  mt.g = ac.createGain(); mt.g.gain.value = 0;
+  mt.a = ac.createOscillator(); mt.a.type = 'sawtooth'; mt.a.frequency.value = 70;
+  mt.b = ac.createOscillator(); mt.b.type = 'triangle'; mt.b.frequency.value = 105;
+  mt.w = ac.createOscillator(); mt.w.frequency.value = 500;
+  mt.wg = ac.createGain(); mt.wg.gain.value = 0;
+  mt.a.connect(lp); mt.b.connect(lp); lp.connect(mt.g); mt.g.connect(bus);
+  mt.w.connect(mt.wg); mt.wg.connect(bus);
+  [mt.a, mt.b, mt.w].forEach(o => o.start());
+}
+function out(pan) {
+  const p = ac.createStereoPanner();
+  p.pan.value = cl(pan || 0, -1, 1);
+  p.connect(bus);
+  return p;
+}
+function noise(t, dur, f, q, g, type, pan, f2) {
+  const s = ac.createBufferSource();
+  s.buffer = nb; s.loop = true;
+  const fl = ac.createBiquadFilter();
+  fl.type = type; fl.Q.value = q;
+  fl.frequency.setValueAtTime(f, t);
+  if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  const ga = ac.createGain();
+  ga.gain.setValueAtTime(0.0001, t);
+  ga.gain.exponentialRampToValueAtTime(g, t + 0.004);
+  ga.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(fl); fl.connect(ga); ga.connect(out(pan));
+  s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+}
+function tone(t, f, f2, dur, g, pan, type) {
+  const o = ac.createOscillator();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(f, t);
+  o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  const ga = ac.createGain();
+  ga.gain.setValueAtTime(g, t);
+  ga.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(ga); ga.connect(out(pan));
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function ping(t, f, dur, g, pan) {
+  [1, 2.76, 5.4].forEach((r, i) => tone(t, f * r, f * r * 0.99, dur / (1 + i), g / (1 + i * 1.5), pan, 'sine'));
+}
+function click(g, pan) {
+  if (!ac) return;
+  const t = ac.currentTime;
+  noise(t, 0.03, 3500, 1.2, 0.5 * g, 'bandpass', pan);
+  noise(t, 0.012, 7000, 0.7, 0.3 * g, 'highpass', pan);
+  tone(t, 150, 60, 0.12, 0.5 * g, pan);
+  ping(t, 1800 + Math.random() * 300, 0.18, 0.12 * g, pan);
+}
+function clack() {
+  if (!ac) return;
+  click(1.3, 0.2);
+  tone(ac.currentTime, 95, 45, 0.2, 0.7, 0.2);
+}
+function thud(g) {
+  if (!ac) return;
+  const t = ac.currentTime;
+  tone(t, 110, 45, 0.25, 0.9 * g, 0.3);
+  noise(t, 0.15, 300, 0.8, 0.5 * g, 'lowpass', 0.3);
+}
+function creak(g, dir) {
+  if (!ac) return;
+  const t = ac.currentTime;
+  noise(t, 0.35, dir > 0 ? 350 : 1100, 8, 0.25 * g, 'bandpass', 0.3, dir > 0 ? 1100 : 350);
+  tone(t, dir > 0 ? 240 : 330, dir > 0 ? 330 : 240, 0.35, 0.03 * g, 0.3, 'sawtooth');
+}
+function hit(o, sp, top) {
+  if (!ac) return;
+  const t = ac.currentTime, g = Math.min(sp / 5, 1) * 0.6, pan = o.x / 1.2, f = (top ? 20 : 14) / o.r;
+  tone(t, f, f * 0.5, 0.18, g, pan);
+  noise(t, 0.09, top ? 900 : 500, 1, g * 0.7, 'bandpass', pan);
+  if (o.type === 2) ping(t, f * 5, 0.1, g * 0.25, pan);
+  if (o.type === 3) ping(t, f * 3.1, 0.2, g * 0.2, pan);
+}
+function motor(P, dt) {
+  if (!ac) return;
+  const v = (Math.hypot(P.S[0] - pp.S[0], P.S[1] - pp.S[1]) + Math.hypot(P.F[0] - pp.F[0], P.F[1] - pp.F[1]) + Math.abs(P.phi - pp.phi) * 0.2) / dt;
+  pp = { S: P.S, F: P.F, phi: P.phi };
+  const n = ac.currentTime;
+  mt.g.gain.setTargetAtTime(Math.min(v * 0.03, 0.09), n, 0.04);
+  mt.a.frequency.setTargetAtTime(70 + v * 30, n, 0.05);
+  mt.b.frequency.setTargetAtTime((70 + v * 30) * 1.503, n, 0.05);
+  mt.w.frequency.setTargetAtTime(500 + v * 500, n, 0.05);
+  mt.wg.gain.setTargetAtTime(Math.min(v * 0.004, 0.012), n, 0.05);
+}
+const X = (a, b, x) => a < x && b >= x;
+function events(a, b) {
+  if (X(a, b, TM.open[0])) creak(0.35, 1);
+  if (X(a, b, TM.open[1])) thud(0.6);
+  if (X(a, b, TM.r2[1])) click(0.5, -0.2);
+  if (X(a, b, TM.pull[1])) clack();
+  if (X(a, b, TM.close[0])) creak(0.35, -1);
+  if (X(a, b, TM.close[1])) thud(0.8);
+}
+
+// Input
+function flip() {
+  flipAt = now();
+  delay = 0.7 + Math.random() * 3.3;
+  document.getElementById('hint').style.display = 'none';
+  click(1, -0.3);
+}
+cv.addEventListener('pointerdown', e => {
+  initAudio();
+  if (flipAt !== null) return;
+  const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, c = cam();
+  for (const f of [0.35, 0.7, 1]) {
+    const q = proj(c, [PV[0] + Math.sin(OFF) * 0.17 * f, PV[1] + Math.cos(OFF) * 0.17 * f, 0]);
+    if (Math.hypot(x - q[0], y - q[1]) < 0.13 * 0.8 * c.H / q[2]) { flip(); return; }
   }
+});
+document.getElementById('drop').addEventListener('click', () => { initAudio(); spawn(); });
 
-  function pop(txt, x, y) {
-    if (stageEl.querySelectorAll('.pop').length > 14) return;
-    const d = document.createElement('div');
-    d.className = 'pop';
-    d.textContent = txt;
-    d.style.left = x + 'px';
-    d.style.top = y + 'px';
-    d.addEventListener('animationend', () => d.remove());
-    stageEl.appendChild(d);
-  }
-
-  coreEl.addEventListener('click', e => {
-    const c = doClick();
-    const r = stageEl.getBoundingClientRect();
-    let x;
-    let y;
-    if (e.clientX || e.clientY) {
-      x = e.clientX - r.left;
-      y = e.clientY - r.top;
-    } else {
-      const q = coreEl.getBoundingClientRect();
-      x = q.left - r.left + q.width / 2;
-      y = q.top - r.top + q.height / 2;
-    }
-    pop('+' + fmt(c), x, y);
-    updateAll();
-  });
-
-  orbEl.addEventListener('click', () => {
-    orbEl.hidden = true;
-    run.orbIn = nextOrb();
-    orbReward();
-    updateAll();
-  });
-
-  modeEl.addEventListener('click', () => {
-    mode = mode === 1 ? 10 : mode === 10 ? 'max' : 1;
-    updateAll();
-  });
-
-  pwrEl.addEventListener('click', () => {
-    const t = run.sel;
-    if (t > 0 && run.owned[t] > 0) run.on[t] = !run.on[t];
-    updateAll();
-  });
-
-  tabsEl.addEventListener('click', e => {
-    const b = e.target.closest('[data-tab]');
-    if (!b) return;
-    tab = b.dataset.tab;
-    armed = false;
-    lastHtml = '';
-    refreshPanel();
-  });
-
-  panelEl.addEventListener('click', e => {
-    const el = e.target.closest('[data-a]');
-    if (!el) return;
-    const a = el.dataset.a;
-    if (a === 'up') {
-      const u = upgrades().find(x => x.id === el.dataset.id);
-      if (u && u.vis && run.stock[u.cost[0]] >= u.cost[1]) {
-        run.stock[u.cost[0]] -= u.cost[1];
-        u.apply();
-      }
-    } else if (a === 'fuse') {
-      const i = Number(el.dataset.i);
-      const rc = run.world.recipes[i];
-      const c = fuseCost(i);
-      if (run.fuse[i] < MAX_FUSE && run.stock[rc.a] >= c[0] && run.stock[rc.b] >= c[1]) {
-        run.stock[rc.a] -= c[0];
-        run.stock[rc.b] -= c[1];
-        run.fuse[i]++;
-        say(rc.name + ' reached level ' + run.fuse[i]);
-      }
-    } else if (a === 'perk') {
-      const p = PERKS[Number(el.dataset.i)];
-      const L = meta.perks[p.id];
-      const c = p.base * (L + 1);
-      if (L < p.max && meta.insight >= c) {
-        meta.insight -= c;
-        meta.perks[p.id]++;
-      }
-    } else if (a === 'asc') {
-      const g = gainInsight();
-      if (g >= 1) {
-        if (!armed) {
-          armed = true;
-        } else {
-          armed = false;
-          meta.insight += g;
-          meta.insightTotal += g;
-          meta.ascensions++;
-          newRun(Math.floor(Math.random() * 2147483646) + 1);
-          buildStatic();
-          say('Ascended. New world, seed ' + run.seed);
-        }
-      }
-    }
-    refreshPanel();
-    updateAll();
-  });
-
-  let last = performance.now();
-  setInterval(() => {
-    const now = performance.now();
-    let dt = Math.min(30, (now - last) / 1000);
-    last = now;
-    while (dt > 0) {
-      const s = Math.min(0.25, dt);
-      tick(s);
-      dt -= s;
-    }
-    updateAll();
-  }, 100);
-
-  newRun(Math.floor(Math.random() * 2147483646) + 1);
-  buildStatic();
-  updateAll();
-  refreshPanel();
+// Rendering
+let sc = Math.min(window.devicePixelRatio || 1, 1.5) * 0.8;
+function resize() {
+  cv.width = Math.max(2, Math.round(cv.clientWidth * sc));
+  cv.height = Math.max(2, Math.round(cv.clientHeight * sc));
+  gl.viewport(0, 0, cv.width, cv.height);
+}
+window.addEventListener('resize', resize);
+resize();
+const OA = new Float32Array(32), OB = new Float32Array(32);
+function draw(P) {
+  const c = cam();
+  gl.uniform2f(U.uRes, cv.width, cv.height);
+  gl.uniform3fv(U.uCam, c.pos);
+  gl.uniform3fv(U.uFw, c.fw);
+  gl.uniform3fv(U.uRt, c.rt);
+  gl.uniform3fv(U.uUp, c.up);
+  gl.uniform3f(U.uS, P.S[0], P.S[1], 0);
+  gl.uniform3f(U.uE, P.E[0], P.E[1], 0);
+  gl.uniform3f(U.uF, P.F[0], P.F[1], 0);
+  gl.uniform2f(U.uLC, Math.cos(P.phi), Math.sin(P.phi));
+  gl.uniform2f(U.uLD, Math.sin(P.a), Math.cos(P.a));
+  OA.fill(0); OB.fill(0);
+  obs.forEach((o, i) => { OA.set([o.x, o.y, o.z, o.r], i * 4); OB.set([o.type, 0, o.yaw, 0], i * 4); });
+  gl.uniform4fv(U.uOA, OA);
+  gl.uniform4fv(U.uOB, OB);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+let last = now(), prevTT = -1, ema = 0.016, fc = 0;
+function frame() {
+  const t = now(), raw = t - last, dt = Math.min(raw || 0.016, 0.033);
+  last = t;
+  if (flipAt !== null && t - flipAt - delay > TM.end) flipAt = null;
+  const P = pose(t);
+  step(dt, P);
+  events(prevTT, P.tt);
+  prevTT = P.tt;
+  motor(P, dt);
+  draw(P);
+  ema = ema * 0.95 + raw * 0.05;
+  if (++fc % 90 === 0 && ema > 0.03 && sc > 0.4) { sc *= 0.85; resize(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
 })();

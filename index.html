@@ -1,34 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang='en'>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Genesis Engine</title>
-<link rel="stylesheet" href="styles.css">
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Useless Box</title>
+<link rel='stylesheet' href='styles.css'>
 </head>
 <body>
-<div id="app">
-  <header id="top"></header>
-  <main id="stage">
-    <div id="orbit">
-      <button id="core" type="button"><span id="cname"></span><small id="cpow"></small></button>
-    </div>
-    <button id="orb" type="button" hidden>&#10022;</button>
-    <div id="msg"></div>
-  </main>
-  <section id="info">
-    <div id="itxt"><div id="i1"></div><div id="i2"></div></div>
-    <div id="ibtn"><button id="mode" type="button"></button><button id="pwr" type="button"></button></div>
-  </section>
-  <aside id="side" hidden>
-    <nav id="tabs">
-      <button type="button" data-tab="up">Upgrades</button>
-      <button type="button" data-tab="fuse">Fusion</button>
-      <button type="button" data-tab="asc">Ascend</button>
-    </nav>
-    <div id="panel"></div>
-  </aside>
-</div>
-<script src="script.js"></script>
+<canvas id='c'></canvas>
+<button id='drop' type='button'>Drop obstacle</button>
+<div id='hint'>Tap the lever</div>
+<script src='script.js'></script>
 </body>
 </html>
