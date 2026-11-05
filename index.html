@@ -1,16 +1,35 @@
 <!DOCTYPE html>
-<html lang='en'>
+<html lang="en">
 <head>
-<meta charset='utf-8'>
-<meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>Useless Box</title>
-<link rel='stylesheet' href='styles.css'>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lemmings</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<canvas id='c'></canvas>
-<div id='hud'></div>
-<div id='hint'>Tap the lever</div>
-<button id='drop' type='button'>Drop obstacle</button>
-<script src='script.js'></script>
+<div id="app">
+  <div id="bar">
+    <span id="lvl"></span>
+    <span id="stat"></span>
+  </div>
+  <div id="hint">Click to play. Pick a skill, then tap a lemming. Keys: 1-7, Space, F, R.</div>
+  <div id="stage">
+    <canvas id="c" width="256" height="128"></canvas>
+    <div id="overlay" hidden>
+      <p id="msg"></p>
+      <button id="ovbtn" type="button"></button>
+    </div>
+  </div>
+  <div id="skills"></div>
+  <div id="ctrl">
+    <button id="bPrev" type="button">Prev</button>
+    <button id="bPause" type="button">Pause</button>
+    <button id="bFast" type="button">Fast</button>
+    <button id="bNuke" type="button">Nuke</button>
+    <button id="bRestart" type="button">Restart</button>
+    <button id="bNext" type="button">Next</button>
+  </div>
+</div>
+<script src="script.js"></script>
 </body>
 </html>

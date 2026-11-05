@@ -1,5 +1,58 @@
-html,body{margin:0;height:100%;overflow:hidden;background:#0b0c0f}
-#c{display:block;width:100%;height:100dvh;touch-action:none}
-#drop{position:fixed;left:12px;bottom:12px;padding:10px 16px;border:1px solid #555;border-radius:8px;background:#1d1f24;color:#ddd;font:14px sans-serif}
-#hud{position:fixed;left:12px;right:12px;top:10px;color:#c9cbd2;font:12px/1.4 sans-serif;pointer-events:none}
-#hint{position:fixed;left:50%;top:52px;transform:translateX(-50%);width:92vw;text-align:center;color:#9a9ca3;font:13px sans-serif;pointer-events:none}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #1a1d24;
+  color: #eee;
+  font: 13px system-ui, sans-serif;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+#app { display: flex; flex-direction: column; height: 100dvh; }
+#bar { flex: none; display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px 0; font-weight: 600; }
+#hint { flex: none; padding: 0 8px 4px; font-size: 11px; color: #9aa; }
+#hint[hidden] { display: none; }
+#stage { position: relative; flex: 1; min-height: 0; }
+#c {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #000;
+  touch-action: none;
+}
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  text-align: center;
+  padding: 12px;
+  font-size: 16px;
+}
+#overlay[hidden] { display: none; }
+#skills, #ctrl { flex: none; display: flex; gap: 4px; padding: 4px; }
+button {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 2px;
+  border: 1px solid #556;
+  border-radius: 4px;
+  background: #2b303b;
+  color: #eee;
+  font: inherit;
+  cursor: pointer;
+}
+button:active { background: #3b4252; }
+#skills button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; }
+#skills button b { font-size: 15px; }
+#skills button.sel { background: #3a6ea5; border-color: #9cf; }
+#skills button.out { opacity: 0.4; }
+#bFast.on, #bPause.on { background: #3a6ea5; border-color: #9cf; }
