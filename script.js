@@ -1,601 +1,525 @@
-(function () {
-  'use strict';
+"use strict";
 
-  // Logical resolution; CSS scales the canvas to the frame.
-  var W = 256, H = 128, TPS = 20;
-  var SKILLS = [['climb', 'Climb'], ['float', 'Float'], ['bomb', 'Bomb'], ['block', 'Block'],
-                ['build', 'Build'], ['bash', 'Bash'], ['dig', 'Dig']];
-
-  var cv = document.getElementById('c');
-  var cx = cv.getContext('2d');
-  var tcv = document.createElement('canvas');
-  tcv.width = W;
-  tcv.height = H;
-  var tcx = tcv.getContext('2d');
-  var timg = tcx.createImageData(W, H);
-  // Terrain map: 0 empty, 1 dirt, 2 grass, 3 brick
-  var terr = new Uint8Array(W * H);
-  var dirty = true;
-  var S = null;       // current level state
-  var sel = 0;        // selected skill index
-  var sbtn = [];
-
-  var elLvl = document.getElementById('lvl');
-  var elStat = document.getElementById('stat');
-  var elHint = document.getElementById('hint');
-  var ov = document.getElementById('overlay');
-  var msg = document.getElementById('msg');
-  var ovbtn = document.getElementById('ovbtn');
-  var bPause = document.getElementById('bPause');
-  var bFast = document.getElementById('bFast');
-
-  // Seeded PRNG (mulberry32): same level number gives the same level.
-  function mulberry(a) {
-    return function () {
-      a |= 0;
-      a = a + 0x6D2B79F5 | 0;
-      var t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
+const $ = id => document.getElementById(id);
+const controls = [
+  ["tuning", "Tuning", 400, 480, 440, 1, " Hz"],
+  ["cutoff", "Cutoff", 100, 8000, 800, 10, " Hz"],
+  ["resonance", "Resonance", 0, 24, 10, 1, ""],
+  ["env", "Env Mod", 0, 100, 60, 1, "%"],
+  ["decay", "Decay", 0, 100, 40, 1, "%"],
+  ["accent", "Accent", 0, 100, 60, 1, "%"],
+  ["tempo", "Tempo", 40, 240, 120, 1, " BPM"],
+  ["volume", "Volume", 0, 100, 70, 1, "%"]
+];
+const params = Object.fromEntries(controls.map(([id, , , , value]) => [id, value]));
+const notes = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B", "C"];
+const shortcuts = ["A", "W", "S", "E", "D", "F", "T", "G", "Y", "H", "U", "J", "K"];
+const emptyStep = () => ({ note: 0, gate: false, slide: false, accent: false });
+const patterns = Array.from({ length: 4 }, () => Array.from({ length: 16 }, emptyStep));
+// Semitone offsets from C2. The two halves of Acid Tracks repeat the transcribed half-bar.
+const acidTracks = [21, -3, -12, -2, -8, 13, -11, 10];
+const presets = [
+  {
+    name: "Acid Tracks",
+    pitches: [...acidTracks, ...acidTracks],
+    slide: [],
+    accent: [],
+    wave: "sawtooth",
+    settings: { tempo: 120, cutoff: 430, resonance: 17, env: 58, decay: 46, accent: 50 }
+  },
+  {
+    name: "Confusion",
+    pitches: [7, 7, 7, 7, null, -5, 7, null, 10, null, -2, -2, -2, 10, null, -2],
+    slide: [1, 2, 11],
+    accent: [],
+    wave: "square",
+    settings: { tempo: 134, cutoff: 2670, resonance: 16, env: 66, decay: 66, accent: 0 }
+  },
+  {
+    name: "Access",
+    pitches: [9, null, 9, 21, 9, 9, 9, null, 9, 9, 21, 9, null, 9, 9, null],
+    slide: [],
+    accent: [4],
+    wave: "square",
+    settings: { tempo: 134, cutoff: 1800, resonance: 24, env: 66, decay: 33, accent: 20 }
+  },
+  {
+    name: "Higher State of Consciousness",
+    pitches: [7, 19, 7, 7, 7, 7, 11, 7, 11, 7, 7, 11, 7, 7, 7, 11],
+    slide: [1, 3, 4, 10, 13, 14],
+    accent: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    wave: "square",
+    settings: { tempo: 134, cutoff: 8000, resonance: 18, env: 50, decay: 0, accent: 66 }
+  },
+  {
+    name: "Acperience 1",
+    pitches: [4, 11, 16, 19, null, 14, 11, 7, -8, 4, 23, 21, 16, null, 9, 11],
+    slide: [2, 3, 6, 9, 10, 11, 15],
+    accent: [0, 3, 5, 8, 10, 14],
+    wave: "sawtooth",
+    settings: { tempo: 126, cutoff: 730, resonance: 20, env: 69, decay: 70, accent: 73 }
+  },
+  {
+    name: "Da Funk",
+    pitches: [-5, 22, 7, 17, 3, -11, -11, 1, 15, -9, 17, 19, -4, -5, -12, 7],
+    slide: [3, 5, 7, 9, 11, 12, 14, 15],
+    accent: [4, 5, 6, 7, 11],
+    wave: "square",
+    settings: { tempo: 110, cutoff: 340, resonance: 7, env: 37, decay: 58, accent: 59 }
+  },
+  {
+    name: "Acid Phase",
+    pitches: [5, 5, 17, 5, -7, null, 5, 12, 5, 5, 20, 17, 15, 5, 24, 12],
+    slide: [2, 4, 7, 10, 11, 12, 14],
+    accent: [0, 2, 6, 10, 12, 14],
+    wave: "sawtooth",
+    settings: { tempo: 138, cutoff: 470, resonance: 21, env: 74, decay: 36, accent: 81 }
+  },
+  {
+    name: "Startpattern",
+    pitches: [0, null, 5, 7, 12, 7, null, 3, 0, null, 10, 7, -5, 0, 12, null],
+    slide: [3, 4, 11, 13],
+    accent: [0, 4, 8, 10, 14],
+    wave: "square",
+    settings: { tempo: 120, cutoff: 800, resonance: 10, env: 60, decay: 40, accent: 60 }
   }
+];
 
-  // ---- terrain helpers ----
-  // Left/right edges count as walls, top is open, bottom is a void.
-  function solid(x, y) {
-    if (x < 0 || x >= W) return true;
-    if (y < 0 || y >= H) return false;
-    return terr[y * W + x] > 0;
-  }
-  function rock(x, y) {
-    return x >= 0 && x < W && y >= 0 && y < H && terr[y * W + x] > 0;
-  }
-  function setT(x, y, v) {
-    if (x >= 0 && x < W && y >= 0 && y < H) {
-      terr[y * W + x] = v;
-      dirty = true;
-    }
-  }
-  function carve(x0, y0, w, h) {
-    for (var j = 0; j < h; j++) {
-      for (var i = 0; i < w; i++) setT(x0 + i, y0 + j, 0);
-    }
-  }
-  function carveCircle(ccx, ccy, r) {
-    for (var dy = -r; dy <= r; dy++) {
-      for (var dx = -r; dx <= r; dx++) {
-        if (dx * dx + dy * dy <= r * r) setT(ccx + dx, ccy + dy, 0);
-      }
-    }
-  }
-  // True if a lemming body (7 px tall) standing with feet on row y fits in column x.
-  function clear(x, y) {
-    for (var j = 0; j < 7; j++) {
-      if (solid(x, y - j)) return false;
-    }
-    return true;
-  }
-
-  // ---- level generation ----
-  function loadLevel(n) {
-    var r = mulberry(n * 7919 + 13);
-    var g = [], x = 0, y = 70, t, len, h, i, j;
-
-    function cl(v) { return v < 34 ? 34 : (v > 104 ? 104 : v); }
-    // Run of len columns changing height by dy (len 1 = vertical step).
-    function seg(l, dy) {
-      var y0 = y, k;
-      for (k = 1; k <= l && x < W; k++, x++) g[x] = cl(Math.round(y0 + dy * k / l));
-      y = g[x - 1];
-    }
-    function gap(w) {
-      for (var k = 0; k < w && x < W; k++, x++) g[x] = H + 5;
-    }
-
-    seg(64, 0);
-    while (x < W - 84) {
-      t = Math.floor(r() * (n < 2 ? 5 : 6));
-      if (t === 0) {
-        seg(14 + Math.floor(r() * 24), 0);
-      } else if (t === 1) {
-        len = 12 + Math.floor(r() * 20);
-        h = Math.round(len * (0.4 + 0.5 * r()));
-        seg(len, r() < 0.5 ? -h : h);
-      } else if (t === 2) {
-        seg(1, 8 + Math.floor(r() * Math.min(40, 20 + n * 2)));
-        seg(10 + Math.floor(r() * 14), 0);
-      } else if (t === 3) {
-        h = 10 + Math.floor(r() * Math.min(18, 8 + n * 3));
-        seg(1, -h);
-        seg(6 + Math.floor(r() * 6), 0);
-        seg(1, h);
-        seg(8, 0);
-      } else if (t === 4) {
-        seg(1, -(8 + Math.floor(r() * 14)));
-        seg(14 + Math.floor(r() * 16), 0);
-      } else {
-        seg(10, 0);
-        gap(10 + Math.floor(r() * Math.min(14, 4 + n * 2)));
-        seg(12, 0);
-      }
-    }
-    seg(W - x, 0);
-
-    terr.fill(0);
-    for (i = 0; i < W; i++) {
-      if (g[i] >= H) continue;
-      for (j = g[i]; j < H; j++) terr[j * W + i] = (j - g[i] < 2) ? 2 : 1;
-    }
-    dirty = true;
-
-    var total = Math.min(40, 8 + 2 * n);
-    var need = Math.ceil(total * Math.min(0.9, 0.4 + 0.05 * n));
-    S = {
-      n: n, lems: [], tk: 0, sp: 10, spawned: 0, total: total, saved: 0, need: need,
-      sk: { climb: 3, float: 3, bomb: 3, block: 2, build: 5, bash: 4, dig: 3 },
-      paused: false, fast: false, nuked: false, over: false, win: false,
-      ent: { x: 32, y: g[32] - 36 },
-      ex: { x: W - 20, y: g[W - 20] - 1 }
-    };
-    ov.hidden = true;
-    bPause.classList.remove('on');
-    bPause.textContent = 'Pause';
-    bFast.classList.remove('on');
-    updateUi();
-  }
-
-  // ---- lemming logic ----
-  function newLem() {
-    return { x: S.ent.x, y: S.ent.y, dir: 1, st: 'fall', fd: 0, clm: false, flt: false, fuse: 0, t: 0, b: 0, gone: false };
-  }
-
-  function land(l) {
-    if (l.fd > 60 && !l.flt) {
-      l.gone = true;
-      return;
-    }
-    l.fd = 0;
-    l.st = 'walk';
-  }
-
-  function fall(l) {
-    var n = (l.flt && l.fd > 10) ? 1 : 2;
-    for (; n > 0; n--) {
-      if (solid(l.x, l.y + 1)) {
-        land(l);
-        return;
-      }
-      l.y++;
-      l.fd++;
-    }
-    if (solid(l.x, l.y + 1)) land(l);
-  }
-
-  function walk(l) {
-    var i, b, d, up, nx = l.x + l.dir;
-    if (!solid(l.x, l.y + 1)) {
-      l.st = 'fall';
-      l.fd = 0;
-      return;
-    }
-    // Blockers turn walkers around.
-    for (i = 0; i < S.lems.length; i++) {
-      b = S.lems[i];
-      if (b !== l && !b.gone && b.st === 'block' && Math.abs(b.y - l.y) < 8) {
-        d = (b.x - l.x) * l.dir;
-        if (d > 0 && d <= 4) {
-          l.dir = -l.dir;
-          return;
-        }
-      }
-    }
-    for (up = 0; up <= 3; up++) {
-      if (clear(nx, l.y - up)) break;
-    }
-    if (up > 3) {
-      if (l.clm) l.st = 'climb';
-      else l.dir = -l.dir;
-      return;
-    }
-    l.x = nx;
-    l.y -= up;
-    for (i = 0; i < 3 && !solid(l.x, l.y + 1); i++) l.y++;
-    if (!solid(l.x, l.y + 1)) {
-      l.st = 'fall';
-      l.fd = 0;
-    }
-  }
-
-  function climb(l) {
-    if (solid(l.x, l.y - 7)) {
-      l.dir = -l.dir;
-      l.st = 'fall';
-      l.fd = 0;
-      return;
-    }
-    if (clear(l.x + l.dir, l.y)) {
-      l.x += l.dir;
-      l.st = 'walk';
-      return;
-    }
-    l.y--;
-  }
-
-  function dig(l) {
-    if (++l.t % 3) return;
-    if (!solid(l.x, l.y + 1)) {
-      l.st = 'fall';
-      l.fd = 0;
-      return;
-    }
-    carve(l.x - 3, l.y + 1, 7, 1);
-    l.y++;
-    if (!solid(l.x, l.y + 1)) {
-      l.st = 'fall';
-      l.fd = 0;
-    }
-  }
-
-  function bash(l) {
-    var k, j, any = false, a, b;
-    if (!solid(l.x, l.y + 1)) {
-      l.st = 'fall';
-      l.fd = 0;
-      return;
-    }
-    if (++l.t % 3) return;
-    for (k = 1; k <= 3; k++) {
-      for (j = 0; j < 7; j++) {
-        if (rock(l.x + l.dir * k, l.y - j)) any = true;
-      }
-    }
-    if (!any) {
-      l.st = 'walk';
-      return;
-    }
-    a = l.x + l.dir;
-    b = l.x + 2 * l.dir;
-    carve(Math.min(a, b), l.y - 6, 2, 7);
-    if (clear(l.x + l.dir, l.y)) l.x += l.dir;
-  }
-
-  function build(l) {
-    var k;
-    if (++l.t % 6) return;
-    for (k = 1; k <= 4; k++) setT(l.x + l.dir * k, l.y, 3);
-    if (clear(l.x + l.dir * 2, l.y - 1)) {
-      l.x += l.dir * 2;
-      l.y--;
-    } else {
-      l.dir = -l.dir;
-      l.st = 'walk';
-      return;
-    }
-    if (--l.b <= 0) l.st = 'walk';
-  }
-
-  function boom(l) {
-    carveCircle(l.x, l.y - 3, 9);
-    l.gone = true;
-  }
-
-  function step(l) {
-    if (l.fuse > 0 && --l.fuse === 0) {
-      boom(l);
-      return;
-    }
-    switch (l.st) {
-      case 'fall': fall(l); break;
-      case 'walk': walk(l); break;
-      case 'climb': climb(l); break;
-      case 'dig': dig(l); break;
-      case 'bash': bash(l); break;
-      case 'build': build(l); break;
-      case 'block':
-        if (!solid(l.x, l.y + 1)) {
-          l.st = 'fall';
-          l.fd = 0;
-        }
-        break;
-    }
-    if (l.gone) return;
-    if (l.y >= H) {
-      l.gone = true;
-      return;
-    }
-    if (l.st !== 'block' && Math.abs(l.x - S.ex.x) <= 3 && Math.abs(l.y - S.ex.y) <= 6) {
-      l.gone = true;
-      S.saved++;
-    }
-  }
-
-  function finish() {
-    S.over = true;
-    S.win = S.saved >= S.need;
-    if (S.win) {
-      msg.textContent = 'Level ' + S.n + ' cleared. Saved ' + S.saved + ' of ' + S.total + '.';
-      ovbtn.textContent = 'Next level';
-    } else {
-      msg.textContent = 'Level ' + S.n + ' failed. Saved ' + S.saved + ', needed ' + S.need + '.';
-      ovbtn.textContent = 'Retry';
-    }
-    ov.hidden = false;
-  }
-
-  function tick() {
-    var i, alive = false;
-    if (S.over) return;
-    S.tk++;
-    if (S.spawned < S.total && !S.nuked && --S.sp <= 0) {
-      S.lems.push(newLem());
-      S.spawned++;
-      S.sp = 24;
-    }
-    for (i = 0; i < S.lems.length; i++) {
-      if (!S.lems[i].gone) {
-        step(S.lems[i]);
-        if (!S.lems[i].gone) alive = true;
-      }
-    }
-    updateUi();
-    if (!alive && (S.spawned >= S.total || S.nuked)) finish();
-  }
-
-  // ---- skills ----
-  function apply(l, sk) {
-    if (S.sk[sk] <= 0 || l.gone) return false;
-    switch (sk) {
-      case 'climb':
-        if (l.clm) return false;
-        l.clm = true;
-        return true;
-      case 'float':
-        if (l.flt) return false;
-        l.flt = true;
-        return true;
-      case 'bomb':
-        if (l.fuse) return false;
-        l.fuse = 5 * TPS;
-        return true;
-    }
-    if (l.st !== 'walk') return false;
-    l.t = 0;
-    if (sk === 'block') l.st = 'block';
-    else if (sk === 'build') {
-      l.st = 'build';
-      l.b = 12;
-    } else if (sk === 'bash') l.st = 'bash';
-    else if (sk === 'dig') l.st = 'dig';
-    return true;
-  }
-
-  function pick(px, py) {
-    var best = null, bd = 100, i, l, dx, dy, d;
-    for (i = 0; i < S.lems.length; i++) {
-      l = S.lems[i];
-      if (l.gone) continue;
-      dx = l.x - px;
-      dy = l.y - 4 - py;
-      d = dx * dx + dy * dy;
-      if (d < bd) {
-        bd = d;
-        best = l;
-      }
-    }
-    return best;
-  }
-
-  // ---- UI ----
-  function updateUi() {
-    var i;
-    elLvl.textContent = 'Level ' + S.n;
-    elStat.textContent = 'Saved ' + S.saved + '/' + S.need + '  Out ' + S.spawned + '/' + S.total;
-    for (i = 0; i < SKILLS.length; i++) {
-      sbtn[i].lastChild.textContent = S.sk[SKILLS[i][0]];
-      sbtn[i].classList.toggle('sel', i === sel);
-      sbtn[i].classList.toggle('out', S.sk[SKILLS[i][0]] <= 0);
-    }
-  }
-
-  function select(i) {
-    sel = i;
-    updateUi();
-  }
-
-  function togglePause() {
-    S.paused = !S.paused;
-    bPause.classList.toggle('on', S.paused);
-    bPause.textContent = S.paused ? 'Resume' : 'Pause';
-  }
-
-  function toggleFast() {
-    S.fast = !S.fast;
-    bFast.classList.toggle('on', S.fast);
-  }
-
-  function nuke() {
-    var i, l;
-    if (S.nuked || S.over) return;
-    S.nuked = true;
-    for (i = 0; i < S.lems.length; i++) {
-      l = S.lems[i];
-      if (!l.gone && !l.fuse) l.fuse = TPS + Math.floor(Math.random() * 3 * TPS);
-    }
-  }
-
-  function buildSkillButtons() {
-    var box = document.getElementById('skills'), i, b, s;
-    for (i = 0; i < SKILLS.length; i++) {
-      b = document.createElement('button');
-      b.type = 'button';
-      b.dataset.i = i;
-      b.appendChild(document.createTextNode(SKILLS[i][1]));
-      s = document.createElement('b');
-      b.appendChild(s);
-      box.appendChild(b);
-      sbtn.push(b);
-    }
-    box.addEventListener('click', function (e) {
-      var b = e.target.closest('button');
-      if (!b) return;
-      select(+b.dataset.i);
-      b.blur();
-    });
-  }
-
-  document.getElementById('ctrl').addEventListener('click', function (e) {
-    var id = e.target.id;
-    if (id === 'bPause') togglePause();
-    else if (id === 'bFast') toggleFast();
-    else if (id === 'bNuke') nuke();
-    else if (id === 'bRestart') loadLevel(S.n);
-    else if (id === 'bPrev') loadLevel(Math.max(1, S.n - 1));
-    else if (id === 'bNext') loadLevel(S.n + 1);
-    e.target.blur();
+function makePattern(preset) {
+  return preset.pitches.map((note, i) => note === null ? emptyStep() : {
+    note,
+    gate: true,
+    slide: preset.slide.includes(i),
+    accent: preset.accent.includes(i)
   });
+}
+patterns[0] = makePattern(presets[presets.length - 1]);
 
-  ovbtn.addEventListener('click', function () {
-    loadLevel(S.win ? S.n + 1 : S.n);
-  });
+let bank = 0;
+let selected = 0;
+let mode = "play";
+let tool = "note";
+let wave = "square";
+let power = true;
+let playing = false;
+let head = -1;
+let next = 0;
+let previous = false;
+let timer;
+let deadline;
+let runId = 0;
+let powerId = 0;
+let context, master, sequenceVoice, previewVoice;
+let audioError = false;
 
-  // Map a pointer event to logical canvas coordinates (canvas uses object-fit: contain).
-  function toLogical(e) {
-    var rc = cv.getBoundingClientRect();
-    var s = Math.min(rc.width / W, rc.height / H);
-    var ox = (rc.width - W * s) / 2;
-    var oy = (rc.height - H * s) / 2;
-    return { x: (e.clientX - rc.left - ox) / s, y: (e.clientY - rc.top - oy) / s };
+function makeVoice(destination) {
+  const osc = context.createOscillator();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  osc.type = wave;
+  filter.type = "lowpass";
+  filter.frequency.value = params.cutoff;
+  filter.Q.value = params.resonance;
+  gain.gain.value = 0;
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(destination);
+  osc.start();
+  return { osc, filter, gain, note: 0 };
+}
+
+async function enableAudio() {
+  if (!context) {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) throw new Error("Web Audio fehlt");
+    context = new Audio();
+    const limiter = context.createDynamicsCompressor();
+    master = context.createGain();
+    master.gain.value = params.volume / 100;
+    limiter.connect(master);
+    master.connect(context.destination);
+    sequenceVoice = makeVoice(limiter);
+    previewVoice = makeVoice(limiter);
   }
+  if (context.state !== "running") await context.resume();
+  audioError = false;
+}
 
-  cv.addEventListener('pointerdown', function (e) {
-    var p, l;
+function frequency(note) {
+  return params.tuning * 2 ** ((36 + note - 69) / 12);
+}
+
+function sound(voice, step, seconds, glide = false) {
+  const t = context.currentTime;
+  const accent = step.accent ? params.accent / 100 : 0;
+  const decay = 0.025 + 0.45 * params.decay / 100;
+  const freq = voice.osc.frequency;
+  const cutoff = voice.filter.frequency;
+  const level = voice.gain.gain;
+  const peak = Math.min(12000, params.cutoff * (1 + params.env / 100 * (5 + accent * 4)));
+  voice.note = step.note;
+  freq.cancelScheduledValues(t);
+  if (glide) freq.setTargetAtTime(frequency(step.note), t, 0.028);
+  else freq.setValueAtTime(frequency(step.note), t);
+
+  cutoff.cancelScheduledValues(t);
+  cutoff.setTargetAtTime(peak, t, 0.004);
+  cutoff.setTargetAtTime(params.cutoff, t + 0.012, decay / 3);
+
+  level.cancelScheduledValues(t);
+  if (!glide) level.setValueAtTime(0.001, t);
+  level.setTargetAtTime(0.24 + accent * 0.16, t, 0.003);
+  level.setTargetAtTime(0.07 + accent * 0.035, t + 0.012, decay / 2);
+  if (seconds !== Infinity) level.setTargetAtTime(0, t + seconds, 0.008);
+}
+
+function release(voice) {
+  if (!voice) return;
+  const t = context.currentTime;
+  voice.gain.gain.cancelScheduledValues(t);
+  voice.gain.gain.setTargetAtTime(0, t, 0.006);
+}
+
+const stepMs = () => 15000 / params.tempo;
+const activeSteps = () => patterns[bank];
+const noteName = note => notes[(note % 12 + 12) % 12] + (2 + Math.floor(note / 12));
+
+function schedule() {
+  timer = setTimeout(tick, Math.max(0, deadline - performance.now()));
+}
+
+function tick() {
+  const steps = activeSteps();
+  const length = stepMs();
+  const now = performance.now();
+  head = next;
+  next = (head + 1) % 16;
+  const step = steps[head];
+  const following = steps[next];
+  if (step.gate) {
+    const hold = following.gate && following.slide;
+    sound(sequenceVoice, step, hold ? Infinity : length * 0.00084, previous && step.slide);
+  } else {
+    release(sequenceVoice);
+  }
+  previous = step.gate;
+  deadline = Math.max(deadline + length, now + length * 0.5);
+  render();
+  schedule();
+}
+
+async function start() {
+  if (!power || playing) return;
+  const id = ++runId;
+  playing = true;
+  render();
+  try {
+    await enableAudio();
+  } catch {
+    if (id === runId) {
+      audioError = true;
+      stop();
+    }
+    return;
+  }
+  if (id !== runId) return;
+  next = 0;
+  previous = false;
+  deadline = performance.now();
+  tick();
+}
+
+function stop() {
+  runId++;
+  playing = false;
+  clearTimeout(timer);
+  head = -1;
+  release(sequenceVoice);
+  render();
+}
+
+async function pressNote(note) {
+  const key = keyButtons[note];
+  key.classList.add("lit");
+  clearTimeout(key.flash);
+  key.flash = setTimeout(() => key.classList.remove("lit"), 170);
+  if (mode === "write") Object.assign(activeSteps()[selected], { note, gate: true });
+  render();
+  if (!power) return;
+  const id = powerId;
+  try {
+    await enableAudio();
+    if (id === powerId) {
+      const accent = mode === "write" && activeSteps()[selected].accent;
+      sound(previewVoice, { note, accent }, 0.2);
+      render();
+    }
+  } catch {
+    if (id === powerId) {
+      audioError = true;
+      render();
+    }
+  }
+}
+
+function setParam(id, value) {
+  const oldLength = stepMs();
+  params[id] = value;
+  if (id === "tempo" && head !== -1) {
+    const now = performance.now();
+    const remaining = Math.max(0, deadline - now) / oldLength;
+    deadline = now + remaining * stepMs();
+    clearTimeout(timer);
+    schedule();
+  }
+  if (master) {
+    const t = context.currentTime;
+    if (id === "volume") master.gain.setTargetAtTime(value / 100, t, 0.012);
+    for (const voice of [sequenceVoice, previewVoice]) {
+      if (id === "resonance") voice.filter.Q.setTargetAtTime(value, t, 0.012);
+      if (id === "cutoff") {
+        voice.filter.frequency.cancelScheduledValues(t);
+        voice.filter.frequency.setTargetAtTime(value, t, 0.015);
+      }
+      if (id === "tuning") {
+        voice.osc.frequency.cancelScheduledValues(t);
+        voice.osc.frequency.setTargetAtTime(frequency(voice.note), t, 0.012);
+      }
+    }
+  }
+  if (id === "tempo") render();
+}
+
+function makeDial([id, label, min, max, value, step, unit], container) {
+  const node = document.createElement("div");
+  node.className = "regulator";
+  node.innerHTML = '<span class="caption"></span><span class="dial"><input type="range"></span><output></output>';
+  node.title = label + " · Ziehen oder Pfeiltasten";
+  node.firstElementChild.textContent = label;
+  const dial = node.querySelector(".dial");
+  const input = node.querySelector("input");
+  const output = node.querySelector("output");
+  Object.assign(input, { min, max, step, value });
+  input.setAttribute("aria-label", label);
+  container.append(node);
+
+  const logarithmic = id === "cutoff";
+  const ratio = logarithmic ? max / min : 1;
+  const positionOf = n => logarithmic ? Math.log(n / min) / Math.log(ratio) : (n - min) / (max - min);
+  const valueAt = position => logarithmic ? min * ratio ** position : min + position * (max - min);
+
+  function show() {
+    const n = Number(input.value);
+    const sweep = positionOf(n) * 270;
+    dial.style.setProperty("--angle", (sweep - 135) + "deg");
+    dial.style.setProperty("--sweep", sweep + "deg");
+    output.textContent = n + unit;
+    input.setAttribute("aria-valuetext", n + unit);
+  }
+  function update() {
+    setParam(id, Number(input.value));
+    show();
+  }
+  input.addEventListener("input", update);
+  show();
+
+  let drag;
+  input.addEventListener("pointerdown", e => {
+    if (e.button !== 0 || drag) return;
     e.preventDefault();
-    if (S.over) return;
-    p = toLogical(e);
-    l = pick(p.x, p.y);
-    if (l && apply(l, SKILLS[sel][0])) {
-      S.sk[SKILLS[sel][0]]--;
-      updateUi();
-    }
+    input.focus();
+    input.setPointerCapture(e.pointerId);
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, position: positionOf(Number(input.value)), moved: false };
   });
-
-  document.addEventListener('pointerdown', function () {
-    elHint.hidden = true;
+  input.addEventListener("pointermove", e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const x = e.clientX - drag.x;
+    const y = drag.y - e.clientY;
+    const delta = Math.abs(y) >= Math.abs(x) ? y : x;
+    if (Math.abs(delta) < 2 && !drag.moved) return;
+    drag.moved = true;
+    const position = Math.max(0, Math.min(1, drag.position + delta / 150));
+    const raw = valueAt(position);
+    input.value = min + Math.round((raw - min) / step) * step;
+    update();
   });
-
-  window.addEventListener('keydown', function (e) {
-    var k = e.key;
-    if (k >= '1' && k <= '7') select(+k - 1);
-    else if (k === ' ') {
-      e.preventDefault();
-      togglePause();
-    } else if (k === 'f' || k === 'F') toggleFast();
-    else if (k === 'r' || k === 'R') loadLevel(S.n);
-    else return;
-    elHint.hidden = true;
+  input.addEventListener("pointerup", e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.moved) {
+      const box = input.getBoundingClientRect();
+      const direction = e.clientX < box.left + box.width / 2 ? -1 : 1;
+      input.value = Number(input.value) + direction * step;
+      update();
+    }
+    drag = null;
   });
+  input.addEventListener("lostpointercapture", e => {
+    if (drag && drag.id === e.pointerId) drag = null;
+  });
+  return nextValue => {
+    input.value = nextValue;
+    update();
+  };
+}
 
-  // ---- rendering ----
-  function renderTerrain() {
-    var d = timg.data, i, o, v, xx, yy, s;
-    for (i = 0; i < W * H; i++) {
-      o = i * 4;
-      v = terr[i];
-      if (!v) {
-        d[o + 3] = 0;
-        continue;
-      }
-      xx = i % W;
-      yy = (i / W) | 0;
-      if (v === 1) {
-        s = ((xx * 13 + yy * 7) % 5) * 6;
-        d[o] = 130 + s;
-        d[o + 1] = 84 + s;
-        d[o + 2] = 44 + s / 2;
-      } else if (v === 2) {
-        d[o] = 70;
-        d[o + 1] = 170 + (xx % 3) * 10;
-        d[o + 2] = 70;
-      } else {
-        d[o] = 190;
-        d[o + 1] = 190;
-        d[o + 2] = 210;
-      }
-      d[o + 3] = 255;
-    }
-    tcx.putImageData(timg, 0, 0);
+const keyButtons = notes.map((note, i) => {
+  const button = document.createElement("button");
+  button.className = note.includes("♯") ? "key sharp" : "key";
+  button.append(note);
+  const label = document.createElement("small");
+  label.textContent = shortcuts[i];
+  button.append(label);
+  button.setAttribute("aria-label", noteName(i) + ", Taste " + shortcuts[i]);
+  button.addEventListener("click", () => pressNote(i));
+  $("keys").append(button);
+  return button;
+});
+
+const stepButtons = Array.from({ length: 16 }, (_, i) => {
+  const button = document.createElement("button");
+  button.className = "step";
+  button.append(String(i + 1));
+  const marks = document.createElement("span");
+  marks.className = "flags";
+  marks.setAttribute("aria-hidden", "true");
+  button.append(marks);
+  button.addEventListener("click", () => {
+    selected = i;
+    changeStep(mode === "play" ? "gate" : tool);
+    render();
+  });
+  $("steps").append(button);
+  return button;
+});
+
+function changeStep(field) {
+  const step = activeSteps()[selected];
+  if (field !== "note") step[field] = !step[field];
+}
+
+const groups = Object.fromEntries(["pattern", "mode", "tool", "wave"].map(group => [
+  group, [...document.querySelectorAll("[data-" + group + "]")]
+]));
+function pressed(button, value) {
+  button.setAttribute("aria-pressed", String(value));
+}
+
+function render() {
+  const steps = activeSteps();
+  const step = steps[selected];
+  stepButtons.forEach((button, i) => {
+    const s = steps[i];
+    pressed(button, s.gate);
+    button.classList.toggle("selected", i === selected);
+    button.classList.toggle("current", i === head);
+    button.lastChild.textContent = (s.slide ? "↗" : "") + (s.accent ? "•" : "");
+    button.setAttribute("aria-label", "Schritt " + (i + 1) + ", " +
+      (s.gate ? noteName(s.note) : "Pause") + (s.slide ? ", Slide" : "") +
+      (s.accent ? ", Accent" : "") + (i === selected ? ", ausgewählt" : ""));
+  });
+  const selectedGroup = { pattern: String(bank), mode, tool: mode === "write" ? tool : "", wave };
+  for (const [group, buttons] of Object.entries(groups)) {
+    buttons.forEach(button => pressed(button, button.dataset[group] === selectedGroup[group]));
   }
+  pressed($("start"), playing);
+  pressed($("power"), power);
+  const loadLabel = "In PTN " + (bank + 1) + " laden";
+  if ($("loadPreset").textContent !== loadLabel) $("loadPreset").textContent = loadLabel;
+  $("display").textContent = "PTN " + (bank + 1) + " · STEP " + (selected + 1) + "/16 " +
+    (step.gate ? noteName(step.note) : "–") + (step.slide ? " ↗" : "") +
+    (step.accent ? " •" : "") + " · " + params.tempo + " BPM" +
+    (head >= 0 ? " · ▶ " + (head + 1) : "");
+  const help = {
+    note: "Pitch: Schritt wählen, dann Note drücken.",
+    slide: "Slide: ↗ gleitet von der vorherigen Note.",
+    accent: "Accent: • betont die Note.",
+    gate: "Time: Schritt zwischen Note und Pause umschalten."
+  };
+  $("hint").textContent = !power ? "Power aus · einschalten für Ton." :
+    audioError ? "Audio konnte nicht starten. Drücke Start oder eine Note." :
+    mode === "write" ? help[tool] : "Klick ins Gerät für Tastatur. Noten antippen oder A–K. Regler ziehen.";
+}
 
-  function drawLem(l) {
-    var x = l.x, y = l.y, col = '#59f';
-    if (l.st === 'block') col = '#e44';
-    else if (l.st === 'dig' || l.st === 'bash' || l.st === 'build') col = '#fc4';
-    else if (l.st === 'climb') col = '#f94';
-    cx.fillStyle = col;
-    cx.fillRect(x - 2, y - 5, 4, 6);
-    cx.fillStyle = '#3c3';
-    cx.fillRect(x - 2, y - 7, 4, 2);
-    cx.fillStyle = '#fc9';
-    cx.fillRect(l.dir > 0 ? x + 1 : x - 2, y - 5, 1, 2);
-    if (l.clm) {
-      cx.fillStyle = '#f60';
-      cx.fillRect(l.dir > 0 ? x - 2 : x + 1, y - 3, 1, 2);
-    }
-    if (l.flt) {
-      cx.fillStyle = '#fff';
-      if (l.st === 'fall' && l.fd > 10) {
-        cx.fillRect(x - 3, y - 10, 7, 1);
-        cx.fillRect(x - 2, y - 11, 5, 1);
-      } else {
-        cx.fillRect(x, y - 9, 1, 1);
-      }
-    }
-    if (l.fuse > 0) {
-      cx.fillStyle = '#fff';
-      cx.font = '7px monospace';
-      cx.fillText(String(Math.ceil(l.fuse / TPS)), x - 2, y - 12);
-    }
+const actions = {
+  pattern: value => {
+    if (bank !== Number(value)) previous = false;
+    bank = Number(value);
+  },
+  mode: value => {
+    mode = value;
+    if (value === "write") tool = "note";
+  },
+  tool: value => {
+    mode = "write";
+    tool = value;
+    changeStep(tool);
+  },
+  wave: value => {
+    wave = value;
+    if (sequenceVoice) sequenceVoice.osc.type = wave;
+    if (previewVoice) previewVoice.osc.type = wave;
   }
-
-  function draw() {
-    var i;
-    if (dirty) {
-      renderTerrain();
-      dirty = false;
-    }
-    cx.fillStyle = '#4a78b8';
-    cx.fillRect(0, 0, W, H);
-    cx.drawImage(tcv, 0, 0);
-    cx.fillStyle = '#6b3f1a';
-    cx.fillRect(S.ent.x - 8, S.ent.y - 7, 16, 4);
-    cx.fillStyle = '#2b1808';
-    cx.fillRect(S.ent.x - 4, S.ent.y - 3, 8, 1);
-    cx.fillStyle = '#c9a227';
-    cx.fillRect(S.ex.x - 6, S.ex.y - 12, 12, 13);
-    cx.fillStyle = '#222';
-    cx.fillRect(S.ex.x - 4, S.ex.y - 10, 8, 11);
-    for (i = 0; i < S.lems.length; i++) {
-      if (!S.lems[i].gone) drawLem(S.lems[i]);
-    }
+};
+for (const [group, buttons] of Object.entries(groups)) {
+  buttons.forEach(button => button.addEventListener("click", () => {
+    actions[group](button.dataset[group]);
+    render();
+  }));
+}
+$("start").addEventListener("click", start);
+$("stop").addEventListener("click", stop);
+$("clear").addEventListener("click", () => {
+  patterns[bank] = Array.from({ length: 16 }, emptyStep);
+  previous = false;
+  release(sequenceVoice);
+  render();
+});
+$("back").addEventListener("click", () => {
+  selected = (selected + 15) % 16;
+  render();
+});
+$("next").addEventListener("click", () => {
+  selected = (selected + 1) % 16;
+  render();
+});
+$("power").addEventListener("click", () => {
+  power = !power;
+  powerId++;
+  if (!power) {
+    release(previewVoice);
+    stop();
+  } else {
+    render();
   }
-
-  var last = 0, acc = 0;
-  function frame(ts) {
-    var dt = Math.min(100, ts - last);
-    var per = 1000 / TPS;
-    last = ts;
-    if (!S.paused) {
-      acc += dt * (S.fast ? 3 : 1);
-      while (acc >= per) {
-        acc -= per;
-        tick();
-      }
-    }
-    draw();
-    requestAnimationFrame(frame);
-  }
-
-  buildSkillButtons();
-  loadLevel(1);
-  requestAnimationFrame(frame);
-})();
+});
+document.addEventListener("keydown", event => {
+  if (event.target === $("preset") || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+  const note = shortcuts.indexOf(event.key.toUpperCase());
+  if (note === -1) return;
+  event.preventDefault();
+  pressNote(note);
+});
+const dials = Object.fromEntries(controls.map((control, i) => [
+  control[0], makeDial(control, $(i < 6 ? "tone" : "mix"))
+]));
+const picker = $("preset");
+presets.forEach((preset, i) => {
+  const option = document.createElement("option");
+  option.value = i;
+  option.textContent = preset.name;
+  picker.append(option);
+});
+$("loadPreset").addEventListener("click", () => {
+  const preset = presets[Number(picker.value)];
+  patterns[bank] = makePattern(preset);
+  selected = 0;
+  next = 0;
+  previous = false;
+  release(sequenceVoice);
+  actions.wave(preset.wave);
+  dials.tuning(440);
+  for (const [id, value] of Object.entries(preset.settings)) dials[id](value);
+  $("presetStatus").textContent = preset.name + " in Pattern " + (bank + 1) + " geladen.";
+  render();
+});
+render();
