@@ -1,77 +1,23 @@
-<!doctype html>
-<html lang="de">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Roland TB-303 Bass Line</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="script.js" defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pip's Endless Run</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="machine" aria-label="Roland TB-303 Bass Line">
-    <header>
-      <div class="brand"><span>◆ Roland</span><h1>Bass Line</h1></div>
-      <div class="model"><strong>TB-303</strong><small>Computer Controlled</small></div>
-    </header>
-    <section class="controls" id="tone" aria-label="Klangregler"></section>
-    <div class="panels">
-      <aside class="side" aria-label="Pattern und Editiermodus">
-        <section class="well">
-          <h2>Pattern</h2>
-          <div class="buttons patterns">
-            <button data-pattern="0">1</button><button data-pattern="1">2</button>
-            <button data-pattern="2">3</button><button data-pattern="3">4</button>
-          </div>
-        </section>
-        <section class="well">
-          <h2>Mode</h2>
-          <div class="buttons">
-            <button data-mode="write">Write</button><button data-mode="play">Play</button>
-          </div>
-        </section>
-        <section class="well">
-          <h2>Function</h2>
-          <div class="buttons">
-            <button data-tool="note">Pitch</button><button data-tool="slide">Slide</button>
-            <button data-tool="accent">Accent</button><button data-tool="gate">Time</button>
-          </div>
-        </section>
-      </aside>
-      <section class="instrument" aria-label="Klaviatur und Presets">
-        <div class="preset-picker">
-          <select id="preset" aria-label="Preset auswählen"></select>
-          <button id="loadPreset" type="button">Laden</button>
-          <span id="presetStatus" class="preset-status" role="status"></span>
-        </div>
-        <div class="screen">
-          <p id="display"></p>
-          <p id="hint"></p>
-        </div>
-        <div class="keys" id="keys" aria-label="Notentasten"></div>
-      </section>
-      <section class="well sequencer" aria-label="16-Step-Sequencer">
-        <h2>Sequencer</h2>
-        <div class="steps" id="steps"></div>
-        <div class="transport">
-          <button id="start" aria-label="Sequencer starten">▶</button>
-          <button id="stop" aria-label="Sequencer stoppen">■</button>
-          <button id="clear" aria-label="Aktives Pattern leeren">CLR</button>
-        </div>
-      </section>
-    </div>
-    <footer>
-      <div class="edit">
-        <span>Edit</span>
-        <button id="back" aria-label="Vorheriger Schritt">◀</button>
-        <button id="next" aria-label="Nächster Schritt">▶</button>
-      </div>
-      <div class="wave">
-        <button data-wave="sawtooth" aria-label="Sägezahn">SAW</button>
-        <button data-wave="square" aria-label="Rechteck">SQR</button>
-      </div>
-      <div class="controls" id="mix" aria-label="Tempo und Lautstärke"></div>
-      <button id="power">Power <i aria-hidden="true"></i></button>
-    </footer>
-  </main>
+<canvas id="game" tabindex="0" aria-label="Pip's Endless Run - a procedural jump and run game"></canvas>
+<div id="pad" aria-hidden="true">
+  <div class="grp">
+    <button type="button" data-k="left">&#9664;</button>
+    <button type="button" data-k="right">&#9654;</button>
+  </div>
+  <div class="grp">
+    <button type="button" data-k="dash" id="dashBtn">Lv5</button>
+    <button type="button" data-k="jump" class="big">JUMP</button>
+  </div>
+</div>
+<script src="script.js"></script>
 </body>
 </html>
