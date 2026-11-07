@@ -110,7 +110,7 @@ function makeSong(n) {
   return { root: [0, 2, -3, 5, -5, 3][n % 6], bars: [A, B, A, C], tempo: Math.max(0.12, 0.16 - n * 0.002) };
 }
 function music() {
-  if (!ac || !song || muted || !(state === 'play' || state === 'title' || state === 'pipe')) { if (ac) mNext = ac.currentTime + 0.1; return; }
+  if (!ac || !song || muted || !(state === 'play' || state === 'title' || state === 'pipe' || state === 'select')) { if (ac) mNext = ac.currentTime + 0.1; return; }
   if (mNext < ac.currentTime) mNext = ac.currentTime + 0.05;
   const root = song.root + (under ? -5 : 0), lead = under ? 'triangle' : 'square';
   while (mNext < ac.currentTime + 0.25) {
@@ -140,13 +140,23 @@ const B = () => under ? UNDER : biome;
 let state = 'title', stT = 0, world = 1, hp = 3, coins = 0, camX = 0, time = 0, combo = 0, shake = 0;
 let map, W, ents, coinL, items, parts, texts, bumps, shots, warps, flagX, mod, safe, rainT = 0, startReq = false;
 let mode = 'run', under = false, saved = null, pipe = null;
+let RH = ROWS, camY = 0, lavaY = 0, lavaWait = 0, goalY = 0;
+const modeFor = n => n % 4 === 0 ? 'fly' : n % 5 === 3 ? 'climb' : 'run';
 const banners = [];
 const prog = { lv: 1, xp: 0 };
 const P = { x: 0, y: 0, w: 12, h: 14, vx: 0, vy: 0, on: false, face: 1, air: 1, coy: 0, inv: 0, star: 0, boots: 0, blaster: 0, wings: 0, spread: 0, fcd: 0, dash: 0, dcd: 0, anim: 0, glide: false, jumping: false };
 const held = { left: 0, right: 0, jump: 0, dash: 0, down: 0, fire: 0 };
 let jb = 0, db = 0, dnb = 0, fb = 0;
 
-const perk = { dj: () => prog.lv >= 2, mag: () => prog.lv >= 3, dash: () => prog.lv >= 5, glide: () => prog.lv >= 7 };
+const PREQ = { dj: 2, mag: 3, dash: 5, glide: 7 };
+const perkSet = { dj: null, mag: null, dash: null, glide: null };
+const perkVal = (k, lv) => perkSet[k] !== null ? perkSet[k] : lv >= PREQ[k];
+const perk = { dj: () => perkVal('dj', prog.lv), mag: () => perkVal('mag', prog.lv), dash: () => perkVal('dash', prog.lv), glide: () => perkVal('glide', prog.lv) };
+const cheat = { start: 0, keep: false };
+const START_OPTS = ['NONE', 'STAR', 'BOOTS', 'BLASTER', 'WINGS', 'ALL'];
+const SEL_ROWS = ['WORLD', 'PIP LEVEL', 'DOUBLE JUMP', 'COIN MAGNET', 'DASH', 'GLIDE', 'START WITH', 'ENDLESS POWER-UPS', 'START!'];
+const sel = { row: 0, w: 1, lv: 1 };
+let secretTaps = 0, secretT = -9;
 const maxHp = () => Math.min(8, 3 + (prog.lv >= 4) + (prog.lv >= 6) + Math.max(0, Math.floor((prog.lv - 6) / 2)));
 const speed = () => 100 * (1 + Math.min(0.25, (prog.lv - 1) * 0.02)) * (mod === 'TURBO' ? 1.3 : 1);
 const xpNeed = l => 50 + l * 30;
@@ -170,14 +180,15 @@ function addXp(n) {
 function updDash() { if (dashBtn) dashBtn.textContent = perk.dash() ? 'DASH' : 'Lv5'; }
 function worldSub() {
   if (mode === 'fly') return 'SKY SHOOTER! fly & auto-fire';
+  if (mode === 'climb') return 'TOWER CLIMB! the lava is rising';
   return biome.name + (mod ? ' - SURPRISE: ' + mod : '');
 }
 
 /* ---------- level generation ---------- */
 // tiles: 1 ground, 2 brick, 3 ?block, 4 used, 5 spikes, 6 crystal, 7 hidden, 8 stone, 9 pipe body, 10 pipe top
-const tileAt = (tx, ty) => tx < 0 ? 1 : (tx >= W || ty < 0 || ty >= ROWS) ? 0 : map[ty * W + tx];
+const tileAt = (tx, ty) => tx < 0 ? 1 : (tx >= W || ty < 0 || ty >= RH) ? 0 : map[ty * W + tx];
 const solid = t => t === 1 || t === 2 || t === 3 || t === 4 || t === 6 || t === 8 || t === 9 || t === 10;
-const firm = t => t === 1 || t === 6 || t === 8 || t === 9 || t === 10;
+const firm = t => t === 1 || t === 6 || t === 8 || t === 9 || t === 10 || t === 11;
 function mkFoe(x, y, type, diff) {
   return { x, y, w: 14, h: 14, vx: -(28 + diff * 22), vy: 0, type, act: 0, ht: 1 + Math.random(), on: false, dead: 0, sqd: 0, sq: 0, hp: 1 };
 }
@@ -187,12 +198,13 @@ function resetP(x, y) {
 function gen(n) {
   const r = rng(n * 9973 + 17);
   biome = BIOMES[(n - 1) % BIOMES.length];
-  mode = n % 4 === 0 ? 'fly' : 'run';
+  mode = modeFor(n); RH = ROWS; camY = 0;
   under = false; saved = null; pipe = null;
   ents = []; coinL = []; items = []; parts = []; texts = []; bumps = []; shots = []; warps = [];
   camX = 0; combo = 0;
   song = makeSong(n); mStep = 0;
   if (mode === 'fly') { genFly(n, r); return; }
+  if (mode === 'climb') { genClimb(n, r); return; }
   W = Math.min(400, 100 + n * 16);
   map = new Uint8Array(W * ROWS);
   const set = (x, y, t) => { if (x >= 0 && x < W && y >= 0 && y < ROWS) map[y * W + x] = t; };
@@ -301,6 +313,48 @@ function genFly(n, r) {
   P.on = false;
   safe = { x: P.x, y: P.y };
 }
+function genClimb(n, r) {
+  W = 20; RH = Math.min(220, 64 + n * 3);
+  map = new Uint8Array(W * RH);
+  mod = ''; flagX = 1e9;
+  const set = (x, y, t) => { if (x >= 0 && x < W && y >= 0 && y < RH) map[y * W + x] = t; };
+  const coin = (tx, ty) => coinL.push({ x: tx * T + 4, y: ty * T + 4, w: 8, h: 8 });
+  const diff = Math.min(1, (n - 1) / 10);
+  for (let y = 0; y < RH; y++) { set(0, y, 8); set(W - 1, y, 8); }
+  for (let x = 1; x < W - 1; x++) { set(x, RH - 2, 1); set(x, RH - 1, 1); }
+  let y = RH - 5, lx = 7, ll = 5;
+  while (y > 9) {
+    const L = 3 + (r() * 4 | 0);
+    const x = clamp(lx - L - 2 + (r() * (ll + L + 5) | 0), 1, W - 1 - L);
+    for (let i = 0; i < L; i++) set(x + i, y, 11);
+    if (r() < 0.55) for (let i = 0; i < L; i++) coin(x + i, y - 1);
+    else if (L >= 4 && r() < 0.25 + diff * 0.4) ents.push(mkFoe((x + 1) * T, (y - 1) * T + 2, r() < 0.3 ? 'hop' : 'walk', diff));
+    if (L >= 4 && r() < 0.15) set(x + (L >> 1), y - 2, 3);
+    lx = x; ll = L; y -= 3;
+  }
+  for (let x = 1; x < W - 1; x++) set(x, y, 11);
+  goalY = y * T;
+  resetP(9 * T, (RH - 2) * T - P.h);
+  safe = { x: P.x, y: P.y };
+  camX = (W * T - VW) / 2; camY = RH * T - VH; lavaY = RH * T + 30; lavaWait = 3;
+}
+function updClimb(dt) {
+  if (lavaWait > 0) lavaWait -= dt; else lavaY -= (10 + Math.min(20, world * 0.8)) * dt;
+  lavaY = Math.max(goalY + 2 * T, Math.min(lavaY, camY + VH + 60));
+  if (P.y + P.h > lavaY + 3) {
+    hurt();
+    if (state === 'play') {
+      P.vy = -560; P.on = false; P.jumping = false; lavaWait = 1.5;
+      for (let i = 0; i < 8; i++) parts.push({ x: P.x + 6, y: lavaY, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 200, g: 600, life: 0.6, col: '#ff8a1f', s: 3 });
+    }
+  }
+  if (state === 'play' && P.on && P.y + P.h <= goalY + 1) worldClear('TOWER CLEAR!');
+}
+function climbCam(dt) {
+  camX = (W * T - VW) / 2;
+  const ty = clamp(P.y - VH * 0.55, 0, RH * T - VH);
+  camY += (ty - camY) * Math.min(1, dt * 6);
+}
 function buildRoom(seed) {
   const r = rng(seed);
   W = Math.max(36, Math.ceil(VW / T) + 2);
@@ -337,7 +391,10 @@ function colY(b, pl) {
   const x0 = Math.floor(b.x / T), x1 = Math.floor((b.x + b.w - 0.01) / T);
   if (b.vy >= 0) {
     const ty = Math.floor((b.y + b.h) / T);
-    for (let tx = x0; tx <= x1; tx++) if (solid(tileAt(tx, ty))) { b.y = ty * T - b.h; b.vy = 0; b.on = true; return; }
+    for (let tx = x0; tx <= x1; tx++) {
+      const t = tileAt(tx, ty);
+      if (solid(t) || (t === 11 && b.y + b.h - ty * T <= 6)) { b.y = ty * T - b.h; b.vy = 0; b.on = true; return; }
+    }
   } else {
     const ty = Math.floor(b.y / T);
     let best = -1, bd = 99;
@@ -392,7 +449,7 @@ function surprise(cx, cy, hidden) {
 function hurt() {
   if (P.inv > 0 || P.star > 0 || P.dash > 0) return;
   hp--; sfx.hurt(); P.inv = 1.6; shake = 0.25;
-  if (mode === 'run') { P.vy = -260; P.vx = -P.face * 120; }
+  if (mode !== 'fly') { P.vy = -260; P.vx = -P.face * 120; }
   if (hp <= 0) gameOver();
 }
 function fallPit() {
@@ -453,8 +510,9 @@ function warp(w) {
 function updPlayer(dt) {
   const g = mod === 'LOW GRAVITY' ? 800 : 1400;
   const jv = 430 * (P.boots > 0 ? 1.3 : 1) * (mod === 'BOUNCY' ? 1.12 : 1) * (mod === 'LOW GRAVITY' ? 0.85 : 1);
-  P.inv = Math.max(0, P.inv - dt); P.star = Math.max(0, P.star - dt); P.boots = Math.max(0, P.boots - dt);
-  P.blaster = Math.max(0, P.blaster - dt); P.wings = Math.max(0, P.wings - dt); P.dcd -= dt; P.fcd -= dt;
+  const pd = cheat.keep ? 0 : dt;
+  P.inv = Math.max(0, P.inv - dt); P.star = Math.max(0, P.star - pd); P.boots = Math.max(0, P.boots - pd);
+  P.blaster = Math.max(0, P.blaster - pd); P.wings = Math.max(0, P.wings - pd); P.dcd -= dt; P.fcd -= dt;
   let dir = (held.right ? 1 : 0) - (held.left ? 1 : 0);
   if (mod === 'AUTO RUN' && !under) dir = held.left ? 0 : 1;
   if (dir) P.face = dir;
@@ -510,13 +568,14 @@ function updPlayer(dt) {
       if (P.star <= 0 && P.inv <= 0) { hurt(); P.vy = -330; }
     }
   }
-  if (P.y > VH + 16) fallPit();
+  if (P.y > RH * T + 16) fallPit();
   if (state === 'play') tryPipe();
   if (state === 'play' && P.x + P.w / 2 >= flagX + 8) { P.x = flagX + 8 - P.w; worldClear('WORLD CLEAR!'); }
 }
 function updFly(dt) {
   const sp = 50 + Math.min(30, world * 1.5), end = W * T - VW;
-  P.inv = Math.max(0, P.inv - dt); P.star = Math.max(0, P.star - dt); P.spread = Math.max(0, P.spread - dt); P.fcd -= dt;
+  const pd = cheat.keep ? 0 : dt;
+  P.inv = Math.max(0, P.inv - dt); P.star = Math.max(0, P.star - pd); P.spread = Math.max(0, P.spread - pd); P.fcd -= dt;
   const move = camX < end ? sp : 0;
   camX = Math.min(end, camX + sp * dt);
   const dx = (held.right ? 1 : 0) - (held.left ? 1 : 0), dy = (held.down ? 1 : 0) - (held.jump ? 1 : 0);
@@ -546,7 +605,7 @@ function updWorld(dt) {
   const g = mod === 'LOW GRAVITY' ? 800 : 1400;
   for (const e of ents) {
     if (!e.act) { if (e.x < camX + VW + 40) e.act = 1; else continue; }
-    if (e.dead) { e.vy += 1400 * dt; e.y += e.vy * dt; e.x += e.vx * dt; if (e.y > VH + 40) e.gone = 1; continue; }
+    if (e.dead) { e.vy += 1400 * dt; e.y += e.vy * dt; e.x += e.vx * dt; if (e.y > RH * T + 40) e.gone = 1; continue; }
     if (e.sqd) { e.sq -= dt; if (e.sq <= 0) e.gone = 1; continue; }
     if (e.flash > 0) e.flash -= dt;
     if (mode === 'fly') { updFlyFoe(e, dt); continue; }
@@ -558,7 +617,7 @@ function updWorld(dt) {
     e.on = false;
     e.y += e.vy * dt;
     colY(e, false);
-    if (e.y > VH + 40) { e.gone = 1; continue; }
+    if (e.y > RH * T + 40) { e.gone = 1; continue; }
     if (state === 'play' && overlap(P, e)) {
       if (P.star > 0 || P.dash > 0) kill(e);
       else if (P.vy > 0 && P.y + P.h - e.y < 10 && e.type !== 'spiky') {
@@ -572,7 +631,7 @@ function updWorld(dt) {
   for (const s of shots) {
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
     if (s.foe) { if (state === 'play' && overlap(P, s)) { s.life = 0; hurt(); } continue; }
-    if (mode === 'run') {
+    if (mode !== 'fly') {
       const tx = Math.floor((s.x + 3) / T), ty = Math.floor((s.y + 1) / T), t = tileAt(tx, ty);
       if (solid(t)) { s.life = 0; if (t === 2) breakBrick(tx, ty); continue; }
     }
@@ -633,11 +692,58 @@ function camera(dt) {
 function startWorld() {
   gen(world); state = 'play';
   banner('WORLD ' + world, worldSub(), 2.4);
+  const o = START_OPTS[cheat.start], all = o === 'ALL';
+  if (all || o === 'STAR') P.star = 8;
+  if (all || o === 'BOOTS') P.boots = 12;
+  if (all || o === 'BLASTER') P.blaster = 15;
+  if (all || o === 'WINGS') P.wings = 10;
+  if (all) P.spread = 10;
+}
+function openSelect() {
+  state = 'select'; stT = 0; startReq = false;
+  sel.row = 0; sel.w = world; sel.lv = prog.lv;
+  sfx.gem();
+}
+function selVal(i) {
+  if (i === 0) { const m = modeFor(sel.w); return sel.w + ' ' + (m === 'fly' ? 'SKY SHOOTER' : m === 'climb' ? 'TOWER CLIMB' : BIOMES[(sel.w - 1) % BIOMES.length].name); }
+  if (i === 1) return String(sel.lv);
+  if (i >= 2 && i <= 5) return perkVal(['dj', 'mag', 'dash', 'glide'][i - 2], sel.lv) ? 'ON' : 'OFF';
+  if (i === 6) return START_OPTS[cheat.start];
+  if (i === 7) return cheat.keep ? 'ON' : 'OFF';
+  return '';
+}
+function selChange(d) {
+  const r = sel.row;
+  if (r === 0) sel.w = clamp(sel.w + d, 1, 999);
+  else if (r === 1) sel.lv = clamp(sel.lv + d, 1, 99);
+  else if (r >= 2 && r <= 5) { const k = ['dj', 'mag', 'dash', 'glide'][r - 2]; perkSet[k] = !perkVal(k, sel.lv); }
+  else if (r === 6) cheat.start = ((cheat.start + Math.sign(d)) % START_OPTS.length + START_OPTS.length) % START_OPTS.length;
+  else if (r === 7) cheat.keep = !cheat.keep;
+  else return;
+  sfx.coin();
+}
+function selectInput(k) {
+  const n = SEL_ROWS.length;
+  if (k === 'left') selChange(-1);
+  else if (k === 'right') selChange(1);
+  else if (k === 'dash') selChange(10);
+  else if (k === 'fire') selChange(-10);
+  else if (k === 'down') { sel.row = (sel.row + 1) % n; sfx.bump(); }
+  else if (k === 'up') { sel.row = (sel.row + n - 1) % n; sfx.bump(); }
+  else if (k === 'back') { state = 'title'; stT = 0; startReq = false; }
+  else if (k === 'jump') {
+    world = sel.w;
+    if (sel.lv !== prog.lv) { prog.lv = sel.lv; prog.xp = 0; }
+    updDash(); coins = 0; hp = maxHp();
+    startReq = false; jb = 0; db = 0;
+    startWorld();
+  }
 }
 function update(dt) {
   time += dt; shake = Math.max(0, shake - dt);
   jb = Math.max(0, jb - dt); db = Math.max(0, db - dt); dnb = Math.max(0, dnb - dt); fb = Math.max(0, fb - dt);
   if (held.fire) fb = Math.max(fb, 0.05);
+  if (state === 'select') { stT += dt; updWorld(dt); return; }
   if (state === 'title' || state === 'over') {
     stT += dt;
     if (state === 'title') camX = (Math.sin(time * 0.15) * 0.5 + 0.5) * (W * T - VW) * 0.3;
@@ -664,6 +770,7 @@ function update(dt) {
   if (state === 'clear') {
     stT += dt;
     if (mode === 'fly') P.x += 160 * dt;
+    else if (mode === 'climb') climbCam(dt);
     else {
       if (P.y + P.h < 13 * T - 0.5) P.y = Math.min(13 * T - P.h, P.y + 90 * dt);
       else { P.x += 55 * dt; P.anim += dt; P.on = true; }
@@ -673,9 +780,10 @@ function update(dt) {
     if (stT > 2.8) { world++; startWorld(); }
     return;
   }
-  if (mode === 'fly') updFly(dt); else updPlayer(dt);
+  if (mode === 'fly') updFly(dt);
+  else { updPlayer(dt); if (mode === 'climb' && state === 'play') updClimb(dt); }
   updWorld(dt);
-  if (mode === 'run') camera(dt);
+  if (mode === 'run') camera(dt); else if (mode === 'climb') climbCam(dt);
 }
 
 /* ---------- drawing ---------- */
@@ -755,6 +863,11 @@ function drawTile(t, x, y, tx, ty) {
       ctx.fillStyle = '#5a5a6a'; ctx.fillRect(x, y, T, T);
       ctx.fillStyle = '#b8b8c8'; ctx.fillRect(x, y, T - 1, T - 1);
       ctx.fillStyle = '#8c8c9c'; ctx.fillRect(x + 1, y + 1, T - 3, T - 3);
+      break;
+    case 11:
+      ctx.fillStyle = b.dirt; ctx.fillRect(x, y, T, 6);
+      ctx.fillStyle = b.top; ctx.fillRect(x, y, T, 2);
+      ctx.fillStyle = b.dot; ctx.fillRect(x + 7, y + 2, 1, 4);
       break;
     case 9: case 10: {
       const left = tileAt(tx - 1, ty) !== t;
@@ -899,8 +1012,9 @@ function draw() {
       const cx = ((i * 170 - camX * (mode === 'fly' ? 0.5 : 0.15) + time * 6) % span + span) % span - 60, cy = 20 + (i * 37) % (mode === 'fly' ? 180 : 60);
       ctx.beginPath(); ctx.ellipse(cx, cy, 22, 7, 0, 0, TAU); ctx.ellipse(cx + 10, cy - 5, 12, 7, 0, 0, TAU); ctx.fill();
     }
-    hills(camX * 0.2, 150, 22, night ? '#1f2a55' : b.h1 || 'hsl(' + ((hue + 120) % 360) + ',35%,72%)');
-    hills(camX * 0.45 + 300, 180, 16, night ? '#17203f' : b.h2 || 'hsl(' + ((hue + 130) % 360) + ',40%,52%)');
+    const hy = mode === 'climb' ? (RH * T - VH - camY) * 0.25 : 0;
+    hills(camX * 0.2, 150 + hy, 22, night ? '#1f2a55' : b.h1 || 'hsl(' + ((hue + 120) % 360) + ',35%,72%)');
+    hills(camX * 0.45 + 300, 180 + hy * 1.6, 16, night ? '#17203f' : b.h2 || 'hsl(' + ((hue + 130) % 360) + ',40%,52%)');
     if (mode === 'fly') hills(camX * 0.8 + 900, 228, 10, night ? '#111833' : b.top);
   } else {
     ctx.fillStyle = 'rgba(255,255,255,.04)';
@@ -909,7 +1023,7 @@ function draw() {
 
   const sx = shake > 0 ? (Math.random() - 0.5) * 4 : 0;
   ctx.save();
-  ctx.translate(-Math.round(camX * scale) / scale + sx, 0);
+  ctx.translate(-Math.round(camX * scale) / scale + sx, -Math.round(camY * scale) / scale);
   const c0 = Math.max(0, Math.floor(camX / T) - 1), c1 = Math.min(W - 1, Math.ceil((camX + VW) / T) + 1);
   if (b.lava && !under && mode === 'run') {
     const lg = ctx.createLinearGradient(0, VH - 10, 0, VH + 40);
@@ -930,8 +1044,20 @@ function draw() {
     ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.moveTo(hx - 4, 13 * T - 28); ctx.lineTo(hx + 16, 13 * T - 44); ctx.lineTo(hx + 36, 13 * T - 28); ctx.fill();
     ctx.fillStyle = '#3a2210'; ctx.fillRect(hx + 11, 13 * T - 16, 10, 16);
   }
+  if (mode === 'climb') {
+    ctx.fillStyle = '#3a3550';
+    if (camX < 0) ctx.fillRect(camX - 1, camY - 1, -camX + 1, SH + 2);
+    if (camX + VW > W * T) ctx.fillRect(W * T, camY - 1, camX + VW - W * T + 1, SH + 2);
+    const fx = W * T / 2;
+    ctx.fillStyle = '#ddd'; ctx.fillRect(fx, goalY - 48, 2, 48);
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(fx + 1, goalY - 49, 3, 0, TAU); ctx.fill();
+    const wv = Math.sin(time * 6) * 2;
+    ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.moveTo(fx + 2, goalY - 46); ctx.lineTo(fx + 22, goalY - 39 + wv); ctx.lineTo(fx + 2, goalY - 32); ctx.fill();
+    star(fx + 9, goalY - 39, 3, '#fff', 0);
+  }
   if (state === 'pipe') drawPip();
-  for (let ty = 0; ty < ROWS; ty++) for (let tx = c0; tx <= c1; tx++) {
+  const r0 = Math.max(0, Math.floor(camY / T)), r1 = Math.min(RH - 1, Math.floor((camY + SH) / T) + 1);
+  for (let ty = r0; ty <= r1; ty++) for (let tx = c0; tx <= c1; tx++) {
     const t = map[ty * W + tx];
     if (!t || t === 7) continue;
     let oy = 0;
@@ -950,7 +1076,7 @@ function draw() {
     if (s.foe) { ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(s.x + 3, s.y + 3, 3, 0, TAU); ctx.fill(); ctx.fillStyle = '#ffd0d0'; ctx.fillRect(s.x + 2, s.y + 2, 2, 2); }
     else { ctx.fillStyle = '#ffe066'; ctx.fillRect(s.x, s.y, s.w, s.h); ctx.fillStyle = '#fff'; ctx.fillRect(s.x + s.w - 2, s.y, 2, s.h); }
   }
-  if (state !== 'title' && state !== 'pipe') drawPip();
+  if (state !== 'title' && state !== 'pipe' && state !== 'select') drawPip();
   for (const p of parts) {
     ctx.globalAlpha = Math.min(1, p.life * 3);
     if (p.coin) drawCoin(p.x - 4, p.y - 4);
@@ -959,6 +1085,14 @@ function draw() {
   ctx.globalAlpha = 1;
   for (const t of texts) { ctx.globalAlpha = Math.min(1, t.t * 2); txt(t.s, t.x + 6, t.y, 8, t.col); }
   ctx.globalAlpha = 1;
+  if (mode === 'climb' && lavaY < camY + SH) {
+    const ly = lavaY + Math.sin(time * 2) * 1.5;
+    const lg = ctx.createLinearGradient(0, ly, 0, ly + 60);
+    lg.addColorStop(0, '#ffd23f'); lg.addColorStop(0.25, '#ff6a00'); lg.addColorStop(1, '#a01800');
+    ctx.fillStyle = lg; ctx.fillRect(camX - 2, ly, VW + 4, camY + SH - ly + 4);
+    ctx.fillStyle = 'rgba(255,230,120,.8)';
+    for (let i = 0; i < 6; i++) ctx.fillRect(camX + ((i * 83 + time * 20) % VW), ly + 3 + Math.sin(time * 3 + i) * 2, 3, 2);
+  }
   ctx.restore();
 
   if (!under && (b.snow || b.ember)) {
@@ -971,7 +1105,7 @@ function draw() {
     }
   }
   if (night && state !== 'title') {
-    const px = P.x + 6 - camX, py = P.y + 7;
+    const px = P.x + 6 - camX, py = P.y + 7 - camY;
     const rg = ctx.createRadialGradient(px, py, 10, px, py, 120);
     rg.addColorStop(0, 'rgba(4,4,20,0)'); rg.addColorStop(0.35, 'rgba(4,4,20,.15)'); rg.addColorStop(1, 'rgba(4,4,20,.93)');
     ctx.fillStyle = rg; ctx.fillRect(0, -offY, VW, SH);
@@ -983,7 +1117,7 @@ function draw() {
   for (let i = 0; i < mh; i++) heart(6 + i * 11, 5, 10, i < hp ? '#ff4d6d' : 'rgba(0,0,0,.35)');
   drawCoin(6, 19); txt('x' + coins, 17, 23.5, 9, '#fff', 'left');
   txt('WORLD ' + world, VW / 2, 10, 10, '#fff');
-  const sub = under ? 'UNDERGROUND' : mode === 'fly' ? 'SKY SHOOTER' : mod || biome.name;
+  const sub = under ? 'UNDERGROUND' : mode === 'fly' ? 'SKY SHOOTER' : mode === 'climb' ? 'TOWER CLIMB' : mod || biome.name;
   txt(sub, VW / 2, 22, 8, '#ffe066');
   const bx = VW - 84;
   txt('Lv ' + prog.lv, bx, 10, 10, '#fff', 'left');
@@ -1013,7 +1147,7 @@ function draw() {
     ctx.fillStyle = 'rgba(10,12,40,.55)'; ctx.fillRect(0, 0, VW, SH);
     if (state === 'title') {
       txt("PIP'S ENDLESS RUN", VW / 2, cy - 44, Math.min(22, VW / 11), '#2fd4c4');
-      txt('5 biomes · pipes · sky shooter · level up', VW / 2, cy - 24, 9, '#ffe066');
+      txt('5 biomes · pipes · sky shooter · tower climb', VW / 2, cy - 24, 9, '#ffe066');
     } else {
       txt('OUT OF HEARTS', VW / 2, cy - 44, Math.min(20, VW / 10), '#ff4d6d');
       txt('Pip keeps Lv ' + prog.lv + ' - retry World ' + world, VW / 2, cy - 24, 9, '#ffe066');
@@ -1024,6 +1158,20 @@ function draw() {
       txt('Arrows / A D move  ·  Space / W / Up jump  ·  Down enter pipe', VW / 2, cy + 18, 8, '#ddd');
       txt('Shift / X dash (Lv5)  ·  F / C fire  ·  M mute  ·  click = jump', VW / 2, cy + 30, 8, '#ddd');
     }
+  }
+  if (state === 'select') {
+    ctx.fillStyle = 'rgba(10,12,40,.85)'; ctx.fillRect(0, 0, VW, SH);
+    const top = Math.max(34, cy - 70);
+    txt('DAYDREAM', VW / 2, top, 16, '#ffd23f');
+    SEL_ROWS.forEach((name, i) => {
+      const y = top + 20 + i * 12, on = i === sel.row;
+      if (on) { ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(VW / 2 - 102, y - 6, 204, 12); }
+      if (i === SEL_ROWS.length - 1) { txt(on ? '> START! <' : 'START!', VW / 2, y, 10, on ? '#7ed957' : '#fff'); return; }
+      txt(name, VW / 2 - 96, y, 8, on ? '#fff' : '#bbb', 'left');
+      txt((on ? '< ' : '') + selVal(i) + (on ? ' >' : ''), VW / 2 + 96, y, 8, on ? '#ffe066' : '#ddd', 'right');
+    });
+    const hy = top + 20 + SEL_ROWS.length * 12 + 2;
+    txt(touch ? 'DOWN row · LEFT/RIGHT change · DASH +10 · FIRE -10 · JUMP start' : 'Up/Down row · Left/Right change · Shift +10 · F -10 · Enter start · Esc back', VW / 2, hy, 7, '#aaa');
   }
 }
 
@@ -1037,8 +1185,15 @@ function press(k) {
   if (k === 'fire') fb = 0.15;
 }
 const KM = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'jump', ArrowUp: 'jump', KeyW: 'jump', KeyZ: 'jump', KeyK: 'jump', Enter: 'jump', ShiftLeft: 'dash', ShiftRight: 'dash', KeyX: 'dash', KeyJ: 'dash', ArrowDown: 'down', KeyS: 'down', KeyF: 'fire', KeyC: 'fire', KeyL: 'fire' };
+const SK = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ShiftLeft: 'dash', ShiftRight: 'dash', KeyX: 'dash', KeyF: 'fire', KeyC: 'fire', Enter: 'jump', Space: 'jump', Escape: 'back', KeyP: 'back' };
 addEventListener('keydown', e => {
   if (e.code === 'KeyM') { if (!e.repeat) toggleMute(); return; }
+  if (state === 'select') {
+    const sk = SK[e.code];
+    if (sk) { e.preventDefault(); initAudio(); selectInput(sk); }
+    return;
+  }
+  if (e.code === 'KeyP' && (state === 'title' || state === 'over')) { e.preventDefault(); if (!e.repeat) { initAudio(); openSelect(); } return; }
   const k = KM[e.code];
   if (!k) return;
   e.preventDefault();
@@ -1056,6 +1211,13 @@ cv.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch' || e.pointerType === 'pen') setTouch();
   const lx = e.clientX * dpr / scale, ly = e.clientY * dpr / scale;
   if (lx > VW - 30 && ly < 26) { toggleMute(); return; }
+  if (state === 'select') return;
+  if ((state === 'title' || state === 'over') && lx < 70 && ly < 32) {
+    if (time - secretT > 2) secretTaps = 0;
+    secretT = time; secretTaps++;
+    if (secretTaps >= 5) { secretTaps = 0; openSelect(); }
+    return;
+  }
   if (state === 'title' || state === 'over') { startReq = true; return; }
   if (state === 'play' && e.pointerType === 'mouse') { press('jump'); mouseJump = true; }
 });
@@ -1067,8 +1229,12 @@ document.querySelectorAll('#pad button').forEach(b => {
   const k = b.dataset.k;
   b.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation();
-    setTouch(); press(k);
-    if (state === 'title' || state === 'over') startReq = true;
+    setTouch();
+    if (state === 'select') { initAudio(); selectInput(k); }
+    else {
+      press(k);
+      if (state === 'title' || state === 'over') startReq = true;
+    }
     b.classList.add('on');
     try { b.setPointerCapture(e.pointerId); } catch (_) {}
   });
