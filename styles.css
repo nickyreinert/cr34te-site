@@ -35,13 +35,13 @@ canvas {
 
 body.touch #pad { display: flex; }
 
-#pad .grp { display: flex; gap: 10px; align-items: flex-end; }
+#pad .grp { display: flex; gap: 6px; align-items: flex-end; }
 
 #pad button {
   pointer-events: auto;
   touch-action: none;
-  width: clamp(46px, 13vw, 68px);
-  height: clamp(46px, 13vw, 68px);
+  width: clamp(40px, 12vw, 64px);
+  height: clamp(40px, 12vw, 64px);
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.7);
   background: rgba(10, 12, 40, 0.35);
@@ -50,8 +50,8 @@ body.touch #pad { display: flex; }
 }
 
 #pad button.big {
-  width: clamp(56px, 16vw, 82px);
-  height: clamp(56px, 16vw, 82px);
+  width: clamp(48px, 14vw, 78px);
+  height: clamp(48px, 14vw, 78px);
   background: rgba(255, 77, 109, 0.45);
 }
 
