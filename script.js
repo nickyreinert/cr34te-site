@@ -90,6 +90,17 @@ const sfx = {
   shoot() { S(900, 0.07, 'square', 0.03, 0, -500); },
   pipe() { arp([12, 7, 3, 0, -5, -9], 0.07, 'square', 0.07, 0.09); }
 };
+/* character voices: each letter is a tiny pitched blip, birds chirp */
+function voice(who, ch) {
+  if (!ac) return;
+  const c = ch.toLowerCase().charCodeAt(0), at = ac.currentTime, k = 1 + (c % 7) / 12;
+  if (who === 'bird') { tn(2300 * k, 0.06, 'sine', 0.05, at, 1100); if (c % 3 === 0) tn(2800 * k, 0.05, 'sine', 0.04, at + 0.05, 900); }
+  else if (who === 'pip') tn(520 * k, 0.05, 'square', 0.03, at, 40);
+  else if (who === 'grumble') tn(120 * k, 0.07, 'sawtooth', 0.05, at, -20);
+  else if (who === 'princess') tn(900 * k, 0.07, 'triangle', 0.07, at, 120);
+  else if (who === 'baron') tn(90 * k, 0.08, 'square', 0.04, at, -30);
+  else tn(210 * k, 0.07, 'triangle', 0.07, at, -40);
+}
 
 /* ---------- music: procedural catchy loop per world ---------- */
 const PROG = [0, -3, 5, 7];
@@ -110,7 +121,7 @@ function makeSong(n) {
   return { root: [0, 2, -3, 5, -5, 3][n % 6], bars: [A, B, A, C], tempo: Math.max(0.12, 0.16 - n * 0.002) };
 }
 function music() {
-  if (!ac || !song || muted || !(state === 'play' || state === 'title' || state === 'pipe' || state === 'select')) { if (ac) mNext = ac.currentTime + 0.1; return; }
+  if (!ac || !song || muted || !(state === 'play' || state === 'title' || state === 'pipe' || state === 'select' || state === 'talk')) { if (ac) mNext = ac.currentTime + 0.1; return; }
   if (mNext < ac.currentTime) mNext = ac.currentTime + 0.05;
   const root = song.root + (under ? -5 : 0), lead = under ? 'triangle' : 'square';
   while (mNext < ac.currentTime + 0.25) {
@@ -141,7 +152,12 @@ let state = 'title', stT = 0, world = 1, hp = 3, coins = 0, camX = 0, time = 0, 
 let map, W, ents, coinL, items, parts, texts, bumps, shots, warps, flagX, mod, safe, rainT = 0, startReq = false;
 let mode = 'run', under = false, saved = null, pipe = null;
 let RH = ROWS, camY = 0, lavaY = 0, lavaWait = 0, goalY = 0;
-const modeFor = n => n % 4 === 0 ? 'fly' : n % 5 === 3 ? 'climb' : 'run';
+// story chapters: 5 worlds per biome - run in, run deeper, climb the Baron's tower, chase his balloon, reach his hut
+const CH_MODES = ['run', 'run', 'climb', 'fly', 'run'];
+const chPos = n => (n - 1) % 5;
+const chNum = n => Math.floor((n - 1) / 5);
+const modeFor = n => CH_MODES[chPos(n)];
+const biomeFor = n => BIOMES[chNum(n) % BIOMES.length];
 const banners = [];
 const prog = { lv: 1, xp: 0 };
 const P = { x: 0, y: 0, w: 12, h: 14, vx: 0, vy: 0, on: false, face: 1, air: 1, coy: 0, inv: 0, star: 0, boots: 0, blaster: 0, wings: 0, spread: 0, fcd: 0, dash: 0, dcd: 0, anim: 0, glide: false, jumping: false };
@@ -152,11 +168,207 @@ const PREQ = { dj: 2, mag: 3, dash: 5, glide: 7 };
 const perkSet = { dj: null, mag: null, dash: null, glide: null };
 const perkVal = (k, lv) => perkSet[k] !== null ? perkSet[k] : lv >= PREQ[k];
 const perk = { dj: () => perkVal('dj', prog.lv), mag: () => perkVal('mag', prog.lv), dash: () => perkVal('dash', prog.lv), glide: () => perkVal('glide', prog.lv) };
-const cheat = { start: 0, keep: false };
+const cheat = { start: 0, keep: false, story: true };
 const START_OPTS = ['NONE', 'STAR', 'BOOTS', 'BLASTER', 'WINGS', 'ALL'];
-const SEL_ROWS = ['WORLD', 'PIP LEVEL', 'DOUBLE JUMP', 'COIN MAGNET', 'DASH', 'GLIDE', 'START WITH', 'ENDLESS POWER-UPS', 'START!'];
+const SEL_ROWS = ['WORLD', 'PIP LEVEL', 'DOUBLE JUMP', 'COIN MAGNET', 'DASH', 'GLIDE', 'START WITH', 'ENDLESS POWER-UPS', 'STORY', 'START!'];
 const sel = { row: 0, w: 1, lv: 1 };
 let secretTaps = 0, secretT = -9;
+
+/* ---------- story ---------- */
+const NAMES = { pip: 'PIP', bird: 'TWEETSY', grumble: 'GRUMBLE', princess: 'PRINCESS MARZIPAN', baron: 'BARON GRUMBLETON', mole: 'MO THE MOLE' };
+const NCOL = { pip: '#2fd4c4', bird: '#ffb02e', grumble: '#b58cff', princess: '#ff8fd0', baron: '#c77dff', mole: '#d9a066' };
+const INTRO = [
+  ['bird', 'TWEET TWEET! Pip! Emergency! A big one!'],
+  ['pip', 'Did someone eat the last cookie again?'],
+  ['bird', 'Worse! Baron Grumbleton kidnapped Princess Marzipan!'],
+  ['pip', 'Again?! That is the third time this week.'],
+  ['bird', 'He left a note. It says: "Not sorry."', [
+    { t: 'Rude. Let\'s go!', f: () => { flags.brave = 1; return [['pip', 'Rude. Let\'s go!'], ['bird', 'That is the spirit! Tweet!']]; } },
+    { t: 'Can I finish my nap first?', f: () => { flags.lazy = 1; return [['pip', 'Can I finish my nap first?'], ['bird', 'NO! ...Okay, five seconds.'], ['bird', '...Time is up! GO GO GO!']]; } }
+  ]]
+];
+const CLEARS = [
+  [['grumble', 'Grr! The princess? She is not here.'], ['pip', 'Then where is she?'], ['grumble', 'Not here. Also not telling. Grr.']],
+  [['bird', 'Tweet! I saw her! She went that way!'], ['pip', 'Which way?'], ['bird', '...Forward. It is always forward.']],
+  [['grumble', 'I am on my lunch break. Try the next hut.', [
+    { t: 'Can I have a bite?', f: () => { hp = Math.min(maxHp(), hp + 1); return [['pip', 'Can I have a bite?'], ['grumble', '...Fine. Here. Do not tell the Baron. (+1 heart)']]; } },
+    { t: 'You are ALWAYS on break.', f: () => [['pip', 'You have been on lunch break for six worlds.'], ['grumble', 'It is a very big sandwich.']] }
+  ]]],
+  [['mole', 'Psst. Want to buy a map? Only 10 coins.', [
+    { t: 'Sure! (10 coins)', f: () => {
+      if (coins < 10) return [['pip', 'Sure! ...Oh. I only have ' + coins + ' coins.'], ['mole', 'Then you get a map of HALF a hole.']];
+      coins -= 10; flags.map = 1;
+      return [['pip', 'Sure!'], ['mole', 'It is a drawing of a hole. Pleasure doing business!']];
+    } },
+    { t: 'No thanks.', f: () => [['pip', 'No thanks.'], ['mole', 'Your loss. It was a really good hole.']] }
+  ]]],
+  [['baron', 'MWAHAHA! You will never catch me!'], ['pip', 'You are standing right there.'], ['baron', '...MWAHAHA! *runs away very fast*']],
+  [['grumble', 'Why do you always jump on our heads?'], ['pip', 'Why do you always walk into me?'], ['grumble', '...Fair point. Grr.']],
+  [['pip', 'Princess? Are you in there?'], ['grumble', 'Wrong door. This is my bathroom.'], ['pip', 'Sorry! Sorry!']],
+  [['bird', 'Tweet! The Baron has an evil plan: step one, steal princess...'], ['pip', 'And step two?'], ['bird', 'He has not decided yet. He is very busy being evil.']],
+  [['bird', 'Fun fact: I am the only bird here who is NOT trying to bonk you.'], ['pip', 'Thanks... I guess?']]
+];
+const flags = {};
+let bonusStar = false;
+function rescueScene(ch) {
+  const L = [];
+  L.push(['princess', flags.snacks ? 'Pip! You found me! Did you bring snacks THIS time?' : 'Pip! You found me! Did you bring snacks?', [
+    { t: 'I brought a RESCUE!', f: () => { flags.snacks = 0; return [['pip', 'I brought a RESCUE!'], ['princess', 'Even better! ...Slightly.']]; } },
+    { t: 'I ate them on the way.', f: () => { const again = flags.snacks; flags.snacks = 1; return [['pip', again ? 'I ate them on the way. Again.' : 'I ate them on the way. Sorry.'], ['princess', again ? 'PIP!' : 'Fair. Heroing is hungry work.']]; } }
+  ]]);
+  L.push(ch % 2 ? ['princess', 'The Baron made me listen to his poetry. All of it.'] : ['princess', 'The Baron was teaching me the bagpipes. It was LOUD.']);
+  L.push(ch % 2 ? ['baron', 'Not so fast! I have a balloon, a net, and NO shame!'] : ['baron', 'MWAHAHA! And now... I steal her AGAIN!']);
+  if (flags.charm) {
+    flags.charm = 0; bonusStar = true;
+    L.push(['baron', 'But you were nice about my balloon. Take this star. Fair is fair.']);
+  }
+  L.push(['princess', 'Ugh, fine. See you in five worlds, Pip!']);
+  L.push(['pip', flags.lazy ? 'Every. Single. Time. ...I need a nap.' : 'Every. Single. Time.']);
+  return L;
+}
+const FLYS = [
+  [['bird', 'Tweet! You have a plane now.'], ['pip', 'Since when?'], ['bird', 'Do not ask. Physics is on a coffee break.']],
+  [['bird', 'My cousins up here are cranky. Sorry in advance.'], ['pip', 'How cranky?'], ['bird', '...Dodge cranky.']]
+];
+const CLIMBS = [
+  [['pip', 'Is that... lava rising?'], ['bird', 'Lava does not rise, Pip.'], ['pip', 'It is rising.'], ['bird', 'TWEET! CLIMB! CLIMB FASTER!']],
+  [['grumble', 'Welcome to the tower! There is no elevator.'], ['pip', 'And why is there lava?'], ['grumble', 'Ambience. Grr.']]
+];
+const MOLES = [
+  [['mole', 'You did not see me. I am not here.']],
+  [['mole', 'Take the coins. I only collect pebbles. Far superior currency.']],
+  [['mole', 'Shh! The Baron thinks this is his broom closet.']]
+];
+let talk = null, talkAdv = false, talkSkip = false, introSeen = false, pendingTalk = null;
+function say(lines, done) {
+  if (!cheat.story || !lines) { if (done) done(); return; }
+  talk = { lines: lines.slice(), i: 0, n: 0, acc: 0, sel: 0, done };
+  talkAdv = false; talkSkip = false;
+  state = 'talk';
+}
+function updTalk(dt) {
+  const L = talk.lines[talk.i], len = L[1].length;
+  if (talk.n < len) {
+    talk.acc += dt * 40;
+    while (talk.acc >= 1 && talk.n < len) {
+      talk.acc--; talk.n++;
+      const ch = L[1][talk.n - 1];
+      if (ch !== ' ' && talk.n % 2) voice(L[0], ch);
+    }
+  }
+  if (talkSkip) {
+    talkSkip = false; talkAdv = false;
+    let j = talk.i;
+    while (j < talk.lines.length && !talk.lines[j][2]) j++;
+    if (j !== talk.i) { talk.i = j; talk.acc = 0; }
+    if (j < talk.lines.length) talk.n = talk.lines[j][1].length;
+  } else if (talkAdv) {
+    talkAdv = false;
+    if (talk.n < len) talk.n = len;
+    else {
+      if (L[2]) { const extra = L[2][talk.sel].f() || []; talk.lines.splice(talk.i + 1, 0, ...extra); sfx.coin(); }
+      talk.i++; talk.n = 0; talk.acc = 0; talk.sel = 0;
+    }
+  }
+  if (talk.i >= talk.lines.length) {
+    const d = talk.done; talk = null; state = 'play';
+    if (d) d();
+  }
+}
+const talkChoosing = () => talk && talk.i < talk.lines.length && talk.lines[talk.i][2] && talk.n >= talk.lines[talk.i][1].length;
+function talkMove(d) { if (!talkChoosing()) return false; const n = talk.lines[talk.i][2].length; talk.sel = (talk.sel + d + n) % n; sfx.bump(); return true; }
+let choiceRects = [];
+function wrapText(str, maxW) {
+  const out = []; let line = '';
+  for (const w of str.split(' ')) {
+    const t = line ? line + ' ' + w : w;
+    if (line && ctx.measureText(t).width > maxW) { out.push(line); line = w; } else line = t;
+  }
+  out.push(line);
+  return out;
+}
+function drawFace(who, x, y, talking) {
+  const m = talking ? 2.5 : 1;
+  ctx.save(); ctx.translate(x, y);
+  if (who === 'pip') {
+    ctx.fillStyle = '#2fd4c4';
+    ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(-4, -20); ctx.lineTo(0, -12); ctx.lineTo(2, -12); ctx.lineTo(6, -20); ctx.lineTo(10, -10); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff4d6d'; ctx.fillRect(-14, 9, 28, 4);
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(5, -3, 4.5, 5.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(6.5, -3, 2.2, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#0d5c55'; ctx.fillRect(1, 5, 7, m);
+  } else if (who === 'bird') {
+    ctx.fillStyle = '#ffb02e'; ctx.beginPath(); ctx.ellipse(0, 2, 14, 12, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#e07a10'; ctx.beginPath(); ctx.ellipse(-6, 6, 7, 4, 0.5 + Math.sin(time * 20) * 0.3, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff6a3d'; ctx.beginPath(); ctx.moveTo(10, -1); ctx.lineTo(19, 1 + (talking ? -2 : 0)); ctx.lineTo(10, 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(10, 3); ctx.lineTo(18, 3 + m); ctx.lineTo(10, 5); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(4, -4, 4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(5, -4, 2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffb02e'; ctx.fillRect(-2, -14, 2, 5); ctx.fillRect(1, -15, 2, 6);
+  } else if (who === 'princess') {
+    ctx.fillStyle = '#ffd0e6'; ctx.beginPath(); ctx.arc(0, 2, 13, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff7ac8'; ctx.beginPath(); ctx.arc(0, -2, 15, Math.PI, 0); ctx.fill(); ctx.fillRect(-15, -2, 5, 16); ctx.fillRect(10, -2, 5, 16);
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(-8, -14); ctx.lineTo(-8, -24); ctx.lineTo(-4, -18); ctx.lineTo(0, -26); ctx.lineTo(4, -18); ctx.lineTo(8, -24); ctx.lineTo(8, -14); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-4, 2, 1.8, 0, TAU); ctx.arc(4, 2, 1.8, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,90,140,.5)'; ctx.beginPath(); ctx.arc(-7, 6, 2.5, 0, TAU); ctx.arc(7, 6, 2.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#c2304f'; ctx.fillRect(-2, 8, 4, m);
+  } else if (who === 'baron') {
+    ctx.fillStyle = '#6b3fa0'; ctx.beginPath(); ctx.arc(0, 2, 14, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.fillRect(-10, -14, 20, 4); ctx.fillRect(-7, -28, 14, 15);
+    ctx.fillStyle = '#ff4d6d'; ctx.fillRect(-7, -17, 14, 2);
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-5, -2, 3, 0, TAU); ctx.arc(5, -2, 3, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-5, -1, 1.5, 0, TAU); ctx.arc(5, -1, 1.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(5, -2, 4.5, 0, TAU); ctx.moveTo(9, 0); ctx.lineTo(10, 10); ctx.stroke();
+    ctx.fillStyle = '#2a1840'; ctx.beginPath(); ctx.moveTo(-10, 8); ctx.quadraticCurveTo(0, 2, 10, 8); ctx.quadraticCurveTo(0, 5, -10, 8); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.fillRect(-3, 9, 6, m);
+  } else if (who === 'mole') {
+    ctx.fillStyle = '#8a5a3c'; ctx.beginPath(); ctx.arc(0, 2, 14, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff9fb0'; ctx.beginPath(); ctx.arc(0, 5, 4, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(-5, -3, 4, 0, TAU); ctx.moveTo(9, -3); ctx.arc(5, -3, 4, 0, TAU); ctx.moveTo(-1, -3); ctx.lineTo(1, -3); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-2, 9, 4, 2 + m);
+  } else {
+    ctx.fillStyle = '#8e5bd8'; ctx.beginPath(); ctx.arc(0, 4, 14, Math.PI, 0); ctx.lineTo(14, 12); ctx.lineTo(-14, 12); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-5, 0, 3.5, 4, 0, 0, TAU); ctx.ellipse(5, 0, 3.5, 4, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(-4, 1, 1.8, 2.4, 0, 0, TAU); ctx.ellipse(6, 1, 1.8, 2.4, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-10, -6); ctx.lineTo(-2, -3); ctx.moveTo(10, -6); ctx.lineTo(2, -3); ctx.stroke();
+    ctx.fillStyle = '#2a1840'; ctx.fillRect(-4, 7, 8, m);
+  }
+  ctx.restore();
+}
+const ARRIVE = {
+  'MEADOW': [['bird', 'Tweet! The balloon went back to the MEADOW!'], ['pip', 'Grass. Flowers. Evil. A classic.']],
+  'DESERT': [['bird', 'Tweet! The Baron flew to the DESERT!'], ['pip', 'Great. Sand. In my everything.'], ['bird', 'Stay hydrated! Tweet!']],
+  'SNOWY PEAKS': [['bird', 'Brrr-tweet! He is hiding in the SNOWY PEAKS!'], ['pip', 'My ears will freeze off. Both of them.'], ['bird', 'Careful, the ground is slippery!']],
+  'VOLCANO': [['bird', 'Tweet! His balloon landed on a VOLCANO!'], ['pip', 'Who builds a hideout on a volcano?'], ['bird', 'Villains. It is always villains.']],
+  'CANDY LAND': [['bird', 'Tweet! He took her to CANDY LAND!'], ['pip', 'Finally a world I can eat!'], ['bird', 'Do NOT lick the scenery, Pip.']]
+};
+const TOWERTOP = [
+  [['baron', 'MWAHAHA! You climbed my whole tower?', [
+    { t: 'Give back the princess!', f: () => [['pip', 'Give back the princess!'], ['baron', 'Never! I have... a BALLOON! Toodle-oo!']] },
+    { t: 'Nice balloon. Is it new?', f: () => { flags.charm = 1; return [['pip', 'Nice balloon. Is it new?'], ['baron', '...It IS new! Nobody ever notices! Thank you!'], ['baron', 'Still escaping, though. Toodle-oo!']]; } }
+  ]]],
+  [['baron', 'Impressive! Most heroes quit at the stairs.'], ['pip', 'There were no stairs. Only lava.'], ['baron', 'Exactly! Byeee!'], ['bird', 'Tweet! He is escaping by air! Follow him!']]
+];
+const LANDED = [
+  [['bird', 'Tweet! He landed! His hut is just ahead!'], ['pip', 'This time for real.']],
+  [['bird', 'His balloon popped! He has to walk now!'], ['pip', 'Ha! Let us catch him at his hut!']]
+];
+function startScene(n) {
+  if (n === 1 && !introSeen) { introSeen = true; return INTRO; }
+  const pos = chPos(n), ch = chNum(n);
+  if (pos === 0 && n > 1) return ARRIVE[biomeFor(n).name];
+  if (pos === 2) return CLIMBS[ch % CLIMBS.length];
+  if (pos === 3) return FLYS[ch % FLYS.length];
+  return null;
+}
+function clearScene(n) {
+  const pos = chPos(n), ch = chNum(n);
+  if (pos === 4) return rescueScene(ch);
+  if (pos === 2) return TOWERTOP[ch % TOWERTOP.length];
+  if (pos === 3) return LANDED[ch % LANDED.length];
+  return CLEARS[(ch * 2 + pos) % CLEARS.length];
+}
 const maxHp = () => Math.min(8, 3 + (prog.lv >= 4) + (prog.lv >= 6) + Math.max(0, Math.floor((prog.lv - 6) / 2)));
 const speed = () => 100 * (1 + Math.min(0.25, (prog.lv - 1) * 0.02)) * (mod === 'TURBO' ? 1.3 : 1);
 const xpNeed = l => 50 + l * 30;
@@ -181,7 +393,8 @@ function updDash() { if (dashBtn) dashBtn.textContent = perk.dash() ? 'DASH' : '
 function worldSub() {
   if (mode === 'fly') return 'SKY SHOOTER! fly & auto-fire';
   if (mode === 'climb') return 'TOWER CLIMB! the lava is rising';
-  return biome.name + (mod ? ' - SURPRISE: ' + mod : '');
+  const part = ['the way in', 'deeper', '', '', "the Baron's hut"][chPos(world)];
+  return biome.name + ' - ' + part + (mod ? ' - SURPRISE: ' + mod : '');
 }
 
 /* ---------- level generation ---------- */
@@ -197,7 +410,7 @@ function resetP(x, y) {
 }
 function gen(n) {
   const r = rng(n * 9973 + 17);
-  biome = BIOMES[(n - 1) % BIOMES.length];
+  biome = biomeFor(n);
   mode = modeFor(n); RH = ROWS; camY = 0;
   under = false; saved = null; pipe = null;
   ents = []; coinL = []; items = []; parts = []; texts = []; bumps = []; shots = []; warps = [];
@@ -492,6 +705,8 @@ function warp(w) {
     buildRoom(world * 131 + w.tx * 7 + 1);
     tgt = warps[0];
     banner('BONUS ROOM!', 'grab the loot, then take a pipe back', 1.8);
+    if (flags.map && !flags.mapGem) { flags.mapGem = 1; addXp(40); pendingTalk = [['mole', 'My best customer! Here, a gem. Do NOT spend it on maps. (+40 XP)']]; }
+    else pendingTalk = MOLES[(world + w.tx) % MOLES.length];
   } else {
     ({ map, W, ents, coinL, items, flagX, warps } = saved);
     under = false;
@@ -698,18 +913,22 @@ function startWorld() {
   if (all || o === 'BLASTER') P.blaster = 15;
   if (all || o === 'WINGS') P.wings = 10;
   if (all) P.spread = 10;
+  if (bonusStar) { bonusStar = false; P.star = 8; }
+  say(startScene(world));
 }
+function nextWorld() { world++; startWorld(); }
 function openSelect() {
   state = 'select'; stT = 0; startReq = false;
   sel.row = 0; sel.w = world; sel.lv = prog.lv;
   sfx.gem();
 }
 function selVal(i) {
-  if (i === 0) { const m = modeFor(sel.w); return sel.w + ' ' + (m === 'fly' ? 'SKY SHOOTER' : m === 'climb' ? 'TOWER CLIMB' : BIOMES[(sel.w - 1) % BIOMES.length].name); }
+  if (i === 0) { const m = modeFor(sel.w); return sel.w + ' ' + (m === 'fly' ? 'SKY SHOOTER' : m === 'climb' ? 'TOWER CLIMB' : biomeFor(sel.w).name); }
   if (i === 1) return String(sel.lv);
   if (i >= 2 && i <= 5) return perkVal(['dj', 'mag', 'dash', 'glide'][i - 2], sel.lv) ? 'ON' : 'OFF';
   if (i === 6) return START_OPTS[cheat.start];
   if (i === 7) return cheat.keep ? 'ON' : 'OFF';
+  if (i === 8) return cheat.story ? 'ON' : 'OFF';
   return '';
 }
 function selChange(d) {
@@ -719,6 +938,7 @@ function selChange(d) {
   else if (r >= 2 && r <= 5) { const k = ['dj', 'mag', 'dash', 'glide'][r - 2]; perkSet[k] = !perkVal(k, sel.lv); }
   else if (r === 6) cheat.start = ((cheat.start + Math.sign(d)) % START_OPTS.length + START_OPTS.length) % START_OPTS.length;
   else if (r === 7) cheat.keep = !cheat.keep;
+  else if (r === 8) cheat.story = !cheat.story;
   else return;
   sfx.coin();
 }
@@ -743,6 +963,7 @@ function update(dt) {
   time += dt; shake = Math.max(0, shake - dt);
   jb = Math.max(0, jb - dt); db = Math.max(0, db - dt); dnb = Math.max(0, dnb - dt); fb = Math.max(0, fb - dt);
   if (held.fire) fb = Math.max(fb, 0.05);
+  if (state === 'talk') { updTalk(dt); return; }
   if (state === 'select') { stT += dt; updWorld(dt); return; }
   if (state === 'title' || state === 'over') {
     stT += dt;
@@ -762,7 +983,10 @@ function update(dt) {
       if (pipe.t >= 0.5) warp(pipe.w);
     } else {
       P.y = pipe.top - P.h * Math.min(1, pipe.t / 0.45);
-      if (pipe.t >= 0.45) { state = 'play'; P.vy = 0; P.on = true; P.inv = Math.max(P.inv, 0.5); }
+      if (pipe.t >= 0.45) {
+        state = 'play'; P.vy = 0; P.on = true; P.inv = Math.max(P.inv, 0.5);
+        if (pendingTalk) { const l = pendingTalk; pendingTalk = null; say(l); }
+      }
     }
     updWorld(dt); camera(dt);
     return;
@@ -777,7 +1001,7 @@ function update(dt) {
       camera(dt);
     }
     updWorld(dt);
-    if (stT > 2.8) { world++; startWorld(); }
+    if (stT > 2.8) say(clearScene(world), nextWorld);
     return;
   }
   if (mode === 'fly') updFly(dt);
@@ -1146,8 +1370,8 @@ function draw() {
   if (state === 'title' || state === 'over') {
     ctx.fillStyle = 'rgba(10,12,40,.55)'; ctx.fillRect(0, 0, VW, SH);
     if (state === 'title') {
-      txt("PIP'S ENDLESS RUN", VW / 2, cy - 44, Math.min(22, VW / 11), '#2fd4c4');
-      txt('5 biomes · pipes · sky shooter · tower climb', VW / 2, cy - 24, 9, '#ffe066');
+      txt('PIP & THE MARZIPAN CAPER', VW / 2, cy - 44, Math.min(20, VW / 15), '#2fd4c4');
+      txt('rescue Princess Marzipan (again)', VW / 2, cy - 24, 9, '#ffe066');
     } else {
       txt('OUT OF HEARTS', VW / 2, cy - 44, Math.min(20, VW / 10), '#ff4d6d');
       txt('Pip keeps Lv ' + prog.lv + ' - retry World ' + world, VW / 2, cy - 24, 9, '#ffe066');
@@ -1157,6 +1381,38 @@ function draw() {
     if (!touch) {
       txt('Arrows / A D move  ·  Space / W / Up jump  ·  Down enter pipe', VW / 2, cy + 18, 8, '#ddd');
       txt('Shift / X dash (Lv5)  ·  F / C fire  ·  M mute  ·  click = jump', VW / 2, cy + 30, 8, '#ddd');
+    }
+  }
+  if (state === 'talk' && talk && talk.i < talk.lines.length) {
+    const L = talk.lines[talk.i], full = L[1];
+    const bw = Math.min(VW - 12, 420), bh = 64, tbx = (VW - bw) / 2, tby = SH - (touch ? 66 : 8) - bh;
+    ctx.fillStyle = 'rgba(12,14,40,.93)'; ctx.fillRect(tbx, tby, bw, bh);
+    ctx.strokeStyle = NCOL[L[0]] || '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(tbx + 0.75, tby + 0.75, bw - 1.5, bh - 1.5);
+    ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(tbx + 4, tby + 4, 50, 56);
+    const typing = talk.n < full.length;
+    drawFace(L[0], tbx + 29, tby + 33, typing && ((time * 14) | 0) % 2 === 0);
+    txt(NAMES[L[0]] || '', tbx + 60, tby + 10, 8, NCOL[L[0]] || '#fff', 'left');
+    ctx.font = 'bold 9px "Trebuchet MS", Verdana, sans-serif';
+    const lines = wrapText(full, bw - 68);
+    let left = talk.n;
+    lines.slice(0, 3).forEach((ln, i) => {
+      if (left > 0) txt(ln.slice(0, left), tbx + 60, tby + 24 + i * 11, 9, '#fff', 'left');
+      left -= ln.length + 1;
+    });
+    choiceRects = [];
+    if (talkChoosing()) {
+      const opts = L[2], pw = Math.min(bw - 40, 230), px = tbx + bw - pw;
+      opts.forEach((o, i) => {
+        const oy = tby - 4 - (opts.length - i) * 15, on = i === talk.sel;
+        ctx.fillStyle = on ? 'rgba(47,212,196,.95)' : 'rgba(12,14,40,.93)'; ctx.fillRect(px, oy, pw, 13);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, oy + 0.5, pw - 1, 12);
+        txt((on ? '> ' : '  ') + o.t, px + 6, oy + 7, 9, on ? '#fff' : '#ccc', 'left');
+        choiceRects.push([px, oy, pw, 13]);
+      });
+      txt(touch ? 'LEFT/RIGHT choose · JUMP pick' : 'Up/Down choose · Space pick (or click)', tbx + 60, tby + bh - 7, 7, '#aaa', 'left');
+    } else {
+      if (!typing && Math.floor(time * 3) % 2) txt('>', tbx + bw - 10, tby + bh - 9, 10, '#ffe066');
+      txt(touch ? 'JUMP next · DASH skip' : 'Space next · Shift skip', tbx + 60, tby + bh - 7, 7, '#888', 'left');
     }
   }
   if (state === 'select') {
@@ -1188,6 +1444,18 @@ const KM = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right'
 const SK = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ShiftLeft: 'dash', ShiftRight: 'dash', KeyX: 'dash', KeyF: 'fire', KeyC: 'fire', Enter: 'jump', Space: 'jump', Escape: 'back', KeyP: 'back' };
 addEventListener('keydown', e => {
   if (e.code === 'KeyM') { if (!e.repeat) toggleMute(); return; }
+  if (state === 'talk') {
+    const c = e.code;
+    if ((c === 'ArrowUp' || c === 'KeyW' || c === 'ArrowLeft' || c === 'KeyA') && talkMove(-1)) { e.preventDefault(); return; }
+    if ((c === 'ArrowDown' || c === 'KeyS' || c === 'ArrowRight' || c === 'KeyD') && talkMove(1)) { e.preventDefault(); return; }
+    const tk = c === 'Escape' ? 'dash' : KM[c];
+    if (!tk) return;
+    e.preventDefault(); initAudio();
+    if (tk === 'jump') { if (!e.repeat) talkAdv = true; }
+    else if (tk === 'dash') { if (!e.repeat) talkSkip = true; }
+    else held[tk] = 1;
+    return;
+  }
   if (state === 'select') {
     const sk = SK[e.code];
     if (sk) { e.preventDefault(); initAudio(); selectInput(sk); }
@@ -1212,6 +1480,10 @@ cv.addEventListener('pointerdown', e => {
   const lx = e.clientX * dpr / scale, ly = e.clientY * dpr / scale;
   if (lx > VW - 30 && ly < 26) { toggleMute(); return; }
   if (state === 'select') return;
+  if (state === 'talk') {
+    choiceRects.forEach((r, i) => { if (lx >= r[0] && lx <= r[0] + r[2] && ly >= r[1] && ly <= r[1] + r[3] && talkChoosing()) talk.sel = i; });
+    talkAdv = true; return;
+  }
   if ((state === 'title' || state === 'over') && lx < 70 && ly < 32) {
     if (time - secretT > 2) secretTaps = 0;
     secretT = time; secretTaps++;
@@ -1231,6 +1503,7 @@ document.querySelectorAll('#pad button').forEach(b => {
     e.preventDefault(); e.stopPropagation();
     setTouch();
     if (state === 'select') { initAudio(); selectInput(k); }
+    else if (state === 'talk') { initAudio(); if ((k === 'left' && talkMove(-1)) || ((k === 'right' || k === 'down') && talkMove(1))) {} else if (k === 'jump') talkAdv = true; else if (k === 'dash') talkSkip = true; else held[k] = 1; }
     else {
       press(k);
       if (state === 'title' || state === 'over') startReq = true;
