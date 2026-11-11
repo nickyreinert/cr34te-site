@@ -1,58 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Alienhop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tracker</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div id="app">
-  <canvas id="view"></canvas>
-
-  <div id="hudL" class="hud">
-    <div id="hudA"></div>
-    <div id="hudB"></div>
-    <div id="hudAnom"></div>
-  </div>
-
-  <div id="bar">
-    <button class="btn" id="btnCraft" type="button">Craft</button>
-    <button class="btn" id="btnCodex" type="button">Codex</button>
-    <button class="btn" id="btnLaunch" type="button">Launch</button>
-  </div>
-
-  <div id="toast"></div>
-
-  <div id="pad">
-    <button class="pb k-fwd" data-k="fwd" type="button">^</button>
-    <button class="pb k-left" data-k="left" type="button">&lt;</button>
-    <button class="pb k-back" data-k="back" type="button">v</button>
-    <button class="pb k-right" data-k="right" type="button">&gt;</button>
-  </div>
-  <button id="jump" class="pb" data-k="jump" type="button">Jump</button>
-
-  <div id="panel" hidden>
-    <div id="box">
-      <div id="boxHead">
-        <span id="panelTitle"></span>
-        <button class="btn" id="panelClose" type="button">Close</button>
-      </div>
-      <div id="panelBody"></div>
-    </div>
-  </div>
-
-  <div id="flash"></div>
-  <div id="fade"></div>
-
-  <div id="start">
-    <div id="startBox">
-      <h1>Alienhop</h1>
-      <p>Click or tap to start</p>
-      <p class="dim">Move: W A S D or arrow keys. Jump: Space. The on-screen buttons work too.</p>
-    </div>
-  </div>
-</div>
+<main id="app">
+  <header class="bar">
+    <button id="play" type="button">Play</button>
+    <label>Tempo <input id="bpm" type="range" min="50" max="200" step="1" value="90"> <output id="bpmOut">90</output></label>
+    <button id="wav" type="button">WAV speichern</button>
+  </header>
+  <section class="bar">
+    <span>Pattern</span>
+    <span id="tabs" class="bar"></span>
+    <button id="addPat" type="button" title="Pattern hinzufügen">+</button>
+    <button id="delPat" type="button" title="Aktuelles Pattern löschen">&minus;</button>
+  </section>
+  <section class="bar">
+    <label>Vorlage <select id="preset"></select></label>
+    <button id="load" type="button">Laden</button>
+    <label>Akkord <select id="chord"></select></label>
+    <label>Bass <select id="bassNote"></select></label>
+  </section>
+  <section id="grid"></section>
+</main>
 <script src="script.js"></script>
 </body>
 </html>
