@@ -404,6 +404,10 @@
     const fc = new Float32Array(NF * 3);
     const fnr = new Float32Array(NF * 3);
     const fcol = new Float32Array(NF * 3);
+    const fwat = new Uint8Array(NF);
+    const skyMax = Math.max(skyHor[0], skyHor[1], skyHor[2], 1);
+    const skyAmb = [0.5 + 0.5 * skyHor[0] / skyMax, 0.5 + 0.5 * skyHor[1] / skyMax, 0.5 + 0.5 * skyHor[2] / skyMax];
+    const sunCol = [1.08, 1.0, 0.9];
     for (let f = 0; f < NF; f++) {
       const ia = ICO.faces[f * 3], ib = ICO.faces[f * 3 + 1], ic = ICO.faces[f * 3 + 2];
       const a = ia * 3, b = ib * 3, c = ic * 3;
@@ -425,16 +429,19 @@
       let col;
       if (sea !== null && Math.max(vh[ia], vh[ib], vh[ic]) <= sea + 0.001) {
         col = cWater;
+        fwat[f] = 1;
       } else {
         col = t < 0.5 ? mixc(cLow, cMid, t * 2) : mixc(cMid, cHigh, (t - 0.5) * 2);
         col = mixc(col, cRock, clamp((slope - 0.05) / 0.12, 0, 1) * 0.85);
       }
       const jit = 0.93 + rnd() * 0.12;
       const diff = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]);
-      const lit = (arch.amb + (1 - arch.amb) * diff) * jit;
-      fcol[f * 3] = col[0] * lit * tint[0];
-      fcol[f * 3 + 1] = col[1] * lit * tint[1];
-      fcol[f * 3 + 2] = col[2] * lit * tint[2];
+      const occ = fwat[f] ? 1 : 0.8 + 0.2 * clamp(t, 0, 1);
+      const ambL = arch.amb * (1.12 - slope * 1.2) * occ * jit;
+      const dirL = (1 - arch.amb) * diff * (0.75 + 0.25 * diff) * jit;
+      fcol[f * 3] = col[0] * (ambL * skyAmb[0] + dirL * sunCol[0]) * tint[0];
+      fcol[f * 3 + 1] = col[1] * (ambL * skyAmb[1] + dirL * sunCol[1]) * tint[1];
+      fcol[f * 3 + 2] = col[2] * (ambL * skyAmb[2] + dirL * sunCol[2]) * tint[2];
     }
 
     // landing site: lit side, on land
@@ -551,7 +558,7 @@
 
     return {
       seed: seed, depth: depth, arch: arch, name: planetName(seed), R: R, g: g, jumpV: jumpV,
-      hf: hf, sea: sea, pos: pos, fc: fc, fnr: fnr, fcol: fcol, sun: sun, tint: tint,
+      hf: hf, sea: sea, pos: pos, fc: fc, fnr: fnr, fcol: fcol, fwat: fwat, sun: sun, tint: tint,
       skyTop: skyTop, skyHor: skyHor, fogCol: fogCol, startDir: startDir, ship: ship,
       resources: resources, anomaly: anomaly, stars: stars
     };
@@ -774,6 +781,14 @@
         let lit = amb + (1 - amb) * Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]);
         if (lit < inst.minLit) lit = inst.minLit;
         rr = col[0] * lit * tint[0]; gg = col[1] * lit * tint[1]; bb = col[2] * lit * tint[2];
+        const vd = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+        let hx = sun[0] - vx / vd, hy = sun[1] - vy / vd, hz = sun[2] - vz / vd;
+        const hl = Math.sqrt(hx * hx + hy * hy + hz * hz) || 1;
+        const nh = (nx * hx + ny * hy + nz * hz) / hl;
+        if (nh > 0 && nx * sun[0] + ny * sun[1] + nz * sun[2] > 0) {
+          const sp = Math.pow(nh, 22) * 90;
+          rr += sp * tint[0]; gg += sp * tint[1]; bb += sp * tint[2];
+        }
         if (!inst.glow) {
           const ft = clamp((Math.sqrt(vx * vx + vy * vy + vz * vz) - fogN) / (fogF - fogN), 0, 1);
           rr += (fogC[0] - rr) * ft; gg += (fogC[1] - gg) * ft; bb += (fogC[2] - bb) * ft;
@@ -794,6 +809,20 @@
 
   const pBody = { mesh: MESH.tet, o: [0, 0, 0], r: [1, 0, 0], u: [0, 1, 0], f: [0, 0, 1], s: [1.2, 1.2, 1.2], cols: [[236, 236, 242, 0]], minLit: 0.5, glow: true, up: 0, bob: false, phase: 0 };
   const pHead = { mesh: MESH.oct, o: [0, 0, 0], r: [1, 0, 0], u: [0, 1, 0], f: [0, 0, 1], s: [0.7, 0.8, 0.7], cols: [[90, 210, 255, 1]], minLit: 0, glow: true, up: 1.3, bob: false, phase: 0 };
+
+  const post = { w: 0, h: 0, vig: null, grain: null };
+  try {
+    const gc = document.createElement('canvas');
+    gc.width = 128; gc.height = 128;
+    const g2 = gc.getContext('2d');
+    const gi = g2.createImageData(128, 128);
+    for (let i = 0; i < gi.data.length; i += 4) {
+      const v = (Math.random() * 255) | 0;
+      gi.data[i] = v; gi.data[i + 1] = v; gi.data[i + 2] = v; gi.data[i + 3] = 255;
+    }
+    g2.putImageData(gi, 0, 0);
+    post.grain = ctx.createPattern(gc, 'repeat');
+  } catch (e) { post.grain = null; }
 
   function computeCamera() {
     const p = player.p, f = player.f, P = player.P;
@@ -819,14 +848,17 @@
     // sky
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, css(planet.skyTop));
-    grad.addColorStop(1, css(planet.skyHor));
+    grad.addColorStop(0.55, css(mixc(planet.skyTop, planet.skyHor, 0.55)));
+    grad.addColorStop(0.85, css(planet.skyHor));
+    grad.addColorStop(1, css(mixc(planet.skyHor, [255, 255, 255], planet.arch.dark ? 0.04 : 0.22)));
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
     const cr = cam.r, cu = cam.u, cf = cam.f, cp = cam.p;
 
     // stars and sun (rotation only)
-    ctx.fillStyle = planet.arch.dark ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)';
+    ctx.fillStyle = '#fff';
+    const starA = planet.arch.dark ? 0.95 : 0.4;
     const st = planet.stars;
     const ss = Math.max(1.5, W / 500);
     for (let i = 0; i < 150; i++) {
@@ -835,16 +867,35 @@
       if (zz < 0.05) continue;
       const sx = cam.cx + (x * cr[0] + y * cr[1] + z * cr[2]) / zz * cam.focal;
       const sy = cam.cy - (x * cu[0] + y * cu[1] + z * cu[2]) / zz * cam.focal;
-      ctx.fillRect(sx, sy, ss, ss);
+      const sq = ss * (0.5 + (i % 5) * 0.22);
+      ctx.globalAlpha = starA * (0.6 + 0.4 * Math.sin(time * 1.7 + i * 12.9898));
+      ctx.fillRect(sx, sy, sq, sq);
     }
+    ctx.globalAlpha = 1;
     const sn = planet.sun;
     const sz = sn[0] * cf[0] + sn[1] * cf[1] + sn[2] * cf[2];
     if (sz > 0.05) {
       const sx = cam.cx + (sn[0] * cr[0] + sn[1] * cr[1] + sn[2] * cr[2]) / sz * cam.focal;
       const sy = cam.cy - (sn[0] * cu[0] + sn[1] * cu[1] + sn[2] * cu[2]) / sz * cam.focal;
-      ctx.fillStyle = css([255 * planet.tint[0], 255 * planet.tint[1], 255 * planet.tint[2]]);
+      const sr = Math.max(8, cam.focal * 0.03);
+      const tr = (255 * planet.tint[0]) | 0, tg = (255 * planet.tint[1]) | 0, tb = (255 * planet.tint[2]) | 0;
+      const gr = sr * 11;
+      const glow = ctx.createRadialGradient(sx, sy, sr * 0.6, sx, sy, gr);
+      const gA = planet.arch.dark ? 0.3 : 0.6;
+      glow.addColorStop(0, 'rgba(' + tr + ',' + tg + ',' + tb + ',' + gA + ')');
+      glow.addColorStop(0.25, 'rgba(' + tr + ',' + tg + ',' + tb + ',' + (gA * 0.3) + ')');
+      glow.addColorStop(1, 'rgba(' + tr + ',' + tg + ',' + tb + ',0)');
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = glow;
+      ctx.fillRect(sx - gr, sy - gr, gr * 2, gr * 2);
+      ctx.globalCompositeOperation = 'source-over';
+      const disc = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+      disc.addColorStop(0, '#fff');
+      disc.addColorStop(0.7, 'rgb(' + tr + ',' + tg + ',' + tb + ')');
+      disc.addColorStop(1, 'rgba(' + tr + ',' + tg + ',' + tb + ',0.55)');
+      ctx.fillStyle = disc;
       ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(8, cam.focal * 0.03), 0, TAU);
+      ctx.arc(sx, sy, sr, 0, TAU);
       ctx.fill();
     }
 
@@ -859,6 +910,7 @@
 
     pc = 0;
     const fc = planet.fc, fnr = planet.fnr, fcol = planet.fcol, faces = ICO.faces;
+    const fwat = planet.fwat, wsun = planet.sun, wsky = planet.skyHor, wtint = planet.tint;
     const fogC = planet.fogCol, fogN = planet.arch.fog[0], fogF = planet.arch.fog[1];
     for (let f = 0; f < NF; f++) {
       const f3 = f * 3;
@@ -873,9 +925,26 @@
       const m = clipNear(3);
       if (m < 3) continue;
       const ft = clamp((Math.sqrt(vx * vx + vy * vy + vz * vz) - fogN) / (fogF - fogN), 0, 1);
-      const r = fcol[f3] + (fogC[0] - fcol[f3]) * ft;
-      const g = fcol[f3 + 1] + (fogC[1] - fcol[f3 + 1]) * ft;
-      const b = fcol[f3 + 2] + (fogC[2] - fcol[f3 + 2]) * ft;
+      let br = fcol[f3], bg = fcol[f3 + 1], bb = fcol[f3 + 2];
+      if (fwat[f]) {
+        const vd = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+        const nxw = fnr[f3], nyw = fnr[f3 + 1], nzw = fnr[f3 + 2];
+        const nv = clamp(-(nxw * vx + nyw * vy + nzw * vz) / vd, 0, 1);
+        const fres = Math.pow(1 - nv, 3) * 0.65;
+        br += (wsky[0] - br) * fres; bg += (wsky[1] - bg) * fres; bb += (wsky[2] - bb) * fres;
+        if (nxw * wsun[0] + nyw * wsun[1] + nzw * wsun[2] > 0) {
+          const hx = wsun[0] - vx / vd, hy = wsun[1] - vy / vd, hz = wsun[2] - vz / vd;
+          const hl = Math.sqrt(hx * hx + hy * hy + hz * hz) || 1;
+          const nh = (nxw * hx + nyw * hy + nzw * hz) / hl;
+          if (nh > 0) {
+            const sp = Math.pow(nh, 70) * 230 * (0.85 + 0.15 * Math.sin(time * 3 + f * 1.7));
+            br += sp * wtint[0]; bg += sp * wtint[1]; bb += sp * wtint[2];
+          }
+        }
+      }
+      const r = br + (fogC[0] - br) * ft;
+      const g = bg + (fogC[1] - bg) * ft;
+      const b = bb + (fogC[2] - bb) * ft;
       emit(m, vx * cf[0] + vy * cf[1] + vz * cf[2], r, g, b);
     }
 
@@ -916,6 +985,26 @@
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+    }
+
+    // lens pass: soft vignette and fine film grain
+    if (post.w !== W || post.h !== H) {
+      post.w = W; post.h = H;
+      const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.sqrt(W * W + H * H) * 0.56);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+      post.vig = vg;
+    }
+    ctx.fillStyle = post.vig;
+    ctx.fillRect(0, 0, W, H);
+    if (post.grain) {
+      const gx = ((time * 613) | 0) % 128, gy = ((time * 397) | 0) % 128;
+      ctx.save();
+      ctx.globalAlpha = 0.05;
+      ctx.translate(-gx, -gy);
+      ctx.fillStyle = post.grain;
+      ctx.fillRect(0, 0, W + 128, H + 128);
+      ctx.restore();
     }
   }
 
