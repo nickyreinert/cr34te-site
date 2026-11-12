@@ -126,14 +126,21 @@ const BADGES=[
 ];
 function renderBadges(){const root=$('badges');const key=BADGES.map(b=>b[3]()?1:0).join('');if(root.dataset.k===key)return;root.dataset.k=key;root.replaceChildren();for(const b of BADGES){if(!b[3]())continue;const el=document.createElement('span');el.className='badge';el.dataset.k=b[0];el.textContent=b[1];el.title=b[2];root.appendChild(el)}}
 // Teaser: announces that more is coming without naming it; hidden once nothing is left to unlock
-let teaser=null,teaserNote=null,teaserFill=null;
+let teaser=null,teaserIcons=null,teaserNote=null,teaserFill=null;
 function renderTeaser(){
-  let next=Infinity;for(const u of upgrades){if(isMaxed(u)||(u.req&&!u.req()))continue;const lv=levelOf(u);if(lv>level())next=Math.min(next,lv)}
-  if(!teaser){teaser=document.createElement('div');teaser.className='teaser';const t=document.createElement('strong');t.textContent='❓ ???';teaserNote=document.createElement('span');const bar=document.createElement('div');bar.className='bar';teaserFill=document.createElement('i');bar.appendChild(teaserFill);teaser.append(t,teaserNote,bar);$('upgrades').appendChild(teaser)}
-  teaser.style.display=next===Infinity?'none':'';
-  if(next===Infinity)return;
-  teaserNote.textContent='Noch '+(next-level())+' Level bis zur Überraschung';
-  teaserFill.style.width=Math.min(100,Math.round(purchases()/((next-1)*3)*100))+'%';
+  let next=Infinity,locked=0;
+  for(const u of upgrades){
+    if(isMaxed(u))continue;
+    const gated=!!(u.req&&!u.req());
+    const lvls=u.tiers?u.tiers.slice(u.count()).map(t=>t.lvl):[levelOf(u)];
+    for(const lv of lvls){if(gated||lv>level())locked++;if(!gated&&lv>level())next=Math.min(next,lv)}
+  }
+  if(!teaser){teaser=document.createElement('div');teaser.className='teaser';const t=document.createElement('strong');t.textContent='❓ ???';teaserIcons=document.createElement('div');teaserNote=document.createElement('span');const bar=document.createElement('div');bar.className='bar';teaserFill=document.createElement('i');bar.appendChild(teaserFill);teaser.append(t,teaserIcons,teaserNote,bar);$('upgrades').appendChild(teaser)}
+  teaser.style.display=locked?'':'none';
+  if(!locked)return;
+  teaserIcons.textContent='🔒'.repeat(Math.min(locked,12));
+  teaserNote.textContent=locked+(locked===1?' weiteres Upgrade':' weitere Upgrades')+' gesperrt'+(next===Infinity?'':' – nächste Überraschung in '+(next-level())+' Level');
+  teaserFill.style.width=next===Infinity?'100%':Math.min(100,Math.round(purchases()/((next-1)*3)*100))+'%';
 }
 const UNITS={wood:['🪵','Holz'],coins:['🪙','Münzen'],planks:['🪚','Bretter']};
 const upgradeEls=new Map();
