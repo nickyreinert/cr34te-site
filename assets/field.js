@@ -164,8 +164,9 @@ const FIELD_HTML=`
 function setWorld(w){
   if(w==='field'&&!state.studium)return;
   world=w;
-  $('pageForest').style.display=w==='forest'?'':'none';
-  $('pageField').style.display=w==='field'?'':'none';
+  // hidden attribute instead of inline styles: the platform turns inline style attributes in the HTML into fixed hiding rules
+  $('pageForest').hidden=w!=='forest';
+  $('pageField').hidden=w!=='field';
   $('topbar').dataset.w=w;
   $('tabForest').classList.toggle('on',w==='forest');
   $('tabField').classList.toggle('on',w==='field');
@@ -197,7 +198,7 @@ function fieldInit(){
 
 function renderField(){
   const has=!!state.studium;
-  $('tabs').style.display=has?'':'none';
+  $('tabs').hidden=!has;
   if(!has&&world==='field')setWorld('forest');
   $('fsheepBox').hidden=!has;$('fwoolBox').hidden=!has;$('fyarnBox').hidden=!(has&&(state.yarn>0||state.spinneries>0||state.spinEdu>0));$('fsweaterBox').hidden=!(has&&(state.sweater>0||state.knitters>0||state.knitEdu>0));
   if(!has)return;

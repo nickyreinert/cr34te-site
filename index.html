@@ -13,7 +13,7 @@
     <header class="topbar" id="topbar" data-w="forest">
       <div class="brand"><span class="brand-icon">🪓</span><div><h1>LUMBERJACK</h1><small>FOREST TYCOON</small></div></div>
       <div class="resources"><div class="resource" data-w="forest"><span>🪵</span><strong id="wood">0</strong><small>HOLZ</small></div><div class="resource" data-w="forest"><span>🌱</span><strong id="trees">0</strong><small>BÄUME</small></div><div class="resource"><span>🪙</span><strong id="coins">0</strong><small>MÜNZEN</small></div><div class="resource" data-w="forest" id="planksBox" hidden><span>🪚</span><strong id="planks">0</strong><small>BRETTER</small></div><div class="resource" data-w="forest" id="furnBox" hidden><span>🪑</span><strong id="furn">0</strong><small>MÖBEL</small></div><div class="resource" data-w="field" id="fsheepBox" hidden><span>🐑</span><strong id="fsheep">0</strong><small>SCHAFE</small></div><div class="resource" data-w="field" id="fwoolBox" hidden><span>🧶</span><strong id="fwool">0</strong><small>WOLLE</small></div><div class="resource" data-w="field" id="fyarnBox" hidden><span>🪢</span><strong id="fyarn">0</strong><small>GARN</small></div><div class="resource" data-w="field" id="fsweaterBox" hidden><span>🧥</span><strong id="fsweater">0</strong><small>PULLOVER</small></div></div>
-      <div class="tabs" id="tabs" style="display:none"><button id="tabForest" class="on">🌲 Wald<i class="dot" id="wdot" hidden> ●</i></button><button id="tabField">🐑 Feld<i class="dot" id="fdot" hidden> ●</i></button></div>
+      <div class="tabs" id="tabs" hidden><button id="tabForest" class="on">🌲 Wald<i class="dot" id="wdot" hidden> ●</i></button><button id="tabField">🐑 Feld<i class="dot" id="fdot" hidden> ●</i></button></div>
       <div class="attn" id="attn"><span id="attnText"></span><i id="attnBar"></i></div>
     </header>
     <div class="page" id="pageForest">
@@ -39,7 +39,7 @@
         <button id="sell"><span>🏪</span><strong><i class="lbl">Bretter verkaufen </i>(G)</strong><small id="sellInfo"></small></button>
         <button id="craft"><span>🪑</span><strong><i class="lbl">Möbel bauen </i>(H)</strong><small id="craftInfo"></small></button>
         <button id="sellFurn"><span>🛋️</span><strong><i class="lbl">Möbel verkaufen </i>(J)</strong><small id="sellFurnInfo"></small></button>
-        <button id="panic" style="display:none"><span>🛑</span><strong>NOT-AUS! (K)</strong><small>Roboter stoppen</small></button>
+        <button id="panic" hidden><span>🛑</span><strong>NOT-AUS! (K)</strong><small>Roboter stoppen</small></button>
       </div>
       <div class="toggles" id="toggles"></div>
       <div class="production"><div><span>🪓 Holzfäller</span><strong id="workerCount">1</strong><small id="rateWood"></small></div><div><span>🌲 Förster</span><strong id="foresterCount">0</strong><small id="rateSeed"></small></div><div><span>🏭 Sägewerk</span><strong id="millCount">0</strong><small id="rateCoin"></small></div><div><span>📦 Lager</span><strong id="capacity">100</strong><small id="rateCap"></small></div><div><span>💰 Bilanz</span><strong id="wageNow">0</strong><small id="wageDetail">Einnahmen − Löhne</small></div></div>
@@ -49,7 +49,7 @@
       <div class="upgrade-list" id="upgrades"></div>
     </section>
     </div>
-    <div class="page" id="pageField" style="display:none"></div>
+    <div class="page" id="pageField" hidden></div>
     <footer><span>🌲 Ein Baum ist erst der Anfang.</span><div><button id="autoMusic">🎵 [5] Rhythmus: AN</button> <button id="mute"></button> <button id="reset">Spiel zurücksetzen</button></div></footer>
     <div class="toast" id="toast" role="status"></div>
   </main>
