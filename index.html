@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="dev" id="dev"><b>IDDQD – Testleiste</b><button data-d="coins">+10k Münzen</button><button data-d="wood">+1k Holz</button><button data-d="planks">+1k Bretter</button><button data-d="furn">+1k Möbel</button><button data-d="lvl">Level +3</button><button data-d="away" data-v="600">+10 Min weg</button><button data-d="away" data-v="3600">+1 Std weg</button><button data-d="away" data-v="10800">+3 Std weg</button><button data-d="away" data-v="28800">+8 Std weg</button><button data-d="band">Band voll 🎵</button><button data-d="bandOff">Band leer</button><b>Sounds</b><button data-d="snd" data-v="chop">Fällen</button><button data-d="snd" data-v="plant">Pflanzen</button><button data-d="snd" data-v="sellWood">Holz verk.</button><button data-d="snd" data-v="saw">Sägen</button><button data-d="snd" data-v="sellPlanks">Bretter verk.</button><button data-d="snd" data-v="hammer">Möbel bauen</button><button data-d="snd" data-v="sellFurn">Möbel verk.</button><button data-d="snd" data-v="siren">Alarm</button></div>
+  <div class="dev" id="dev"><b>IDDQD – Testleiste</b><button data-d="coins">+10k Münzen</button><button data-d="wood">+1k Holz</button><button data-d="planks">+1k Bretter</button><button data-d="furn">+1k Möbel</button><button data-d="lvl">Level +3</button><button data-d="away" data-v="600">+10 Min weg</button><button data-d="away" data-v="3600">+1 Std weg</button><button data-d="away" data-v="10800">+3 Std weg</button><button data-d="away" data-v="28800">+8 Std weg</button><button data-d="band">Band voll 🎵</button><button data-d="bandOff">Band leer</button><b>Ereignisse</b><button data-d="ev" data-v="windbreak">Sturm</button><button data-d="ev" data-v="watchtower">Feuer</button><button data-d="ev" data-v="cats">Ungeziefer</button><button data-d="ev" data-v="fence">Diebe</button><button data-d="riot">Aufstand</button><b>Sounds</b><button data-d="snd" data-v="chop">Fällen</button><button data-d="snd" data-v="plant">Pflanzen</button><button data-d="snd" data-v="sellWood">Holz verk.</button><button data-d="snd" data-v="saw">Sägen</button><button data-d="snd" data-v="sellPlanks">Bretter verk.</button><button data-d="snd" data-v="hammer">Möbel bauen</button><button data-d="snd" data-v="sellFurn">Möbel verk.</button><button data-d="snd" data-v="siren">Alarm</button></div>
   <main class="game">
     <header class="topbar">
       <div class="brand"><span class="brand-icon">🪓</span><div><h1>LUMBERJACK</h1><small>FOREST TYCOON</small></div></div>
@@ -29,7 +29,7 @@
     <section class="controls">
       <div class="section-heading"><div><h2>Dein Forstbetrieb</h2><p>Ein Baum nach dem anderen.</p></div><span class="level" id="level">LEVEL 1</span></div>
       <div class="actions" id="actions">
-        <button class="primary" id="plant" title="Baum pflanzen (Taste A)"><span>🌱</span><strong><i class="lbl">Pflanzen </i>(A)</strong><small>gratis</small></button>
+        <button class="primary" id="plant" title="Baum pflanzen (Taste A)"><span>🌱</span><strong><i class="lbl">Pflanzen </i>(A)</strong><small id="plantInfo">gratis</small></button>
         <button id="chop" title="Baum fällen (Taste S)"><span>🪓</span><strong><i class="lbl">Fällen </i>(S)</strong><small>+<b id="chopGain">5</b> Holz</small></button>
         <button id="sellWood" title="Holz verkaufen (Taste D)"><span>🪙</span><strong><i class="lbl">Holz verkaufen </i>(D)</strong><small id="sellWoodInfo"></small></button>
         <button id="cut"><span>🪚</span><strong><i class="lbl">Brett sägen </i>(F)</strong><small id="cutInfo"></small></button>
@@ -38,14 +38,14 @@
         <button id="sellFurn"><span>🛋️</span><strong><i class="lbl">Möbel verkaufen </i>(J)</strong><small id="sellFurnInfo"></small></button>
         <button id="panic" style="display:none"><span>🛑</span><strong>NOT-AUS! (K)</strong><small>Roboter stoppen</small></button>
       </div>
-      <div class="toggles"><button id="autoWood" style="display:none"></button><button id="autoPlanks" style="display:none"></button><button id="autoFurn" style="display:none"></button><button id="autoCraft" style="display:none"></button><button id="autoMusic" style="display:none"></button></div>
+      <div class="toggles" id="toggles"></div>
       <div class="production"><div><span>🪓 Holzfäller</span><strong id="workerCount">1</strong><small id="rateWood"></small></div><div><span>🌲 Förster</span><strong id="foresterCount">0</strong><small id="rateSeed"></small></div><div><span>🏭 Sägewerk</span><strong id="millCount">0</strong><small id="rateCoin"></small></div><div><span>📦 Lager</span><strong id="capacity">100</strong><small id="rateCap"></small></div><div><span>💰 Bilanz</span><strong id="wageNow">0</strong><small id="wageDetail">Einnahmen − Löhne</small></div></div>
     </section>
     <section class="upgrades">
       <div class="section-heading"><div><h2>Ausbau & Upgrades</h2><p>Investiere dein Holz in die Zukunft.</p></div></div>
       <div class="upgrade-list" id="upgrades"></div>
     </section>
-    <footer><span>🌲 Ein Baum ist erst der Anfang.</span><div><button id="mute"></button> <button id="reset">Spiel zurücksetzen</button></div></footer>
+    <footer><span>🌲 Ein Baum ist erst der Anfang.</span><div><button id="autoMusic">🎵 [5] Rhythmus: AN</button> <button id="mute"></button> <button id="reset">Spiel zurücksetzen</button></div></footer>
     <div class="toast" id="toast" role="status"></div>
   </main>
   <script src="assets/sounds.js"></script>
