@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const initial={wood:0,trees:0,saplings:0,coins:0,workers:1,foresters:0,mills:0,storage:0,axe:0,day:1,planted:0,muted:0,land:0,last:0,carpentry:0,planks:0,windbreak:0,watchtower:0,cats:0,fence:0,evNext:0,belt:0,saw:0,stall:0,trader:0,oak:0,robots:0,firmware:0,robotsOff:0,rbNext:0};
+const initial={wood:0,trees:0,saplings:0,coins:0,workers:1,foresters:0,mills:0,storage:0,axe:0,day:1,planted:0,muted:0,land:0,last:0,carpentry:0,planks:0,windbreak:0,watchtower:0,cats:0,fence:0,evNext:0,belt:0,saw:0,stall:0,trader:0,oak:0,robots:0,firmware:0,robotsOff:0,rbNext:0,tischler:0};
 let state={...initial};
 const capacity=()=>Math.max(100+state.storage*100,Math.floor(100*Math.pow(1.6,state.storage)));
 const maxTrees=()=>20+state.foresters*10+state.land*10;
@@ -18,11 +18,15 @@ const upgrades=[
 {id:'foresters',name:'Förster einstellen',desc:'Pflanzt automatisch Bäume, +10 Waldfläche',base:50,scale:1.65,icon:'🌱',res:'coins',count:()=>state.foresters},
 {id:'land',name:'Land kaufen',desc:'Neue Parzelle: +10 Waldfläche',base:80,scale:1.7,icon:'🏞️',res:'coins',count:()=>state.land,minLevel:2},
 {id:'carpentry',name:'Tischlerei',desc:'Macht aus 5 Holz je 1 Brett pro Takt',base:250,scale:2.2,icon:'🪚',res:'coins',count:()=>state.carpentry,minLevel:4},
+{id:'tischler',name:'Tischler-Weiterbildung',icon:'🎓',msg:'Weiterbildung abgeschlossen! Oben im Forstbetrieb: „Brett sägen“ (Taste S).',count:()=>state.tischler,tiers:[
+  {lvl:5,c:400,desc:'Schaltet „Brett sägen“ frei: 10 Holz → 2 Bretter pro Klick'},
+  {lvl:12,c:4000,desc:'Brett sägen: 40 Holz → 8 Bretter pro Klick'},
+  {lvl:20,c:40000,desc:'Brett sägen: 200 Holz → 40 Bretter pro Klick'}]},
 {id:'windbreak',name:'Windbrecher',desc:'Schützt vor Sturm (−70 % Schaden)',base:8,scale:1,icon:'🌬️',res:'planks',count:()=>state.windbreak,minLevel:6,max:1,unlock:'Gefahr im Wald! Schutzbauten sind verfügbar.'},
 {id:'watchtower',name:'Wachturm',desc:'Schützt vor Feuer (−70 % Schaden)',base:12,scale:1,icon:'🗼',res:'planks',count:()=>state.watchtower,minLevel:6,max:1},
 {id:'cats',name:'Katzen',desc:'Schützen vor Ungeziefer (−70 % Schaden)',base:6,scale:1,icon:'🐈',res:'planks',count:()=>state.cats,minLevel:6,max:1},
 {id:'fence',name:'Zaun',desc:'Schützt vor Dieben (−70 % Schaden)',base:15,scale:1,icon:'🚧',res:'planks',count:()=>state.fence,minLevel:6,max:1},
-{id:'stall',name:'Marktstand',icon:'🏪',count:()=>state.stall,tiers:[{lvl:10,c:2000,p:150,desc:'Schaltet „Holz verkaufen“ frei'}]},
+{id:'stall',name:'Marktstand',icon:'🏪',msg:'Marktstand gebaut! Oben im Forstbetrieb gibt es jetzt „Bretter verkaufen“. Holz verkaufen die Sägewerke weiter automatisch.',count:()=>state.stall,tiers:[{lvl:10,c:1000,p:80,desc:'Schaltet „Bretter verkaufen“ frei (Holz verkaufen die Sägewerke automatisch)'}]},
 {id:'belt',name:'Förderband',icon:'⚙️',count:()=>state.belt,tiers:[
   {lvl:12,c:1500,p:100,desc:'Sägewerke verkaufen 4 Holz pro Takt'},
   {lvl:16,c:6000,p:400,desc:'Sägewerke verkaufen 8 Holz pro Takt'},
@@ -32,17 +36,17 @@ const upgrades=[
   {lvl:14,c:3000,p:200,desc:'Sägewerke zahlen 2,0 Münzen pro Holz'},
   {lvl:22,c:20000,p:1500,desc:'Sägewerke zahlen 2,5 Münzen pro Holz'}]},
 {id:'trader',name:'Händlerruf',icon:'📣',count:()=>state.trader,req:()=>state.stall>0,tiers:[
-  {lvl:14,c:3000,p:300,desc:'Markt: 150 Holz pro Klick'},
-  {lvl:20,c:12000,p:1200,desc:'Markt: 500 Holz pro Klick'},
-  {lvl:26,c:48000,p:4800,desc:'Markt: 1500 Holz pro Klick'}]},
-{id:'oak',name:'Eichen-Saatgut',icon:'🌳',count:()=>state.oak,tiers:[{lvl:15,c:20000,p:800,desc:'Eichen: ×1,5 Holz pro Baum, größere Bäume'}]},
+  {lvl:14,c:3000,p:300,desc:'Markt: 30 Bretter pro Klick'},
+  {lvl:20,c:12000,p:1200,desc:'Markt: 100 Bretter pro Klick'},
+  {lvl:26,c:48000,p:4800,desc:'Markt: 300 Bretter pro Klick'}]},
+{id:'oak',name:'Eichen-Saatgut',icon:'🌳',count:()=>state.oak,tiers:[{lvl:15,c:8000,p:400,desc:'Eichen: ×1,5 Holz pro Baum, größere Bäume'}]},
 {id:'robots',name:'KI-Roboter',desc:()=>'Alle Arbeit +50 % pro Roboter (jetzt ×'+robotMult().toFixed(1).replace('.',',')+(Date.now()<state.robotsOff?', defekt!':'')+')',base:100000,scale:2,icon:'🤖',res:'coins',count:()=>state.robots,minLevel:30,max:6,unlock:'KI-Roboter verfügbar! Sie beschleunigen alles – aber nicht ohne Risiko.'},
 {id:'firmware',name:'Firmware-Update',icon:'🛡️',count:()=>state.firmware,req:()=>state.robots>0,tiers:[{lvl:30,c:150000,p:3000,desc:'Aufstände: halbe Chance, 60 % weniger Schaden'}]}
 ];
 const cost=u=>Math.floor(u.base*Math.pow(u.scale,u.count()));
 // Tiered upgrades list their tiers (level, coins, planks, text); classic ones use base/scale/res
 const tierOf=u=>u.tiers&&u.tiers[u.count()];
-const prices=u=>u.tiers?(tierOf(u)?{coins:tierOf(u).c,planks:tierOf(u).p}:{}):{[u.res]:cost(u)};
+const prices=u=>u.tiers?(tierOf(u)?{coins:tierOf(u).c,...(tierOf(u).p?{planks:tierOf(u).p}:{})}:{}):{[u.res]:cost(u)};
 const levelOf=u=>u.tiers?(tierOf(u)?tierOf(u).lvl:0):(u.minLevel||0);
 const isMaxed=u=>u.tiers?!tierOf(u):!!(u.max&&u.count()>=u.max);
 const visible=u=>isMaxed(u)||(level()>=levelOf(u)&&(!u.req||u.req()));
@@ -122,7 +126,8 @@ const BADGES=[
   ['saw','🌀','Kreissäge',()=>state.saw>0],
   ['oak','🌳','Eichen-Saatgut',()=>state.oak>0],
   ['robots','🤖','KI-Roboter',()=>state.robots>0],
-  ['firmware','🛡️','Firmware-Update',()=>state.firmware>0]
+  ['firmware','🛡️','Firmware-Update',()=>state.firmware>0],
+  ['tischler','🎓','Tischler-Weiterbildung',()=>state.tischler>0]
 ];
 function renderBadges(){const root=$('badges');const key=BADGES.map(b=>b[3]()?1:0).join('');if(root.dataset.k===key)return;root.dataset.k=key;root.replaceChildren();for(const b of BADGES){if(!b[3]())continue;const el=document.createElement('span');el.className='badge';el.dataset.k=b[0];el.textContent=b[1];el.title=b[2];root.appendChild(el)}}
 // Teaser: announces that more is coming without naming it; hidden once nothing is left to unlock
@@ -145,19 +150,25 @@ function renderTeaser(){
 const UNITS={wood:['🪵','Holz'],coins:['🪙','Münzen'],planks:['🪚','Bretter']};
 const upgradeEls=new Map();
 function renderUpgrades(){const root=$('upgrades');for(const u of upgrades){let el=upgradeEls.get(u.id);if(!el){const btn=document.createElement('button');btn.className='upgrade';const title=document.createElement('strong');const desc=document.createElement('span');const priceEl=document.createElement('em');btn.append(title,desc,priceEl);btn.addEventListener('click',()=>buy(u));root.appendChild(btn);el={btn,title,desc,priceEl};upgradeEls.set(u.id,el)}const pr=prices(u);el.title.textContent=u.icon+' '+nameOf(u);el.desc.textContent=descOf(u);el.btn.style.display=visible(u)?'':'none';el.btn.disabled=!canBuy(u);el.priceEl.textContent=isMaxed(u)?'✓ Gebaut':Object.keys(pr).map(r=>UNITS[r][0]+' '+pr[r].toLocaleString('de-DE')+' '+UNITS[r][1]).join(' + ')+(pr.wood>capacity()?' – Lager zu klein':'')}renderTeaser()}
-function render(){$('wood').textContent=Math.floor(state.wood)+'/'+capacity();$('trees').textContent=state.trees+(state.saplings?' (+'+state.saplings+'🌱)':'');$('coins').textContent=Math.floor(state.coins);$('workerCount').textContent=state.workers;$('foresterCount').textContent=state.foresters;$('millCount').textContent=state.mills;$('capacity').textContent=capacity();$('chopGain').textContent=chopGain();$('day').textContent='TAG '+state.day;$('level').textContent='LEVEL '+level();$('mute').textContent=state.muted?'🔇 Ton aus':'🔊 Ton an';$('planks').textContent=Math.floor(state.planks);$('planksBox').hidden=!(state.carpentry>0||state.planks>0);renderFences();renderBadges();renderCrew();$('cabin').dataset.s=level()>=25?3:level()>=15?2:level()>=8?1:0;$('sell').style.display=state.stall?'':'none';$('sellInfo').textContent=SELL_AMOUNTS[state.trader]+' Holz · '+marketPrice.toFixed(2).replace('.',',')+' Münzen/Holz';renderUpgrades()}
+function render(){$('wood').textContent=Math.floor(state.wood)+'/'+capacity();$('trees').textContent=state.trees+(state.saplings?' (+'+state.saplings+'🌱)':'');$('coins').textContent=Math.floor(state.coins);$('workerCount').textContent=state.workers;$('foresterCount').textContent=state.foresters;$('millCount').textContent=state.mills;$('capacity').textContent=capacity();$('chopGain').textContent=chopGain();$('day').textContent='TAG '+state.day;$('level').textContent='LEVEL '+level();$('mute').textContent=state.muted?'🔇 Ton aus':'🔊 Ton an';$('planks').textContent=Math.floor(state.planks);$('planksBox').hidden=!(state.carpentry>0||state.planks>0);renderFences();renderBadges();renderCrew();$('cabin').dataset.s=level()>=25?3:level()>=15?2:level()>=8?1:0;$('sell').style.display=state.stall?'':'none';$('cut').style.display=state.tischler?'':'none';if(state.tischler)$('cutInfo').textContent=CUT[state.tischler-1][0]+' Holz → '+CUT[state.tischler-1][1]+' Bretter';$('sellInfo').textContent=SELL_AMOUNTS[state.trader]+' Bretter · '+marketPrice.toFixed(1).replace('.',',')+' Münzen/Brett';renderUpgrades()}
 function chop(){if(state.trees<1){sfx.error();toast(state.saplings?'Die Setzlinge wachsen noch… 🌱':'Pflanze zuerst einen Baum! 🌱');return}if(state.wood>=capacity()){sfx.error();toast('Lager voll! Baue es aus oder verkaufe Holz im Sägewerk.');return}fellTree();sfx.chop(1);$('worker').classList.add('chopping');setTimeout(()=>$('worker').classList.remove('chopping'),350);renderForest();render();save()}
-function buy(u){if(!canBuy(u))return;const nm=nameOf(u);const lv=level();const pr=prices(u);for(const r of Object.keys(pr))state[r]-=pr[r];state[u.id]++;clampState();sfx.buy();if(level()>lv){setTimeout(sfx.levelUp,350);const nu=upgrades.find(x=>!isMaxed(x)&&visible(x)&&levelOf(x)===level());if(nu)setTimeout(()=>toast(nu.unlock||'Neu freigeschaltet: '+nameOf(nu)+'!',3000),900)}toast(nm+' gekauft!');renderForest();render();save()}
+function buy(u){if(!canBuy(u))return;const nm=nameOf(u);const lv=level();const pr=prices(u);for(const r of Object.keys(pr))state[r]-=pr[r];state[u.id]++;clampState();sfx.buy();if(level()>lv){setTimeout(sfx.levelUp,350);const nu=upgrades.find(x=>!isMaxed(x)&&visible(x)&&levelOf(x)===level());if(nu)setTimeout(()=>toast(nu.unlock||'Neu freigeschaltet: '+nameOf(nu)+'!',3000),900)}toast(u.msg||nm+' gekauft!',u.msg?4000:undefined);renderForest();render();save()}
 $('plant').addEventListener('click',()=>{if(addTree(false)){sfx.plant();render();save();toast('Ein Setzling wurde gepflanzt – er braucht etwas Zeit. 🌱')}else sfx.error()});
 $('chop').addEventListener('click',chop);
 let resetArmed=false,resetTimer;
 const disarmReset=()=>{resetArmed=false;clearTimeout(resetTimer);$('reset').textContent='Spiel zurücksetzen'};
 $('reset').addEventListener('click',()=>{if(!resetArmed){resetArmed=true;$('reset').textContent='Wirklich löschen? Nochmal klicken';resetTimer=setTimeout(disarmReset,3000);return}disarmReset();state={...initial,muted:state.muted};save();sfx.reset();renderForest();render();toast('Neuer Wald, neues Glück!')});
 $('mute').addEventListener('click',()=>{state.muted=state.muted?0:1;save();render();sfx.sell()});
-// Market: manual wood sales; amount grows with Händlerruf, price fluctuates every minute, 3 s cooldown
-const SELL_AMOUNTS=[50,150,500,1500];
-let marketPrice=1.7,sellLocked=false;
-$('sell').addEventListener('click',()=>{if(sellLocked)return;const n=Math.min(Math.floor(state.wood),SELL_AMOUNTS[state.trader]);if(n<1){sfx.error();toast('Kein Holz zum Verkaufen.');return}state.wood-=n;state.coins+=n*marketPrice;sfx.sell();toast(n+' Holz verkauft: +'+Math.floor(n*marketPrice)+' Münzen');sellLocked=true;$('sell').disabled=true;setTimeout(()=>{sellLocked=false;$('sell').disabled=false},3000);render();save()});
+// Market: manual plank sales (sawmills sell wood automatically); amount grows with Händlerruf, price fluctuates every minute, 3 s cooldown
+const SELL_AMOUNTS=[10,30,100,300];
+let marketPrice=6,sellLocked=false;
+$('sell').addEventListener('click',()=>{if(sellLocked)return;const n=Math.min(Math.floor(state.planks),SELL_AMOUNTS[state.trader]);if(n<1){sfx.error();toast('Keine Bretter zum Verkaufen.');return}state.planks-=n;state.coins+=n*marketPrice;sfx.sell();toast(n+' Bretter verkauft: +'+Math.floor(n*marketPrice)+' Münzen');sellLocked=true;$('sell').disabled=true;setTimeout(()=>{sellLocked=false;$('sell').disabled=false},3000);render();save()});
+// Manual sawing (needs Tischler-Weiterbildung): wood -> planks per click, 1 s cooldown
+const CUT=[[10,2],[40,8],[200,40]];
+let cutLocked=false;
+$('cut').addEventListener('click',()=>{if(!state.tischler||cutLocked)return;const [w,p]=CUT[state.tischler-1];if(state.wood<w){sfx.error();toast('Zu wenig Holz: '+w+' nötig.');return}state.wood-=w;state.planks+=p;sfx.chop(1);cutLocked=true;$('cut').disabled=true;setTimeout(()=>{cutLocked=false;$('cut').disabled=false},1000);render();save()});
+// Keyboard: A plant, L chop, S saw (the frame needs a click first); presses are applied immediately
+document.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;const k=e.key.toLowerCase();if(k==='a')$('plant').click();else if(k==='l')$('chop').click();else if(k==='s')$('cut').click()});
 function step(){let changed=false,sold=false,chopped=false;const m=robotMult();for(let i=0;i<Math.floor(state.mills*m);i++){const processed=Math.min(state.wood,millRate());if(processed>0){state.wood-=processed;state.coins+=processed*millPrice();changed=true;sold=true}}for(let i=0;i<Math.floor(state.carpentry*m);i++){if(state.wood>=5){state.wood-=5;state.planks++;changed=true}}for(let i=0;i<Math.floor(state.workers*m);i++){if(fellTree()>0){changed=true;chopped=true}}for(let i=0;i<Math.floor(state.foresters*m);i++){if(addTree(true))changed=true}if(state.saplings>0){const grown=Math.ceil(state.saplings/2);state.saplings-=grown;state.trees+=grown;changed=true}return{changed,sold,chopped}}
 setInterval(()=>{const r=step();if(r.sold)sfx.sell(true);if(r.chopped)sfx.chop(0.35);if(r.changed){renderForest();render();save()}},2000);
 // Random events (level 6+): rare by design - 10 min grace after unlock, 10 min minimum gap, ~10 % chance per minute afterwards,
@@ -199,7 +210,7 @@ function rollRobots(){
   alertTimer=setTimeout(()=>{$('panic').style.display='none';alertTimer=null;robotDamage()},12000);
 }
 $('panic').addEventListener('click',()=>{if(!alertTimer)return;clearTimeout(alertTimer);alertTimer=null;$('panic').style.display='none';state.rbNext=Date.now()+900000;sfx.buy();toast('Not-Aus gedrückt: Aufstand gestoppt!',3000);save()});
-setInterval(()=>{state.day++;rollEvent();rollRobots();marketPrice=1.2+Math.random();render();save()},60000);
+setInterval(()=>{state.day++;rollEvent();rollRobots();marketPrice=4.5+Math.random()*3;render();save()},60000);
 window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});
 // Offline progress: capped at 8 h, random 20-60 % efficiency (the boss was not looking)
 (()=>{
