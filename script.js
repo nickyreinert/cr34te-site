@@ -56,7 +56,7 @@ const upgrades=[
   {lvl:26,c:48000,p:3120,desc:'Verkauf pro Klick: 600 Holz · 300 Bretter · 150 Möbel'}]},
 {id:'oak',name:'Eichen-Saatgut',icon:'🌳',count:()=>state.oak,tiers:[{lvl:15,c:8000,p:260,desc:'Eichen: ×1,5 Holz pro Baum, größere Bäume'}]},
 {id:'robots',name:'KI-Roboter',desc:()=>'Alle Arbeit +50 % pro Roboter (jetzt ×'+robotMult().toFixed(1).replace('.',',')+(Date.now()<state.robotsOff?', defekt!':'')+')',base:100000,scale:2,icon:'🤖',res:'coins',count:()=>state.robots,minLevel:30,max:6,unlock:'KI-Roboter verfügbar! Sie beschleunigen alles – aber nicht ohne Risiko.'},
-{id:'studium',name:'Studium: Agrarwissenschaft',icon:'📚',delay:600000,req:()=>state.robots>0,busy:()=>state.studiumEnd>0,busyText:()=>'📚 Studium läuft – noch '+fmmss((state.studiumEnd-Date.now())/1000),msg:'Studium begonnen! In 10 Minuten steht dir das Feld offen (läuft auch offline).',count:()=>state.studium,tiers:[{lvl:30,c:500000,desc:'Dauert 10 Minuten, auch offline. Danach öffnet sich das Feld: wische nach links.'}]},
+{id:'studium',name:'Studium: Agrarwissenschaft',icon:'📚',delay:600000,req:()=>state.robots>0,busy:()=>state.studiumEnd>0,busyText:()=>'📚 Studium läuft – noch '+fmmss((state.studiumEnd-Date.now())/1000),msg:'Studium begonnen! In 10 Minuten steht dir das Feld offen (läuft auch offline).',count:()=>state.studium,tiers:[{lvl:30,c:500000,desc:'Dauert 10 Minuten, auch offline. Danach öffnet sich das Feld (Reiter 🐑 Feld, Wischen oder Pfeiltasten).'}]},
 {id:'firmware',name:'Firmware-Update',icon:'🛡️',count:()=>state.firmware,req:()=>state.robots>0,tiers:[{lvl:30,c:150000,p:1950,desc:'Aufstände: halbe Chance, 60 % weniger Schaden'}]}
 ];
 upgrades.push(...FIELD_UPGRADES);
@@ -83,80 +83,41 @@ const sfx=(()=>{
   let mb=null,mBar=0;
   // Automation song: a bar starts with every game tick and is built from what the automation actually did in it
   // (felled trees, sawmill sales, sawn planks, crafted furniture, dealer sales); foresters add the melody, robots the bass.
-  const MSTEP=60/120/4;
+  const MSTEP=0.25;   // 8 steps of 250 ms per game tick (2 s): a calm groove instead of sixteenth-note chatter
   const MCH=[[57,60,64],[53,57,60],[48,52,55],[55,59,62]];
-  const MP={plant:[[2,10],[2,6,10,14],[0,2,4,6,8,10,12,14],[0,1,2,4,5,6,8,9,10,12,13,14]],bass:[[0,8],[0,6,8,14],[0,3,6,8,11,14]]};
+  const MP={plant:[[0],[0,4],[0,3,5],[0,2,4,6]],bass:[[0],[0,4],[0,4,6]]};
   const mhz=m=>440*Math.pow(2,(m-69)/12);
   const mlv=(n,th)=>th.filter(x=>n>=x).length;
   const mnote=(type,f,t,dur,vol)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(mb);o.start(t);o.stop(t+dur+0.02)};
   const mhit=(name,t,vol,rate,lp)=>{const b=samples[name];if(!b)return;const s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=b;s.playbackRate.value=rate*(1+(Math.random()-0.5)*0.04);g.gain.value=vol;if(lp){const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=lp;s.connect(f);f.connect(g)}else s.connect(g);g.connect(mb);s.start(t)};
   const mhat=(t,vol)=>{const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();s.buffer=noiseBuf;f.type='highpass';f.frequency.value=6000;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.04);s.connect(f);f.connect(g);g.connect(mb);s.start(t);s.stop(t+0.05)};
-  const spread=(count,cap,off)=>{const n=Math.min(count,cap),out=[];for(let i=0;i<n;i++)out.push((Math.floor(i*16/n)+off)%16);return out};
+  const spread=(count,cap,off)=>{const n=Math.min(count,cap),out=[];for(let i=0;i<n;i++)out.push((Math.floor(i*8/n)+off)%8);return out};
   const bar=ev=>{
     if(!ctx||ctx.state!=='running'||state.muted||!state.music||document.hidden)return;
-    const t0=ctx.currentTime+0.05,ch=MCH[mBar%4],at=s=>t0+s*MSTEP;mBar++;
-    spread(ev.felled,6,0).forEach((s,i)=>mhit('chop',at(s),i===0?0.22:0.14,1.1,600));
-    spread(ev.milled,16,0).forEach((s,i)=>mhat(at(s),i%4===0?0.10:0.06));
-    spread(ev.sawn,4,4).forEach(s=>mhit('saw',at(s),0.28,1.15));
-    spread(ev.crafted,4,10).forEach(s=>mhit('hammer',at(s),0.28,1.1));
-    spread(ev.dealt,4,14).forEach(s=>mhit('sellFurn',at(s),0.2,1.25));
+    const t0=ctx.currentTime+0.05,ch=MCH[Math.floor(mBar/2)%4],at=s=>t0+s*MSTEP,first=mBar%2===0;mBar++;
+    spread(ev.felled,3,0).forEach((s,i)=>mhit('chop',at(s),i===0?0.22:0.14,1.1,600));
+    spread(ev.milled,4,1).forEach((s,i)=>mhat(at(s),i===0?0.09:0.06));
+    spread(ev.sawn,2,2).forEach(s=>mhit('saw',at(s),0.26,1.15));
+    spread(ev.crafted,2,5).forEach(s=>mhit('hammer',at(s),0.26,1.1));
+    spread(ev.dealt,2,6).forEach(s=>mhit('sellFurn',at(s),0.18,1.25));
     const pl=mlv(state.foresters,[1,3,8,16]);
-    if(pl>0)MP.plant[pl-1].forEach((s,i)=>mnote('triangle',mhz(ch[i%3]+(i%6>=3?24:12)),at(s),0.22,0.10));
+    if(pl>0)MP.plant[pl-1].forEach((s,i)=>mnote('triangle',mhz(ch[(i+(first?0:1))%3]+12),at(s),0.45,0.09));
     const bs=mlv(state.robots,[1,2,4]);
-    if(bs>0)MP.bass[bs-1].forEach(s=>mnote('sawtooth',mhz(ch[0]-12),at(s),0.2,0.14));
-    if(pl>0||ev.felled+ev.milled+ev.sawn+ev.crafted+ev.dealt>0)for(const n of ch)mnote('triangle',mhz(n),t0,1.8,0.04);
+    if(bs>0)MP.bass[bs-1].forEach(s=>mnote('sawtooth',mhz(ch[0]-12),at(s),0.3,0.12));
+    if(first&&(pl>0||ev.felled+ev.milled+ev.sawn+ev.crafted+ev.dealt>0))for(const n of ch)mnote('triangle',mhz(n),t0,3.8,0.04);
   };
   // Field song: same chords as the forest bar of this tick, built from what the field did (shearing, spinning, knitting, sales, herd)
   const mbleat=(t,vol,f)=>{const o=ctx.createOscillator(),l=ctx.createOscillator(),lg=ctx.createGain(),bp=ctx.createBiquadFilter(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(f,t);o.frequency.linearRampToValueAtTime(f*0.82,t+0.32);l.frequency.value=32;lg.gain.value=f*0.06;l.connect(lg);lg.connect(o.frequency);bp.type='bandpass';bp.frequency.value=1100;bp.Q.value=2.5;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.03);g.gain.exponentialRampToValueAtTime(0.0001,t+0.34);o.connect(bp);bp.connect(g);g.connect(mb);o.start(t);l.start(t);o.stop(t+0.36);l.stop(t+0.36)};
   const fbar=ev=>{
-    if(!ev||!ev.ok||!ctx||ctx.state!=='running'||state.muted||!state.music||document.hidden)return;
-    const t0=ctx.currentTime+0.05,ch=MCH[(mBar+3)%4],at=s=>t0+s*MSTEP;
-    spread(ev.sheared,4,2).forEach(s=>{mhat(at(s),0.12);mnote('triangle',mhz(ch[2]+24),at(s),0.06,0.05)});
-    spread(ev.spun,3,6).forEach(s=>mnote('sine',mhz(ch[1]+24),at(s),0.2,0.05));
-    spread(ev.knit,3,9).forEach(s=>mnote('triangle',mhz(ch[0]+36),at(s),0.05,0.08));
-    spread(ev.sold,4,12).forEach(s=>mnote('sine',mhz(ch[0]+31),at(s),0.4,0.07));
+    if(!ev||!ev.ok||!ctx||ctx.state!=='running'||state.muted||!state.music||document.hidden||mBar<1)return;
+    const t0=ctx.currentTime+0.05,ch=MCH[Math.floor((mBar-1)/2)%4],at=s=>t0+s*MSTEP,first=(mBar-1)%2===0;
+    spread(ev.sheared,2,1).forEach(s=>{mhat(at(s),0.1);mnote('triangle',mhz(ch[2]+24),at(s),0.06,0.05)});
+    spread(ev.spun,2,3).forEach(s=>mnote('sine',mhz(ch[1]+24),at(s),0.2,0.05));
+    spread(ev.knit,2,5).forEach(s=>mnote('triangle',mhz(ch[0]+36),at(s),0.05,0.07));
+    spread(ev.sold,2,7).forEach(s=>mnote('sine',mhz(ch[0]+31),at(s),0.4,0.06));
     const hl=mlv(ev.sheep,[3,10,30,80]);
-    if(hl>0)MP.plant[hl-1].forEach((s,i)=>mnote('sine',mhz(ch[i%3]+19),at(s),0.3,0.05));
-    if(ev.fed<0.9)mbleat(t0+1.1,0.18,260);else if(Math.random()<0.25)mbleat(t0+0.5+Math.random(),0.07,300);
-  };
-  // Decode the embedded base64 WAVs (assets/sounds.js); until a sample is ready the synthesized fallback plays
-  const loadSamples=()=>{if(typeof SOUNDS==='undefined')return;for(const k of Object.keys(SOUNDS)){try{const bin=atob(SOUNDS[k]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);ctx.decodeAudioData(u.buffer,b=>{samples[k]=b},()=>{})}catch(e){}}};
-  const play=(name,vol,vary)=>{const b=samples[name];if(!b)return false;const s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=b;s.playbackRate.value=1+(Math.random()-0.5)*vary;g.gain.value=vol;s.connect(g);g.connect(master);s.start();return true};
-  const ready=auto=>{
-    if(state.muted)return false;
-    try{
-      if(!ctx){
-        if(auto)return false;
-        const AC=window.AudioContext||window.webkitAudioContext;
-        if(!AC)return false;
-        const c=new AC();
-        const m=c.createGain();m.gain.value=0.6;
-        const comp=c.createDynamicsCompressor();
-        m.connect(comp);comp.connect(c.destination);
-        const buf=c.createBuffer(1,Math.floor(c.sampleRate*0.4),c.sampleRate);
-        const d=buf.getChannelData(0);
-        for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
-        ctx=c;master=m;noiseBuf=buf;mb=c.createGain();mb.gain.value=0.6;mb.connect(m);loadSamples();
-      }
-      if(ctx.state!=='running'){ctx.resume();if(auto)return false}
-      return true;
-    }catch(e){return false}
-  };
-  const tone=(type,f0,f1,t0,dur,vol)=>{
-    const o=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime+t0;
-    o.type=type;o.frequency.setValueAtTime(f0,t);
-    if(f1!==f0)o.frequency.exponentialRampToValueAtTime(f1,t+dur);
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(vol,t+0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+0.02);
-  };
-  const noise=(freq,q,t0,dur,vol)=>{
-    const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain(),t=ctx.currentTime+t0;
-    s.buffer=noiseBuf;f.type='bandpass';f.frequency.value=freq;f.Q.value=q;
-    g.gain.setValueAtTime(vol,t);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+dur+0.02);
+    if(hl>0)MP.plant[hl-1].forEach((s,i)=>mnote('sine',mhz(ch[(i+(first?1:2))%3]+19),at(s),0.35,0.05));
+    if(ev.fed<0.9)mbleat(t0+1.1,0.18,260);else if(Math.random()<0.2)mbleat(t0+0.5+Math.random(),0.07,300);
   };
   return{
     bar,

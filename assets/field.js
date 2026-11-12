@@ -114,7 +114,7 @@ function studyTick(){
   if(state.studiumEnd>0&&Date.now()>=state.studiumEnd){
     state.studiumEnd=0;state.studium=1;
     if(!state.sheep){state.sheep=3;state.grass=60}
-    toast('📚 Studium abgeschlossen! Wische nach links (oder Pfeil →) aufs Feld.',9000);sfx.levelUp();render();save();
+    toast('📚 Studium abgeschlossen! Das Feld ist offen – Reiter „🐑 Feld“, Wischen oder Pfeiltasten wechseln die Welt.',9000);sfx.levelUp();render();save();if(!document.hidden)setWorld('field');
   }else if(state.studiumEnd>0)renderUpgrades();
 }
 
@@ -171,6 +171,7 @@ function setWorld(w){
   $('tabField').classList.toggle('on',w==='field');
   if(w==='field')$('fdot').hidden=true;else $('wdot').hidden=true;
   window.scrollTo(0,0);
+  render();
 }
 
 function fieldInit(){
@@ -188,17 +189,17 @@ function fieldInit(){
   $('ftoggles').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.id in state){state[b.id]=state[b.id]?0:1;render();save()}});
   on('tabForest',()=>setWorld('forest'));
   on('tabField',()=>setWorld('field'));
-  // swipe: left = to the field, right = back to the forest (clearly horizontal gestures only)
+  // swipe: any clearly horizontal gesture switches between forest and field
   let sx=0,sy=0;
   document.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY},{passive:true});
-  document.addEventListener('touchend',e=>{const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.abs(dx)>70&&Math.abs(dx)>2*Math.abs(dy))setWorld(dx<0?'field':'forest')},{passive:true});
+  document.addEventListener('touchend',e=>{const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.abs(dx)>70&&Math.abs(dx)>2*Math.abs(dy))setWorld(world==='forest'?'field':'forest')},{passive:true});
 }
 
 function renderField(){
   const has=!!state.studium;
   $('tabs').style.display=has?'':'none';
   if(!has&&world==='field')setWorld('forest');
-  $('fsheepBox').hidden=!has;$('fwoolBox').hidden=!(has&&(state.wool>0||state.shepherds>0));$('fyarnBox').hidden=!(has&&(state.yarn>0||state.spinneries>0||state.spinEdu>0));$('fsweaterBox').hidden=!(has&&(state.sweater>0||state.knitters>0||state.knitEdu>0));
+  $('fsheepBox').hidden=!has;$('fwoolBox').hidden=!has;$('fyarnBox').hidden=!(has&&(state.yarn>0||state.spinneries>0||state.spinEdu>0));$('fsweaterBox').hidden=!(has&&(state.sweater>0||state.knitters>0||state.knitEdu>0));
   if(!has)return;
   $('fsheep').textContent=state.sheep;$('fwool').textContent=fmtN(state.wool);$('fyarn').textContent=fmtN(state.yarn);$('fsweater').textContent=fmtN(state.sweater);
   $('flevel').textContent='LEVEL '+fieldLevel();
