@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const initial={wood:0,trees:0,saplings:0,coins:0,workers:1,foresters:0,mills:0,storage:0,axe:0,day:1,planted:0,muted:0,land:0,last:0};
+const initial={wood:0,trees:0,saplings:0,coins:0,workers:1,foresters:0,mills:0,storage:0,axe:0,day:1,planted:0,muted:0,land:0,last:0,carpentry:0,planks:0,windbreak:0,watchtower:0,cats:0,fence:0,evNext:0};
 let state={...initial};
 const capacity=()=>Math.max(100+state.storage*100,Math.floor(100*Math.pow(1.6,state.storage)));
 const maxTrees=()=>20+state.foresters*10+state.land*10;
@@ -13,10 +13,15 @@ const upgrades=[
 {id:'mills',name:'Sägewerk',desc:'Verkauft 2 Holz pro Takt für je 1,5 Münzen',base:150,scale:1.9,icon:'🏭',res:'wood',count:()=>state.mills},
 {id:'workers',name:'Weiterer Holzfäller',desc:'Fällt automatisch Bäume (Lohn in Münzen)',base:30,scale:1.8,icon:'🧔',res:'coins',count:()=>state.workers-1},
 {id:'foresters',name:'Förster einstellen',desc:'Pflanzt automatisch Bäume, +10 Waldfläche',base:50,scale:1.85,icon:'🌱',res:'coins',count:()=>state.foresters},
-{id:'land',name:'Land kaufen',desc:'Neue Parzelle: +10 Waldfläche',base:80,scale:2,icon:'🏞️',res:'coins',count:()=>state.land,minLevel:2}
+{id:'land',name:'Land kaufen',desc:'Neue Parzelle: +10 Waldfläche',base:80,scale:2,icon:'🏞️',res:'coins',count:()=>state.land,minLevel:2},
+{id:'carpentry',name:'Tischlerei',desc:'Macht aus 5 Holz je 1 Brett pro Takt',base:250,scale:2.2,icon:'🪚',res:'coins',count:()=>state.carpentry,minLevel:4},
+{id:'windbreak',name:'Windbrecher',desc:'Schützt vor Sturm (−70 % Schaden)',base:8,scale:1,icon:'🌬️',res:'planks',count:()=>state.windbreak,minLevel:6,max:1,unlock:'Gefahr im Wald! Schutzbauten sind verfügbar.'},
+{id:'watchtower',name:'Wachturm',desc:'Schützt vor Feuer (−70 % Schaden)',base:12,scale:1,icon:'🗼',res:'planks',count:()=>state.watchtower,minLevel:6,max:1},
+{id:'cats',name:'Katzen',desc:'Schützen vor Ungeziefer (−70 % Schaden)',base:6,scale:1,icon:'🐈',res:'planks',count:()=>state.cats,minLevel:6,max:1},
+{id:'fence',name:'Zaun',desc:'Schützt vor Dieben (−70 % Schaden)',base:15,scale:1,icon:'🚧',res:'planks',count:()=>state.fence,minLevel:6,max:1}
 ];
 const cost=u=>Math.floor(u.base*Math.pow(u.scale,u.count()));
-const purchases=()=>state.workers-1+state.foresters+state.mills+state.axe+state.storage+state.land;
+const purchases=()=>state.workers-1+state.foresters+state.mills+state.axe+state.storage+state.land+state.carpentry;
 const level=()=>1+Math.floor(purchases()/3);
 // Synthesized sound effects (Web Audio); the audio context is created lazily inside a user gesture
 const sfx=(()=>{
@@ -64,7 +69,8 @@ const sfx=(()=>{
     levelUp:()=>{if(!ready())return;[523,659,784,1047,1319].forEach((f,i)=>{tone('triangle',f,f,i*0.09,0.3,0.25);tone('square',f*2,f*2,i*0.09,0.15,0.04)})},
     sell:a=>{if(!ready(a))return;tone('sine',1568,1568,0,0.12,0.12);tone('sine',2093,2093,0.06,0.18,0.12)},
     error:()=>{if(!ready())return;tone('square',160,110,0,0.2,0.1)},
-    reset:()=>{if(!ready())return;tone('sawtooth',440,110,0,0.5,0.15)}
+    reset:()=>{if(!ready())return;tone('sawtooth',440,110,0,0.5,0.15)},
+    event:()=>{if(!ready())return;tone('sawtooth',90,50,0,0.6,0.25);tone('square',70,40,0.1,0.5,0.12);noise(300,0.6,0,0.35,0.3)}
   };
 })();
 let toastTimer;
@@ -85,20 +91,43 @@ function renderTeaser(){
   teaserNote.textContent='Noch '+(next-level())+' Level bis zur Überraschung';
   teaserFill.style.width=Math.min(100,Math.round(purchases()/((next-1)*3)*100))+'%';
 }
+const UNITS={wood:['🪵','Holz'],coins:['🪙','Münzen'],planks:['🪚','Bretter']};
 const upgradeEls=new Map();
-function renderUpgrades(){const root=$('upgrades');for(const u of upgrades){let el=upgradeEls.get(u.id);if(!el){const btn=document.createElement('button');btn.className='upgrade';const title=document.createElement('strong');title.textContent=u.icon+' '+u.name;const desc=document.createElement('span');desc.textContent=u.desc;const priceEl=document.createElement('em');btn.append(title,desc,priceEl);btn.addEventListener('click',()=>buy(u));root.appendChild(btn);el={btn,priceEl};upgradeEls.set(u.id,el)}const price=cost(u);const unit=u.res==='wood'?'🪵':'🪙';el.btn.style.display=level()>=(u.minLevel||0)?'':'none';el.btn.disabled=state[u.res]<price;el.priceEl.textContent=unit+' '+price+(u.res==='wood'?' Holz':' Münzen')+(u.res==='wood'&&price>capacity()?' – Lager zu klein':'')}renderTeaser()}
-function render(){$('wood').textContent=Math.floor(state.wood)+'/'+capacity();$('trees').textContent=state.trees+(state.saplings?' (+'+state.saplings+'🌱)':'');$('coins').textContent=Math.floor(state.coins);$('workerCount').textContent=state.workers;$('foresterCount').textContent=state.foresters;$('millCount').textContent=state.mills;$('capacity').textContent=capacity();$('chopGain').textContent=chopGain();$('day').textContent='TAG '+state.day;$('level').textContent='LEVEL '+level();$('mute').textContent=state.muted?'🔇 Ton aus':'🔊 Ton an';renderFences();renderUpgrades()}
+function renderUpgrades(){const root=$('upgrades');for(const u of upgrades){let el=upgradeEls.get(u.id);if(!el){const btn=document.createElement('button');btn.className='upgrade';const title=document.createElement('strong');title.textContent=u.icon+' '+u.name;const desc=document.createElement('span');desc.textContent=u.desc;const priceEl=document.createElement('em');btn.append(title,desc,priceEl);btn.addEventListener('click',()=>buy(u));root.appendChild(btn);el={btn,priceEl};upgradeEls.set(u.id,el)}const price=cost(u);const [unit,label]=UNITS[u.res];const maxed=u.max&&u.count()>=u.max;el.btn.style.display=level()>=(u.minLevel||0)?'':'none';el.btn.disabled=maxed||state[u.res]<price;el.priceEl.textContent=maxed?'✓ Gebaut':unit+' '+price+' '+label+(u.res==='wood'&&price>capacity()?' – Lager zu klein':'')}renderTeaser()}
+function render(){$('wood').textContent=Math.floor(state.wood)+'/'+capacity();$('trees').textContent=state.trees+(state.saplings?' (+'+state.saplings+'🌱)':'');$('coins').textContent=Math.floor(state.coins);$('workerCount').textContent=state.workers;$('foresterCount').textContent=state.foresters;$('millCount').textContent=state.mills;$('capacity').textContent=capacity();$('chopGain').textContent=chopGain();$('day').textContent='TAG '+state.day;$('level').textContent='LEVEL '+level();$('mute').textContent=state.muted?'🔇 Ton aus':'🔊 Ton an';$('planks').textContent=Math.floor(state.planks);$('planksBox').hidden=!(state.carpentry>0||state.planks>0);renderFences();renderUpgrades()}
 function chop(){if(state.trees<1){sfx.error();toast(state.saplings?'Die Setzlinge wachsen noch… 🌱':'Pflanze zuerst einen Baum! 🌱');return}if(state.wood>=capacity()){sfx.error();toast('Lager voll! Baue es aus oder verkaufe Holz im Sägewerk.');return}fellTree();sfx.chop(1);$('worker').classList.add('chopping');setTimeout(()=>$('worker').classList.remove('chopping'),350);renderForest();render();save()}
-function buy(u){const price=cost(u);if(state[u.res]<price||level()<(u.minLevel||0))return;const lv=level();state[u.res]-=price;state[u.id]++;clampState();sfx.buy();if(level()>lv){setTimeout(sfx.levelUp,350);const nu=upgrades.find(x=>x.minLevel&&x.minLevel===level());if(nu)setTimeout(()=>toast('Neu freigeschaltet: '+nu.name+'!'),900)}toast(u.name+' gekauft!');renderForest();render();save()}
+function buy(u){const price=cost(u);if(state[u.res]<price||level()<(u.minLevel||0)||(u.max&&u.count()>=u.max))return;const lv=level();state[u.res]-=price;state[u.id]++;clampState();sfx.buy();if(level()>lv){setTimeout(sfx.levelUp,350);const nu=upgrades.find(x=>x.minLevel&&x.minLevel===level());if(nu)setTimeout(()=>toast(nu.unlock||'Neu freigeschaltet: '+nu.name+'!',3000),900)}toast(u.name+' gekauft!');renderForest();render();save()}
 $('plant').addEventListener('click',()=>{if(addTree(false)){sfx.plant();render();save();toast('Ein Setzling wurde gepflanzt – er braucht etwas Zeit. 🌱')}else sfx.error()});
 $('chop').addEventListener('click',chop);
 let resetArmed=false,resetTimer;
 const disarmReset=()=>{resetArmed=false;clearTimeout(resetTimer);$('reset').textContent='Spiel zurücksetzen'};
 $('reset').addEventListener('click',()=>{if(!resetArmed){resetArmed=true;$('reset').textContent='Wirklich löschen? Nochmal klicken';resetTimer=setTimeout(disarmReset,3000);return}disarmReset();state={...initial,muted:state.muted};save();sfx.reset();renderForest();render();toast('Neuer Wald, neues Glück!')});
 $('mute').addEventListener('click',()=>{state.muted=state.muted?0:1;save();render();sfx.sell()});
-function step(){let changed=false,sold=false,chopped=false;for(let i=0;i<state.mills;i++){const processed=Math.min(state.wood,2);if(processed>0){state.wood-=processed;state.coins+=processed*1.5;changed=true;sold=true}}for(let i=0;i<state.workers;i++){if(fellTree()>0){changed=true;chopped=true}}for(let i=0;i<state.foresters;i++){if(addTree(true))changed=true}if(state.saplings>0){const grown=Math.ceil(state.saplings/2);state.saplings-=grown;state.trees+=grown;changed=true}return{changed,sold,chopped}}
+function step(){let changed=false,sold=false,chopped=false;for(let i=0;i<state.mills;i++){const processed=Math.min(state.wood,2);if(processed>0){state.wood-=processed;state.coins+=processed*1.5;changed=true;sold=true}}for(let i=0;i<state.carpentry;i++){if(state.wood>=5){state.wood-=5;state.planks++;changed=true}}for(let i=0;i<state.workers;i++){if(fellTree()>0){changed=true;chopped=true}}for(let i=0;i<state.foresters;i++){if(addTree(true))changed=true}if(state.saplings>0){const grown=Math.ceil(state.saplings/2);state.saplings-=grown;state.trees+=grown;changed=true}return{changed,sold,chopped}}
 setInterval(()=>{const r=step();if(r.sold)sfx.sell(true);if(r.chopped)sfx.chop(0.35);if(r.changed){renderForest();render();save()}},2000);
-setInterval(()=>{state.day++;render();save()},60000);
+// Random events (level 6+): rare by design - 10 min grace after unlock, 10 min minimum gap, ~10 % chance per minute afterwards,
+// only while the game is open and visible. The matching protection building cuts the damage by 70 %.
+const EVENTS=[
+  {key:'windbreak',ok:()=>state.trees>=1,hit:p=>{const n=Math.max(1,Math.floor(state.trees*0.15*p));state.trees-=n;return '⛈ Sturm! '+n+' Bäume umgeknickt.'}},
+  {key:'watchtower',ok:()=>state.wood>=10,hit:p=>{const n=Math.max(1,Math.floor(state.wood*0.2*p));state.wood-=n;return '🔥 Feuer im Holzlager! '+n+' Holz verbrannt.'}},
+  {key:'cats',ok:()=>state.wood>=10,hit:p=>{const n=Math.max(1,Math.floor(state.wood*0.15*p));state.wood-=n;return '🐛 Ungeziefer! '+n+' Holz zerfressen.'}},
+  {key:'fence',ok:()=>state.coins>=10,hit:p=>{const n=Math.max(1,Math.floor(state.coins*0.1*p));state.coins-=n;return '🥷 Diebe! '+n+' Münzen gestohlen.'}}
+];
+function rollEvent(){
+  if(level()<6||document.hidden)return;
+  const now=Date.now();
+  if(!state.evNext){state.evNext=now+600000;return}
+  if(now<state.evNext||Math.random()>=0.1)return;
+  const pool=EVENTS.filter(e=>e.ok());
+  if(!pool.length)return;
+  const e=pool[Math.floor(Math.random()*pool.length)];
+  const shielded=state[e.key]>0;
+  const msg=e.hit(shielded?0.3:1);
+  state.evNext=now+600000;
+  clampState();sfx.event();renderForest();
+  toast(msg+(shielded?' Der Schutz hat gewirkt.':''),4500);
+}
+setInterval(()=>{state.day++;rollEvent();render();save()},60000);
 window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});
 // Offline progress: capped at 8 h, random 20-60 % efficiency (the boss was not looking)
 (()=>{
@@ -108,6 +137,7 @@ window.addEventListener('pagehide',save);document.addEventListener('visibilitych
   const ticks=Math.floor(Math.min(away,28800)*eff/2);
   const before={wood:state.wood,coins:state.coins};
   quiet=true;for(let i=0;i<ticks;i++)step();quiet=false;
+  if(state.evNext)state.evNext=Math.max(state.evNext,Date.now()+120000);
   save();
   const gain=Math.floor(state.coins-before.coins);
   if(gain>0||state.wood>before.wood){
