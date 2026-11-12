@@ -74,32 +74,32 @@ const level=()=>1+Math.floor(purchases()/3);
 const sfx=(()=>{
   let ctx=null,master=null,noiseBuf=null;
   const samples={};
-  let mb=null,mTimer=null,mNext=0,mStep=0;
-  // Automation song: every automated job is an instrument on a shared 16-step groove (120 BPM, Am-F-C-G).
-  // More workers/mills/... = denser pattern. Read live from the game state, so the band grows with the factory.
+  let mb=null,mBar=0;
+  // Automation song: a bar starts with every game tick and is built from what the automation actually did in it
+  // (felled trees, sawmill sales, sawn planks, crafted furniture, dealer sales); foresters add the melody, robots the bass.
   const MSTEP=60/120/4;
   const MCH=[[57,60,64],[53,57,60],[48,52,55],[55,59,62]];
-  const MP={chop:[[0,8],[0,6,8],[0,6,8,14],[0,3,6,8,11,14]],coin:[[4,12],[2,6,10,14],[0,2,4,6,8,10,12,14],[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]],saw:[[4,12],[4,12,15],[4,7,12,15],[4,7,12,14,15]],hammer:[[10],[7,10],[3,7,10,15]],cash:[[14],[6,14],[2,6,10,14]],plant:[[2,10],[2,6,10,14],[0,2,4,6,8,10,12,14],[0,1,2,4,5,6,8,9,10,12,13,14]],bass:[[0,8],[0,6,8,14],[0,3,6,8,11,14]]};
+  const MP={plant:[[2,10],[2,6,10,14],[0,2,4,6,8,10,12,14],[0,1,2,4,5,6,8,9,10,12,13,14]],bass:[[0,8],[0,6,8,14],[0,3,6,8,11,14]]};
   const mhz=m=>440*Math.pow(2,(m-69)/12);
   const mlv=(n,th)=>th.filter(x=>n>=x).length;
   const mnote=(type,f,t,dur,vol)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(mb);o.start(t);o.stop(t+dur+0.02)};
-  const mhit=(name,t,vol,rate)=>{const b=samples[name];if(!b)return;const s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=b;s.playbackRate.value=rate*(1+(Math.random()-0.5)*0.04);g.gain.value=vol;s.connect(g);g.connect(mb);s.start(t)};
+  const mhit=(name,t,vol,rate,lp)=>{const b=samples[name];if(!b)return;const s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=b;s.playbackRate.value=rate*(1+(Math.random()-0.5)*0.04);g.gain.value=vol;if(lp){const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=lp;s.connect(f);f.connect(g)}else s.connect(g);g.connect(mb);s.start(t)};
   const mhat=(t,vol)=>{const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();s.buffer=noiseBuf;f.type='highpass';f.frequency.value=6000;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.04);s.connect(f);f.connect(g);g.connect(mb);s.start(t);s.stop(t+0.05)};
-  const musicStep=(step,t)=>{
-    const s=step%16,ch=MCH[Math.floor(step/16)];
-    const L={chop:mlv(Math.max(0,state.workers-1),[1,4,10,20]),plant:mlv(state.foresters,[1,3,8,16]),coin:state.autoWood?mlv(state.mills,[1,3,8,16]):0,saw:mlv(state.carpentry,[1,2,5,10]),hammer:mlv(state.carpenters,[1,2,5]),cash:(state.autoPlanks||state.autoFurn)?mlv(state.dealers,[1,3,8]):0,bass:mlv(state.robots,[1,2,4])};
-    const on=k=>L[k]>0&&MP[k][L[k]-1].includes(s);
-    if(on('chop'))mhit('chop',t,s===0?0.9:0.55,s===0?0.8:1);
-    if(on('coin'))mhat(t,s%4===0?0.10:0.06);
-    if(on('saw'))mhit('saw',t,0.45,1.15);
-    if(on('hammer'))mhit('hammer',t,0.4,1.1);
-    if(on('cash'))mhit('sellFurn',t,0.3,1.25);
-    if(on('plant')){const i=MP.plant[L.plant-1].indexOf(s);mnote('triangle',mhz(ch[i%3]+(i%6>=3?24:12)),t,0.22,0.10)}
-    if(on('bass'))mnote('sawtooth',mhz(ch[0]-12),t,0.2,0.14);
-    if(s===0&&Object.keys(L).some(k=>L[k]>0))for(const n of ch)mnote('triangle',mhz(n),t,1.8,0.04);
+  const spread=(count,cap,off)=>{const n=Math.min(count,cap),out=[];for(let i=0;i<n;i++)out.push((Math.floor(i*16/n)+off)%16);return out};
+  const bar=ev=>{
+    if(!ctx||ctx.state!=='running'||state.muted||!state.music||document.hidden)return;
+    const t0=ctx.currentTime+0.05,ch=MCH[mBar%4],at=s=>t0+s*MSTEP;mBar++;
+    spread(ev.felled,6,0).forEach((s,i)=>mhit('chop',at(s),i===0?0.22:0.14,1.1,600));
+    spread(ev.milled,16,0).forEach((s,i)=>mhat(at(s),i%4===0?0.10:0.06));
+    spread(ev.sawn,4,4).forEach(s=>mhit('saw',at(s),0.28,1.15));
+    spread(ev.crafted,4,10).forEach(s=>mhit('hammer',at(s),0.28,1.1));
+    spread(ev.dealt,4,14).forEach(s=>mhit('sellFurn',at(s),0.2,1.25));
+    const pl=mlv(state.foresters,[1,3,8,16]);
+    if(pl>0)MP.plant[pl-1].forEach((s,i)=>mnote('triangle',mhz(ch[i%3]+(i%6>=3?24:12)),at(s),0.22,0.10));
+    const bs=mlv(state.robots,[1,2,4]);
+    if(bs>0)MP.bass[bs-1].forEach(s=>mnote('sawtooth',mhz(ch[0]-12),at(s),0.2,0.14));
+    if(pl>0||ev.felled+ev.milled+ev.sawn+ev.crafted+ev.dealt>0)for(const n of ch)mnote('triangle',mhz(n),t0,1.8,0.04);
   };
-  // Look-ahead scheduler on the audio clock; silent when muted, switched off, or the tab is hidden
-  const startMusic=()=>{if(mTimer)return;mTimer=setInterval(()=>{if(!ctx||ctx.state!=='running'||state.muted||!state.music||document.hidden)return;const now=ctx.currentTime;if(mNext<now-0.3)mNext=now+0.05;while(mNext<now+0.3){musicStep(mStep,mNext);mNext+=MSTEP;mStep=(mStep+1)%64}},100)};
   // Decode the embedded base64 WAVs (assets/sounds.js); until a sample is ready the synthesized fallback plays
   const loadSamples=()=>{if(typeof SOUNDS==='undefined')return;for(const k of Object.keys(SOUNDS)){try{const bin=atob(SOUNDS[k]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);ctx.decodeAudioData(u.buffer,b=>{samples[k]=b},()=>{})}catch(e){}}};
   const play=(name,vol,vary)=>{const b=samples[name];if(!b)return false;const s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=b;s.playbackRate.value=1+(Math.random()-0.5)*vary;g.gain.value=vol;s.connect(g);g.connect(master);s.start();return true};
@@ -117,7 +117,7 @@ const sfx=(()=>{
         const buf=c.createBuffer(1,Math.floor(c.sampleRate*0.4),c.sampleRate);
         const d=buf.getChannelData(0);
         for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
-        ctx=c;master=m;noiseBuf=buf;mb=c.createGain();mb.gain.value=0.6;mb.connect(m);loadSamples();startMusic();
+        ctx=c;master=m;noiseBuf=buf;mb=c.createGain();mb.gain.value=0.6;mb.connect(m);loadSamples();
       }
       if(ctx.state!=='running'){ctx.resume();if(auto)return false}
       return true;
@@ -140,6 +140,7 @@ const sfx=(()=>{
     s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+dur+0.02);
   };
   return{
+    bar,
     chop:v=>{if(!ready(v<1))return;if(play('chop',v<1?0.45:0.9,0.14))return;noise(2200,0.9,0,0.07,0.5*v);tone('sine',240,60,0,0.16,0.7*v);tone('triangle',620,300,0,0.05,0.25*v);noise(500,0.7,0.14,0.28,0.25*v);tone('sawtooth',150,45,0.12,0.26,0.12*v)},
     plant:()=>{if(!ready())return;if(play('plant',0.8,0.1))return;tone('sine',330,660,0,0.18,0.3);tone('triangle',660,990,0.1,0.2,0.2);tone('sine',1320,1320,0.2,0.25,0.1)},
     buy:()=>{if(!ready())return;tone('square',988,988,0,0.08,0.1);tone('square',1319,1319,0.07,0.35,0.1);tone('triangle',1976,1976,0.07,0.4,0.12)},
@@ -207,7 +208,7 @@ const upgradeEls=new Map();
 function renderUpgrades(){const root=$('upgrades');for(const u of upgrades){let el=upgradeEls.get(u.id);if(!el){const btn=document.createElement('button');btn.className='upgrade';const title=document.createElement('strong');const desc=document.createElement('span');const priceEl=document.createElement('em');btn.append(title,desc,priceEl);btn.addEventListener('click',()=>buy(u));root.appendChild(btn);el={btn,title,desc,priceEl};upgradeEls.set(u.id,el)}const pr=prices(u);el.title.textContent=u.icon+' '+nameOf(u);el.desc.textContent=descOf(u);el.btn.style.display=visible(u)?'':'none';el.btn.disabled=!canBuy(u);el.priceEl.textContent=isMaxed(u)?'✓ Gebaut':Object.keys(pr).map(r=>UNITS[r][0]+' '+fmtN(pr[r])+' '+UNITS[r][1]).join(' + ')+(pr.wood>capacity()?' – Lager zu klein':'')}renderTeaser()}
 function render(){$('wood').textContent=fmtN(state.wood)+'/'+fmtN(capacity());$('trees').textContent=state.trees+(state.saplings?' (+'+state.saplings+'🌱)':'');$('coins').textContent=fmtN(state.coins);$('workerCount').textContent=state.workers;$('foresterCount').textContent=state.foresters;$('millCount').textContent=state.mills;$('capacity').textContent=fmtN(capacity());$('chopGain').textContent=chopGain();$('day').textContent='TAG '+state.day;$('level').textContent='LEVEL '+level();$('mute').textContent=state.muted?'🔇 Ton aus':'🔊 Ton an';$('planks').textContent=fmtN(state.planks);$('planksBox').hidden=!(state.carpentry>0||state.planks>0);$('furn').textContent=fmtN(state.furn);$('furnBox').hidden=!(state.furn>0||state.carpenters>0||state.moebel>0);renderFences();renderBadges();renderCrew();$('cabin').dataset.s=level()>=25?3:level()>=15?2:level()>=8?1:0;$('sellWoodInfo').textContent=SELL_WOOD[state.trader]+' à '+pWood.toFixed(1).replace('.',',');$('sellWood').title='Holz verkaufen (Taste D): '+SELL_WOOD[state.trader]+' Holz à '+pWood.toFixed(1).replace('.',',')+' Münzen';renderRates();renderToggles();renderLocks();renderUpgrades()}
 function renderRates(){
-  const m=robotMult();const g=chopGain();
+  const m=robotMult()*attEff();const g=chopGain();
   $('rateWood').textContent='+'+(Math.floor(state.workers*m)*g)+' Holz/Takt';
   $('rateSeed').textContent='+'+Math.floor(state.foresters*m)+' Setzlinge/Takt';
   $('rateCoin').textContent=state.autoWood?'+'+(Math.floor(state.mills*m)*millRate()*millPrice()).toLocaleString('de-DE',{maximumFractionDigits:1})+' Münzen/Takt':'Automatik aus';
@@ -274,10 +275,10 @@ document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||e.rep
 document.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(holds.has(k)){clearInterval(holds.get(k));holds.delete(k)}});
 window.addEventListener('blur',stopHolds);document.addEventListener('visibilitychange',stopHolds);
 // Test bar (type iddqd): level cheat uses a hidden bonus so it does not inflate the land price
-const DEV={coins:()=>{state.coins+=10000},wood:()=>{state.wood=Math.min(capacity(),state.wood+1000)},planks:()=>{state.planks+=1000},furn:()=>{state.furn+=1000},lvl:()=>{state.cheat+=9},away:s=>{offline(+s);renderForest()},snd:n=>{if(sfx[n])sfx[n](1)},band:()=>{state.workers=Math.max(state.workers,12);state.foresters=Math.max(state.foresters,9);state.mills=Math.max(state.mills,9);state.carpentry=Math.max(state.carpentry,5);state.carpenters=Math.max(state.carpenters,3);state.dealers=Math.max(state.dealers,4);state.robots=Math.max(state.robots,2)},ev:k=>{const e=EVENTS.find(x=>x.key===k);if(e&&e.ok())fireEvent(e);else toast('Nichts zu verlieren (zu wenig Bäume, Holz oder Münzen).')},riot:()=>robotAlert(),bandOff:()=>{state.workers=1;state.foresters=0;state.mills=0;state.carpentry=0;state.carpenters=0;state.dealers=0;state.robots=0}};
+const DEV={coins:()=>{state.coins+=10000},wood:()=>{state.wood=Math.min(capacity(),state.wood+1000)},planks:()=>{state.planks+=1000},furn:()=>{state.furn+=1000},lvl:()=>{state.cheat+=9},away:s=>{lastInput=Date.now();offline(+s);renderForest()},idle:s=>{lastInput-=s*1000},snd:n=>{if(sfx[n])sfx[n](1)},band:()=>{state.workers=Math.max(state.workers,12);state.foresters=Math.max(state.foresters,9);state.mills=Math.max(state.mills,9);state.carpentry=Math.max(state.carpentry,5);state.carpenters=Math.max(state.carpenters,3);state.dealers=Math.max(state.dealers,4);state.robots=Math.max(state.robots,2)},ev:k=>{const e=EVENTS.find(x=>x.key===k);if(e&&e.ok())fireEvent(e);else toast('Nichts zu verlieren (zu wenig Bäume, Holz oder Münzen).')},riot:()=>robotAlert(),bandOff:()=>{state.workers=1;state.foresters=0;state.mills=0;state.carpentry=0;state.carpenters=0;state.dealers=0;state.robots=0}};
 $('dev').addEventListener('click',e=>{const f=DEV[e.target.dataset.d];if(f){f(e.target.dataset.v);render();save()}});
-function step(){let changed=false,sold=false,chopped=false,paid=0;const c0=state.coins,m=robotMult();for(let i=0;i<(state.autoWood?Math.floor(state.mills*m):0);i++){const processed=Math.min(state.wood,millRate());if(processed>0){state.wood-=processed;state.coins+=processed*millPrice();changed=true;sold=true}}for(let i=0;i<Math.floor(state.carpentry*m);i++){const w=wageAct();if(state.wood>=5&&state.coins>=w){state.wood-=5;state.planks++;state.coins-=w;paid+=w;changed=true}}for(let i=0;i<(state.autoCraft?Math.floor(state.carpenters*m):0);i++){const w=wageAct();if(state.planks>=4&&state.coins>=w){state.planks-=4;state.furn++;state.coins-=w;paid+=w;changed=true}}for(let i=0;i<Math.floor(state.workers*m);i++){const w=i>0?wageAct():0;if(state.coins<w)continue;if(fellTree()>0){state.coins-=w;paid+=w;changed=true;chopped=true}}for(let i=0;i<Math.floor(state.foresters*m);i++){const w=wageAct();if(state.coins<w)continue;if(addTree(true)){state.coins-=w;paid+=w;changed=true}}if(state.saplings>0){const grown=Math.ceil(state.saplings/2);state.saplings-=grown;state.trees+=grown;changed=true}if(state.autoPlanks){for(let i=0;i<state.dealers;i++){const n=Math.min(Math.floor(state.planks),5);if(n>0){state.planks-=n;state.coins+=n*pPlank*0.8;changed=true;sold=true}}}if(state.autoFurn){for(let i=0;i<state.dealers;i++){if(state.furn>=1){state.furn--;state.coins+=pFurn*0.8;changed=true;sold=true}}}lastWage=paid;lastNet=state.coins-c0;return{changed,sold,chopped}}
-setInterval(()=>{const r=step();if(!state.music){if(r.sold)sfx.sell(true);if(r.chopped)sfx.chop(0.35)}if(r.changed){renderForest();render();save()}},2000);
+function step(){let changed=false,sold=false,chopped=false,paid=0,felled=0,planted=0,milled=0,sawn=0,crafted=0,dealt=0;const am=attEff(),c0=state.coins,m=robotMult()*am;const cnt=n=>Math.floor(n*m+Math.random());for(let i=0;i<(state.autoWood?cnt(state.mills):0);i++){const processed=Math.min(state.wood,millRate());if(processed>0){state.wood-=processed;state.coins+=processed*millPrice();changed=true;sold=true;milled++}}for(let i=0;i<cnt(state.carpentry);i++){const w=wageAct();if(state.wood>=5&&state.coins>=w){state.wood-=5;state.planks++;state.coins-=w;paid+=w;changed=true;sawn++}}for(let i=0;i<(state.autoCraft?cnt(state.carpenters):0);i++){const w=wageAct();if(state.planks>=4&&state.coins>=w){state.planks-=4;state.furn++;state.coins-=w;paid+=w;changed=true;crafted++}}for(let i=0;i<cnt(state.workers);i++){const w=i>0?wageAct():0;if(state.coins<w)continue;if(fellTree()>0){state.coins-=w;paid+=w;changed=true;chopped=true;felled++}}for(let i=0;i<cnt(state.foresters);i++){const w=wageAct();if(state.coins<w)continue;if(addTree(true)){state.coins-=w;paid+=w;changed=true;planted++}}if(state.saplings>0){const grown=Math.ceil(state.saplings/2);state.saplings-=grown;state.trees+=grown;changed=true}if(state.autoPlanks){for(let i=0;i<Math.floor(state.dealers*am+Math.random());i++){const n=Math.min(Math.floor(state.planks),5);if(n>0){state.planks-=n;state.coins+=n*pPlank*0.8;changed=true;sold=true;dealt++}}}if(state.autoFurn){for(let i=0;i<Math.floor(state.dealers*am+Math.random());i++){if(state.furn>=1){state.furn--;state.coins+=pFurn*0.8;changed=true;sold=true;dealt++}}}lastWage=paid;lastNet=state.coins-c0;return{changed,sold,chopped,felled,planted,milled,sawn,crafted,dealt}}
+setInterval(()=>{const r=step();if(state.music)sfx.bar(r);else{if(r.sold)sfx.sell(true);if(r.chopped)sfx.chop(0.35)}if(r.changed){renderForest();render();save()}},2000);
 // Random events (level 6+): 5 min grace after unlock, 5 min minimum gap, 20 % chance per minute afterwards (about one per 10 min),
 // only while the game is open and visible. The matching protection building cuts the damage by 70 %.
 const EVENTS=[
@@ -298,7 +299,7 @@ function rollEvent(){
   if(level()<6||document.hidden)return;
   const now=Date.now();
   if(!state.evNext){state.evNext=now+300000;return}
-  if(now<state.evNext||Math.random()>=0.2)return;
+  if(now<state.evNext||Math.random()>=0.2*ATT[attStage(idleSec())].ev)return;
   const pool=EVENTS.filter(e=>e.ok());
   if(!pool.length)return;
   fireEvent(pool[Math.floor(Math.random()*pool.length)]);
@@ -326,11 +327,40 @@ function robotAlert(){
 $('panic').addEventListener('click',()=>{if(!alertTimer)return;clearTimeout(alertTimer);alertTimer=null;$('panic').style.display='none';state.rbNext=Date.now()+900000;sfx.buy();toast('Not-Aus gedrückt: Aufstand gestoppt!',3000);save()});
 setInterval(()=>{state.day++;rollEvent();rollRobots();refreshPrices();render();save()},60000);
 window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});
+
+// Attention: no key press or click for a while makes the crew lazy and events more likely; any input resets the timer.
+// The same stages drive the offline summary (time away counts as idle time).
+const ATT=[
+  {at:0,eff:[1,1],ev:1,name:'Voll dabei',lines:['Kurze Pause']},
+  {at:120,eff:[0.6,0.8],ev:1,name:'Kaffeepause',lines:['Kaffeepause','Mittagsschlaf']},
+  {at:600,eff:[0.4,0.6],ev:2,name:'Mittagsschlaf',lines:['Woodie Ellen hat gepennt','Chef hat nicht hingeschaut','Alle haben Unsinn gemacht']},
+  {at:1800,eff:[0.2,0.4],ev:3,name:'Urlaub',lines:['Betriebsausflug','Alle im Urlaub','Woodie Ellen liegt am See']}
+];
+const ATT_TIP='Ohne Tasten oder Klicks wird die Belegschaft nachlässig:\n• ab 2 Min „Kaffeepause“: Betrieb nur zu etwa 70 %\n• ab 10 Min „Mittagsschlaf“: etwa 50 % und Ereignisse doppelt so häufig\n• ab 30 Min „Urlaub“: etwa 30 % und Ereignisse dreimal so häufig\nJede Taste und jeder Klick setzt den Timer zurück.';
+const attStage=sec=>{let s=0;for(let i=0;i<ATT.length;i++)if(sec>=ATT[i].at)s=i;return s};
+let lastInput=Date.now(),lastStage=0;
+const idleSec=()=>(Date.now()-lastInput)/1000;
+const attEff=()=>{const a=ATT[attStage(idleSec())];return (a.eff[0]+a.eff[1])/2};
+const wake=()=>{const was=attStage(idleSec());lastInput=Date.now();lastStage=0;if(was>=1)toast('Zurück am Schreibtisch – alle arbeiten wieder voll.',3000)};
+for(const ev of ['pointerdown','keydown','touchstart'])document.addEventListener(ev,wake,true);
+function renderAttention(){
+  const sec=idleSec(),st=attStage(sec),a=ATT[st],nxt=ATT[st+1],eff=Math.round(attEff()*100);
+  const mmss=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
+  const icons=['⏱','☕','😴','🏖️'];
+  $('attnText').textContent=nxt?icons[st]+' '+(st?a.name+' ('+eff+' %) – ':'Aufmerksamkeit – ')+nxt.name+' in '+mmss(nxt.at-sec):icons[st]+' '+a.name+' ('+eff+' %) – Taste drücken!';
+  $('attnBar').style.width=nxt?Math.min(100,(sec-a.at)/(nxt.at-a.at)*100)+'%':'100%';
+  const box=$('attn');box.className='attn s'+st;box.title=ATT_TIP;
+  for(const el of [$('worker'),$('crew')])el.classList.toggle('dozing',st>=2);
+  if(st>lastStage)toast(a.name+'! Die Belegschaft arbeitet nur noch zu '+eff+' %.',4000);
+  lastStage=st;
+}
+$('attn').addEventListener('click',()=>toast(ATT_TIP,9000));
+setInterval(renderAttention,1000);
 // Offline progress: capped at 8 h, random 20-60 % efficiency (the boss was not looking)
 function offline(away){
   if(away<60)return;
-  const tier=away<1800?{lo:0.5,hi:0.7,lines:['Kaffeepause','Mittagsschlaf']}:away<7200?{lo:0.3,hi:0.6,lines:['Woodie Ellen hat gepennt','Chef hat nicht hingeschaut','Alle haben Unsinn gemacht']}:{lo:0.2,hi:0.4,lines:['Betriebsausflug','Alle im Urlaub','Woodie Ellen liegt am See']};
-  const eff=tier.lo+Math.random()*(tier.hi-tier.lo);
+  const st=ATT[attStage(away)];
+  const eff=st.eff[0]+Math.random()*(st.eff[1]-st.eff[0]);
   const ticks=Math.floor(Math.min(away,28800)*eff/2);
   const before={wood:state.wood,coins:state.coins};
   quiet=true;for(let i=0;i<ticks;i++)step();quiet=false;
@@ -338,10 +368,10 @@ function offline(away){
   if(state.rbNext)state.rbNext=Math.max(state.rbNext,Date.now()+120000);
   save();
   const gain=Math.floor(state.coins-before.coins);
-  const lines=tier.lines;
+  const lines=st.lines;
   const span=away>=3600?(away/3600).toFixed(1).replace('.',',')+' Std':Math.round(away/60)+' Min';
   toast((away>=28800?'Urlaubsende! ':'')+lines[Math.floor(Math.random()*lines.length)]+' ('+span+' weg): nur '+Math.round(eff*100)+' % Leistung, +'+fmtN(gain)+' Münzen',6000);
   for(const el of [$('worker'),$('crew')]){el.classList.add('sleepy');setTimeout(()=>el.classList.remove('sleepy'),6000)}
 }
 offline(state.last?(Date.now()-state.last)/1000:0);
-renderForest();render();
+renderForest();render();renderAttention();
