@@ -1,32 +1,42 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tracker</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#17251c">
+  <title>Lumberjack — Forest Idle</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main id="app">
-  <header class="bar">
-    <button id="play" type="button">Play</button>
-    <label>Tempo <input id="bpm" type="range" min="50" max="200" step="1" value="90"> <output id="bpmOut">90</output></label>
-    <button id="wav" type="button">WAV speichern</button>
-  </header>
-  <section class="bar">
-    <span>Pattern</span>
-    <span id="tabs" class="bar"></span>
-    <button id="addPat" type="button" title="Pattern hinzufügen">+</button>
-    <button id="delPat" type="button" title="Aktuelles Pattern löschen">&minus;</button>
-  </section>
-  <section class="bar">
-    <label>Vorlage <select id="preset"></select></label>
-    <button id="load" type="button">Laden</button>
-    <label>Akkord <select id="chord"></select></label>
-    <label>Bass <select id="bassNote"></select></label>
-  </section>
-  <section id="grid"></section>
-</main>
-<script src="script.js"></script>
+  <main class="game">
+    <header class="topbar">
+      <div class="brand"><span class="brand-icon">🪓</span><div><h1>LUMBERJACK</h1><small>FOREST TYCOON</small></div></div>
+      <div class="resources"><div class="resource"><span>🪵</span><strong id="wood">0</strong><small>HOLZ</small></div><div class="resource"><span>🌱</span><strong id="trees">0</strong><small>BÄUME</small></div><div class="resource"><span>🪙</span><strong id="coins">0</strong><small>MÜNZEN</small></div></div>
+    </header>
+    <section class="world" aria-label="Dein Wald">
+      <div class="sky"><span class="sun">☀</span><span class="cloud cloud1">☁</span><span class="cloud cloud2">☁</span></div>
+      <div class="mountains"></div>
+      <div class="forest" id="forest"><div class="tree-placeholder">🌲</div></div>
+      <div class="cabin"><div class="roof"></div><div class="cabin-body"><div class="door"></div><div class="window"></div></div><div class="smoke">☁</div></div>
+      <div class="worker" id="worker"><div class="worker-head">🧑‍🌾</div><div class="worker-label">WILLI</div></div>
+      <div class="ground"></div>
+      <div class="world-caption"><span>DEIN ERSTER WALD</span><span id="day">TAG 1</span></div>
+    </section>
+    <section class="controls">
+      <div class="section-heading"><div><h2>Dein Forstbetrieb</h2><p>Ein Baum nach dem anderen.</p></div><span class="level" id="level">LEVEL 1</span></div>
+      <div class="actions">
+        <button class="primary" id="plant"><span>🌱</span><strong>Baum pflanzen</strong><small>Kostenlos</small></button>
+        <button id="chop"><span>🪓</span><strong>Baum fällen</strong><small>+<b id="chopGain">5</b> Holz</small></button>
+      </div>
+      <div class="production"><div><span>🪓 Holzfäller</span><strong id="workerCount">1</strong></div><div><span>🌲 Förster</span><strong id="foresterCount">0</strong></div><div><span>🏭 Sägewerk</span><strong id="millCount">0</strong></div><div><span>📦 Lager</span><strong id="capacity">100</strong></div></div>
+    </section>
+    <section class="upgrades">
+      <div class="section-heading"><div><h2>Ausbau & Upgrades</h2><p>Investiere dein Holz in die Zukunft.</p></div></div>
+      <div class="upgrade-list" id="upgrades"></div>
+    </section>
+    <footer><span>🌲 Ein Baum ist erst der Anfang.</span><button id="reset">Spiel zurücksetzen</button></footer>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+  <script src="script.js"></script>
 </body>
 </html>
