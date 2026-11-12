@@ -81,6 +81,28 @@ const sfx=(()=>{
   let ctx=null,master=null,noiseBuf=null;
   const samples={};
   let mb=null,mBar=0;
+  // Audio core: context, master and music bus, white-noise buffer and the decoded action samples (assets/sounds.js)
+  const ensure=()=>{
+    if(ctx)return ctx;
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;
+    try{ctx=new AC()}catch(e){ctx=null;return null}
+    master=ctx.createGain();master.gain.value=0.6;master.connect(ctx.destination);
+    mb=ctx.createGain();mb.gain.value=1;mb.connect(master);
+    noiseBuf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    if(typeof SOUNDS==='object')for(const k of Object.keys(SOUNDS)){try{const b=atob(SOUNDS[k]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);const p=ctx.decodeAudioData(a.buffer,buf=>{samples[k]=buf},()=>{});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+    return ctx;
+  };
+  // auto=true marks sounds triggered by the game loop: they never create or wake the context (browsers only allow that in a user gesture)
+  const ready=auto=>{
+    if(state.muted)return false;
+    if(!ctx){if(auto||!ensure())return false}
+    if(ctx.state==='suspended'){if(auto)return false;try{const p=ctx.resume();if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+    return ctx.state!=='closed';
+  };
+  const tone=(type,f0,f1,st,dur,vol)=>{const t=ctx.currentTime+st,o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(f0,t);if(f1!==f0)o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(0.0002,vol),t+Math.min(0.01,dur/4));g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+0.02)};
+  const noise=(freq,q,st,dur,vol)=>{const t=ctx.currentTime+st,s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();s.buffer=noiseBuf;f.type='bandpass';f.frequency.value=freq;f.Q.value=q;g.gain.setValueAtTime(Math.max(0.0002,vol),t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+dur+0.02)};
+  // Plays a decoded sample with slight pitch jitter; returns false while it is not decoded yet so the caller falls back to synthesis
+  const play=(name,vol,jit)=>{const b=samples[name];if(!b)return false;const s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=b;s.playbackRate.value=1+(Math.random()-0.5)*2*(jit||0);g.gain.value=vol;s.connect(g);g.connect(master);s.start();return true};
   // Automation song: a bar starts with every game tick and is built from what the automation actually did in it
   // (felled trees, sawmill sales, sawn planks, crafted furniture, dealer sales); foresters add the melody, robots the bass.
   const MSTEP=0.25;   // 8 steps of 250 ms per game tick (2 s): a calm groove instead of sixteenth-note chatter
