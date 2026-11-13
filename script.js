@@ -298,8 +298,38 @@ var time = 0, cash = 0, heat = 0, wanted = 0, crimeT = 0, bustT = 0, kills = 0, 
 var over = { t: 0, msg: '', sub: '' }, banner = { t: 0, txt: '' }, note = { t: 0, txt: '' }, curDist = -1, mission = null;
 var started = false, paused = false, spawnR = 600;
 try { best = parseInt(localStorage.getItem('asphaltkiez_best') || '0', 10) || 0; } catch (e) { best = 0; }
-function saveBest() { if (cash > best) { best = cash; try { localStorage.setItem('asphaltkiez_best', String(best)); } catch (e) { } } }
+function saveBest() { if (started) saveGame(); if (cash > best) { best = cash; try { localStorage.setItem('asphaltkiez_best', String(best)); } catch (e) { } } }
 function say(t) { note.txt = t; note.t = 3; }
+var SAVE_KEY = 'asphaltturf_save', saveT = 0, lastSave = '';
+function saveGame() {
+  var s = JSON.stringify({ v: 1, cash: cash, jobs: jobs, ammo: player.ammo, weapon: player.weapon, kills: kills, muted: muted });
+  if (s === lastSave) return;
+  lastSave = s;
+  try { localStorage.setItem(SAVE_KEY, s); } catch (e) { }
+}
+function loadGame() {
+  function num(v, max) { v = Math.floor(Number(v)); return v > 0 && isFinite(v) ? Math.min(v, max) : 0; }
+  try {
+    var d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (!d || d.v !== 1) return;
+    cash = num(d.cash, 1e9); jobs = num(d.jobs, 1e6); kills = num(d.kills, 1e9);
+    player.ammo = num(d.ammo, 9999); player.weapon = d.weapon === 1 && player.ammo > 0 ? 1 : 0; muted = d.muted === true;
+  } catch (e) { }
+}
+function showProgress() {
+  var bl = document.getElementById('best'), rb = document.getElementById('reset'), has = cash > 0 || jobs > 0;
+  if (rb) rb.hidden = !has;
+  if (!bl) return;
+  if (has) bl.textContent = 'Saved progress: $' + cash + ' · ' + RANKS[rank()][1] + ' · ' + jobs + (jobs === 1 ? ' job' : ' jobs') + (best > 0 ? ' · best $' + best : '');
+  else if (best > 0) bl.textContent = 'Your best on this device: $' + best;
+  else bl.textContent = 'On a phone: steer on the left, buttons on the right. Progress is saved on this device.';
+}
+function resetGame() {
+  cash = 0; jobs = 0; kills = 0; player.ammo = 0; player.weapon = 0; lastJob = ''; lastSave = '';
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+  if (mission) endMission();
+  showProgress();
+}
 var polT = 0, steerMode = 0, steerSet = false, jobs = 0, lastJob = '';
 var JOBS = ['deliver', 'gang', 'steal', 'taxi', 'courier', 'van'];
 var RANKS = [[0, 'Errand Boy'], [2, 'Henchman'], [4, 'Bruiser'], [7, 'Enforcer'], [10, 'Lieutenant'], [14, 'Underboss'], [19, 'Kingpin']];
@@ -344,7 +374,9 @@ window.addEventListener('keydown', function (e) {
   else if (c === 'KeyP') paused = !paused;
 });
 window.addEventListener('keyup', function (e) { keys[codeOf(e)] = false; });
-window.addEventListener('blur', function () { keys = {}; mouse.down = false; stick.id = -1; stick.x = stick.y = 0; tFire = false; });
+window.addEventListener('pagehide', function () { if (started) saveGame(); });
+document.addEventListener('visibilitychange', function () { if (started && document.hidden) saveGame(); });
+window.addEventListener('blur', function () { if (started) saveGame(); keys = {}; mouse.down = false; stick.id = -1; stick.x = stick.y = 0; tFire = false; });
 function setMouse(e) { mouse.x = e.clientX * PR; mouse.y = e.clientY * PR; mouse.t = time; }
 cv.addEventListener('pointerdown', function (e) {
   if (e.pointerType === 'touch') e.preventDefault();
@@ -1012,6 +1044,7 @@ function update(dt) {
     var di = dist[idx(clamp(Math.floor(player.x / T), 0, N - 1), clamp(Math.floor(player.y / T), 0, N - 1))];
     if (di !== curDist) { curDist = di; if (banner.t <= 0) { banner.txt = DIST[di].n; banner.t = 2.6; } }
   }
+  saveT += dt; if (saveT > 3) { saveT = 0; if (started) saveGame(); }
   if (banner.t > 0) banner.t -= dt;
   if (note.t > 0) note.t -= dt;
   populate();
@@ -1266,8 +1299,12 @@ function boot() {
     sb.addEventListener('click', function (e) { e.stopPropagation(); toggleSteer(); });
   }
   showSteer();
-  var bl = document.getElementById('best');
-  if (bl && best > 0) bl.textContent = 'Your best on this device: $' + best;
+  var rb = document.getElementById('reset');
+  if (rb) {
+    rb.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    rb.addEventListener('click', function (e) { e.stopPropagation(); resetGame(); });
+  }
+  loadGame(); showProgress();
   requestAnimationFrame(frame);
 }
 boot();

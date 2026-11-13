@@ -56,13 +56,14 @@ html, body {
 #start:hover { background: #ffd83a; }
 #start:active { transform: translateY(3px); box-shadow: 0 1px 0 #a8850c; }
 #start:focus-visible { outline: 3px solid var(--paper); outline-offset: 3px; }
-#steer {
+#steer, #reset {
   display: block; width: 100%; margin-top: 0.6em; cursor: pointer;
   padding: clamp(0.3rem, 1.4vmin, 0.55rem); font: inherit; font-size: clamp(0.62rem, 2.2vmin, 0.85rem);
   background: transparent; color: var(--paper); border: 2px solid var(--curb);
 }
-#steer:hover { border-color: var(--line); color: var(--line); }
-#steer:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
+#steer:hover, #reset:hover { border-color: var(--line); color: var(--line); }
+#reset[hidden] { display: none; }
+#steer:focus-visible, #reset:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
 .foot { margin: 0.7em 0 0; font-size: clamp(0.6rem, 2.1vmin, 0.8rem); color: var(--curb); }
 @media (max-height: 330px) { .sub, .foot { display: none; } }
 @media (max-height: 230px) { .keys { display: none; } }
