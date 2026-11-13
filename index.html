@@ -1,34 +1,42 @@
-<!doctype html>
-<html lang="en" style="background:#151515;color-scheme:dark">
+<!DOCTYPE html>
+<html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
-<title>Legend Pixel Puzzle</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>8-Bit Weltraumreise: Mars bis Proxima Centauri</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main class="game" aria-label="Legend puzzle">
-  <header><h1>LEGEND</h1><p class="status" role="status"></p></header>
-  <p class="instructions">Drag or tap two tiles to swap. Use arrows and Enter for keyboard play.</p>
-  <div class="stage">
-    <div class="board" role="group" aria-label="Six by six puzzle"></div>
-    <canvas class="reference" aria-hidden="true" hidden></canvas>
-    <div class="victory" aria-hidden="true" hidden>
-      <div class="dog-track"><div class="dog">
-        <canvas class="dog-body"></canvas>
-        <canvas class="dog-back"></canvas>
-        <canvas class="dog-front"></canvas>
-      </div></div>
-      <p class="victory-title">LEGEND!</p>
-    </div>
+  <div id="app">
+    <header id="hud">
+      <div class="hud-stats">
+        <span class="hud-pill" id="hud-stage">LVL 1/5</span>
+        <span class="hud-pill" id="hud-dist">0 MIO KM</span>
+        <span class="hud-pill" id="hud-time">TAG 0</span>
+        <span class="hud-pill" id="hud-gen">GEN 1</span>
+      </div>
+      <button id="btn-sound" type="button" aria-label="Ton umschalten">♪ TON: AUS</button>
+    </header>
+
+    <main id="stage-viewport">
+      <canvas id="space-canvas"></canvas>
+
+      <section id="dialog-box" aria-live="polite">
+        <div class="dialog-header">
+          <span id="level-title">LEVEL 1: AB ZUM NACHBARN!</span>
+          <span id="level-sub">ERDE → MARS</span>
+        </div>
+        <p id="level-text">7 Monate Flug (55–400 Mio. km). Starten geht nur alle 26 Monate, wenn die Planeten-Ampel auf Grün steht!</p>
+        <div id="controls-area"></div>
+      </section>
+    </main>
+
+    <footer id="nav-bar">
+      <button id="btn-prev" type="button" disabled>◀ ZURÜCK</button>
+      <div id="progress-dots" aria-hidden="true"></div>
+      <button id="btn-next" type="button">WEITER ▶</button>
+    </footer>
   </div>
-  <div class="controls">
-    <button class="shuffle" type="button" disabled>Shuffle</button>
-    <button class="hint" type="button" aria-pressed="false" disabled>Hint</button>
-  </div>
-</main>
-<script src="assets/pixels.js" defer></script>
-<script src="script.js" defer></script>
+  <script src="script.js"></script>
 </body>
 </html>
