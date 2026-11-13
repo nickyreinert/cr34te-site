@@ -1,42 +1,37 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>8-Bit Weltraumreise: Mars bis Proxima Centauri</title>
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Asphalt Turf</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="app">
-    <header id="hud">
-      <div class="hud-stats">
-        <span class="hud-pill" id="hud-stage">LVL 1/5</span>
-        <span class="hud-pill" id="hud-dist">0 MIO KM</span>
-        <span class="hud-pill" id="hud-time">TAG 0</span>
-        <span class="hud-pill" id="hud-gen">GEN 1</span>
-      </div>
-      <button id="btn-sound" type="button" aria-label="Ton umschalten">♪ TON: AUS</button>
-    </header>
+<canvas id="game" tabindex="0" aria-label="Asphalt Turf, a top-down city game"></canvas>
 
-    <main id="stage-viewport">
-      <canvas id="space-canvas"></canvas>
-
-      <section id="dialog-box" aria-live="polite">
-        <div class="dialog-header">
-          <span id="level-title">LEVEL 1: AB ZUM NACHBARN!</span>
-          <span id="level-sub">ERDE → MARS</span>
-        </div>
-        <p id="level-text">7 Monate Flug (55–400 Mio. km). Starten geht nur alle 26 Monate, wenn die Planeten-Ampel auf Grün steht!</p>
-        <div id="controls-area"></div>
-      </section>
-    </main>
-
-    <footer id="nav-bar">
-      <button id="btn-prev" type="button" disabled>◀ ZURÜCK</button>
-      <div id="progress-dots" aria-hidden="true"></div>
-      <button id="btn-next" type="button">WEITER ▶</button>
-    </footer>
+<div id="overlay">
+  <div class="card">
+    <h1>Asphalt Turf</h1>
+    <p class="sub">A city that is rebuilt on every visit. Take jobs, pick fights with gangs and work your way up from errand boy to kingpin.</p>
+    <dl class="keys">
+      <dt>W A S D</dt><dd>walk and drive, Shift runs</dd>
+      <dt>Mouse</dt><dd>aim, left click shoots</dd>
+      <dt>E / right click</dt><dd>get in and out</dd>
+      <dt>Space</dt><dd>handbrake (on foot: shoot)</dd>
+      <dt>Q · C · M · P</dt><dd>weapon, steering, sound, pause</dd>
+    </dl>
+    <button id="start" type="button">Click to play</button>
+    <button id="steer" type="button">Steering: driver view</button>
+    <p class="foot" id="best">On a phone: steer on the left, buttons on the right.</p>
   </div>
-  <script src="script.js"></script>
+</div>
+
+<div id="touch" aria-hidden="true">
+  <button id="bE" type="button">Door</button>
+  <button id="bF" type="button">Fire</button>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
