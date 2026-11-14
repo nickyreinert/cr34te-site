@@ -1,38 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Asphalt Turf</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Blacktop Outlaws</title>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<canvas id="game" tabindex="0" aria-label="Asphalt Turf, a top-down city game"></canvas>
-
-<div id="overlay">
-  <div class="card">
-    <h1>Asphalt Turf</h1>
-    <p class="sub">A city that is rebuilt on every visit. Take jobs, pick fights with gangs and work your way up from errand boy to kingpin.</p>
-    <dl class="keys">
-      <dt>W A S D</dt><dd>walk and drive, Shift runs</dd>
-      <dt>Mouse</dt><dd>aim, left click shoots</dd>
-      <dt>E / right click</dt><dd>get in and out</dd>
-      <dt>Space</dt><dd>handbrake (on foot: shoot)</dd>
-      <dt>Q · C · M · P</dt><dd>weapon, steering, sound, pause</dd>
-    </dl>
-    <button id="start" type="button">Click to play</button>
-    <button id="steer" type="button">Steering: driver view</button>
-    <button id="reset" type="button" hidden>Reset saved progress</button>
-    <p class="foot" id="best">On a phone: steer on the left, buttons on the right.</p>
+<main id="game" aria-label="Blacktop Outlaws">
+  <button type="button" id="mute" aria-label="Ton stummschalten" aria-pressed="false" title="Ton umschalten (M)">TON AN</button>
+  <canvas id="track" aria-label="Freight Loop racetrack from behind the kart"></canvas>
+  <div id="hud" hidden>
+    <div class="stats"><span>RUNDE <b id="lap">1 / 5</b></span><span>POS <b id="position">1 / 6</b></span><span><b id="speed">0</b> KM/H</span><span id="boostHud" hidden>⚡ <b id="boostReadout">BOOST</b></span></div>
+    <div class="equipment"><button id="item" data-tap="item">E · KEIN ITEM</button><button id="special" data-tap="special">C · SPEZIAL</button><button id="pause" aria-label="Pause race">Ⅱ</button></div>
   </div>
-</div>
-
-<div id="touch" aria-hidden="true">
-  <button id="bE" type="button">Door</button>
-  <button id="bF" type="button">Fire</button>
-</div>
-
-<script src="assets/data.js"></script>
-<script src="script.js"></script>
+  <div id="notice" role="status"></div>
+  <div id="timeout" hidden aria-label="Bomben-Treffer"></div>
+  <div id="raceBanner" role="status" aria-live="polite" hidden></div>
+  <div id="controls" hidden aria-label="Touch controls">
+    <div><button data-hold="left" aria-label="Steer left">◀</button><button data-hold="right" aria-label="Steer right">▶</button></div>
+    <div><button data-hold="brake" aria-label="Bremse">BREMSE</button><button data-hold="reverse" aria-label="Rückwärts">▼</button><button data-hold="gas" aria-label="Accelerate">▲</button></div>
+  </div>
+  <section id="menu">
+    <div class="menu-inner">
+      <p class="eyebrow">FAHRER WÄHLEN / 5 RUNDEN</p>
+      <h1>BLACKTOP<br><em>OUTLAWS</em></h1>
+      <div id="drivers" aria-label="Choose driver"></div>
+      <p id="bio"></p>
+      <button id="start">STRECKE WÄHLEN</button>
+      <p class="hint">Anklicken zum Spielen. W: Gas · A/D: Lenken · S: Rückwärts · Leertaste: Bremse · E: Item · C: Spezial · M: Ton. Beim Bremsen in Kurven kannst du driften.</p>
+    </div>
+  </section>
+  <section id="courseMenu" hidden>
+    <div class="course-inner">
+      <p class="eyebrow" id="courseDriver"></p>
+      <h2>STRECKE WÄHLEN</h2>
+      <div id="courses" aria-label="Strecke wählen"></div>
+      <p id="courseDescription"></p>
+      <button id="courseBack">ZUR FAHRERAUSWAHL</button><button id="raceStart">RENNEN STARTEN</button>
+    </div>
+  </section>
+  <section id="overlay" hidden>
+    <div class="end-panel">
+      <p class="eyebrow" id="resultTrack"></p><h2 id="result"></h2><p id="resultDetail"></p>
+      <button id="resume">WEITER</button><button id="retry">NOCH EIN RENNEN</button><button id="garage">FAHRER WECHSELN</button><button id="changeTrack">STRECKE WECHSELN</button>
+    </div>
+  </section>
+</main>
+<script src="./script.js"></script>
 </body>
 </html>
