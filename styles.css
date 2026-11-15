@@ -211,6 +211,52 @@ html, body {
 }
 #snd:hover { border-color: #fff; }
 
+#radio {
+  position: absolute;
+  left: 50%;
+  bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+#stInfo {
+  min-width: 9.5em;
+  text-align: center;
+  line-height: 1.15;
+  font-size: clamp(12px, 2.2vmin, 16px);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(20, 0, 40, 0.95), 0 0 8px rgba(255, 70, 170, 0.7);
+}
+#stFreq {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffc24a;
+}
+#stName { font-style: italic; font-weight: 900; }
+#radio.flash #stInfo { animation: tuned 0.9s ease-out; }
+@keyframes tuned {
+  0% { transform: scale(1.25); text-shadow: 0 0 18px #ff5fb8, 0 0 30px #ffc24a; }
+  100% { transform: scale(1); }
+}
+.tune {
+  font: inherit;
+  font-size: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: #fff;
+  background: rgba(30, 8, 50, 0.6);
+  border: 1px solid rgba(255, 120, 200, 0.6);
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.tune:hover { border-color: #fff; }
+#hostBtn[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
+
+
 @media (prefers-reduced-motion: reduce) {
-  .sep, #hint { animation: none; }
+  .sep, #hint, #radio.flash #stInfo { animation: none; }
 }

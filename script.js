@@ -722,29 +722,13 @@
     }
   }
 
-  // ---------- music: an original synth loop made with Web Audio ----------
+  // ---------- radio: four original stations made with Web Audio ----------
   var AC = window.AudioContext || window.webkitAudioContext;
-  var ac = null, master = null, delayIn = null, noiseBuf = null;
-  var musicOn = false, nextStep = 0, nextTime = 0, timer = null;
-  var BPM = 96, STEP = 60 / BPM / 4;
-  var BARS = [
-    { bass: 38, pad: [62, 65, 69] },
-    { bass: 34, pad: [62, 65, 70] },
-    { bass: 41, pad: [60, 65, 69] },
-    { bass: 36, pad: [60, 64, 67] }
-  ];
-  var LEAD = [
-    [[0, 74, 3], [4, 77, 2], [8, 81, 4], [14, 79, 2]],
-    [[0, 77, 6], [8, 74, 2], [12, 70, 4]],
-    [[0, 72, 3], [4, 77, 2], [8, 81, 4], [14, 84, 2]],
-    [[0, 79, 8], [10, 76, 2], [12, 72, 4]],
-    [[0, 74, 3], [4, 77, 2], [8, 81, 4], [14, 82, 2]],
-    [[0, 82, 4], [6, 81, 2], [8, 77, 6]],
-    [[0, 81, 3], [4, 77, 2], [8, 72, 4], [14, 69, 2]],
-    [[0, 72, 4], [4, 76, 4], [8, 79, 8]]
-  ];
+  var ac = null, master = null, duck = null, noiseBuf = null, bus = null;
+  var musicOn = false, nextStep = 0, nextTime = 0, timer = null, STEP = 60 / 96 / 4;
   function hz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
+  // sustained note with a soft attack
   function voice(type, freq, t, dur, vol, cutoff, dest, detune) {
     var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
     o.type = type; o.frequency.value = freq;
@@ -757,62 +741,442 @@
     o.connect(f); f.connect(g); g.connect(dest);
     o.start(t); o.stop(t + dur + 0.05);
   }
-  function kick(t) {
+  // plucked note: hard attack, decaying level and filter
+  function pluck(type, freq, t, dur, vol, cutoff, dest, detune) {
+    var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    if (detune) o.detune.value = detune;
+    f.type = 'lowpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(cutoff, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(90, cutoff * 0.25), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); f.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  // electric piano: sine body with a little bell on top
+  function rhodes(freq, t, dur, vol, dest) {
+    var o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain(), g2 = ac.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    o2.type = 'triangle'; o2.frequency.value = freq * 2;
+    g2.gain.setValueAtTime(0.3, t);
+    g2.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(dest);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+  // bright bell for pop hooks
+  function bell(freq, t, dur, vol, dest) {
+    var o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain(), g2 = ac.createGain();
+    o.type = 'triangle'; o.frequency.value = freq;
+    o2.type = 'sine'; o2.frequency.value = freq * 3;
+    g2.gain.setValueAtTime(0.35, t);
+    g2.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(dest);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+  function kick(t, dest, f0, f1, len, vol) {
     var o = ac.createOscillator(), g = ac.createGain();
     o.type = 'sine';
-    o.frequency.setValueAtTime(140, t);
-    o.frequency.exponentialRampToValueAtTime(45, t + 0.14);
-    g.gain.setValueAtTime(0.9, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + 0.3);
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + len * 0.5);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + len);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + len + 0.02);
   }
-  function noise(t, dur, vol, hp) {
+  // filtered noise; gate=true holds the level and cuts it off (80s gated snare)
+  function noise(t, dur, vol, freq, dest, type, gate) {
     var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
     s.buffer = noiseBuf;
-    f.type = 'highpass'; f.frequency.value = hp;
+    f.type = type || 'highpass'; f.frequency.value = freq;
     g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    s.connect(f); f.connect(g); g.connect(master);
-    s.start(t); s.stop(t + dur + 0.02);
+    if (gate) {
+      g.gain.setValueAtTime(vol * 0.8, t + dur * 0.8);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    } else {
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    }
+    s.connect(f); f.connect(g); g.connect(dest);
+    s.start(t, Math.random() * 0.4); s.stop(t + dur + 0.02);
   }
-  function scheduleStep(n, t) {
-    var bar = Math.floor(n / 16), st = n % 16;
-    var ch = BARS[bar % 4], loop = Math.floor(bar / 8);
-    // bass pulse
-    voice('sawtooth', hz(ch.bass + (st % 4 === 2 ? 12 : 0)), t, STEP * 0.92, 0.22, 420, master, 0);
-    // pad
+  // turntable scratch: a swept band of noise, forwards and back
+  function scratch(t, dest, len) {
+    var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noiseBuf;
+    f.type = 'bandpass'; f.Q.value = 7;
+    f.frequency.setValueAtTime(450, t);
+    f.frequency.exponentialRampToValueAtTime(2600, t + len * 0.4);
+    f.frequency.exponentialRampToValueAtTime(380, t + len);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.55, t + 0.02);
+    g.gain.setValueAtTime(0.55, t + len * 0.4);
+    g.gain.linearRampToValueAtTime(0.04, t + len * 0.5);
+    g.gain.linearRampToValueAtTime(0.45, t + len * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.001, t + len);
+    s.connect(f); f.connect(g); g.connect(dest);
+    s.start(t, Math.random() * 0.4); s.stop(t + len + 0.02);
+  }
+
+  // --- 96.0 Causeway FM: the original synthwave loop ---
+  var CW_BARS = [
+    { bass: 38, pad: [62, 65, 69] },
+    { bass: 34, pad: [62, 65, 70] },
+    { bass: 41, pad: [60, 65, 69] },
+    { bass: 36, pad: [60, 64, 67] }
+  ];
+  var CW_LEAD = [
+    [[0, 74, 3], [4, 77, 2], [8, 81, 4], [14, 79, 2]],
+    [[0, 77, 6], [8, 74, 2], [12, 70, 4]],
+    [[0, 72, 3], [4, 77, 2], [8, 81, 4], [14, 84, 2]],
+    [[0, 79, 8], [10, 76, 2], [12, 72, 4]],
+    [[0, 74, 3], [4, 77, 2], [8, 81, 4], [14, 82, 2]],
+    [[0, 82, 4], [6, 81, 2], [8, 77, 6]],
+    [[0, 81, 3], [4, 77, 2], [8, 72, 4], [14, 69, 2]],
+    [[0, 72, 4], [4, 76, 4], [8, 79, 8]]
+  ];
+  function playCauseway(n, t, b) {
+    var bar = Math.floor(n / 16), st = n % 16, ch = CW_BARS[bar % 4], i;
+    voice('sawtooth', hz(ch.bass + (st % 4 === 2 ? 12 : 0)), t, STEP * 0.92, 0.22, 420, b.out, 0);
     if (st === 0) {
-      for (var i = 0; i < ch.pad.length; i++) {
-        voice('sawtooth', hz(ch.pad[i]), t, STEP * 16, 0.045, 1100, master, -7);
-        voice('sawtooth', hz(ch.pad[i]), t, STEP * 16, 0.045, 1100, master, 7);
+      for (i = 0; i < ch.pad.length; i++) {
+        voice('sawtooth', hz(ch.pad[i]), t, STEP * 16, 0.045, 1100, b.out, -7);
+        voice('sawtooth', hz(ch.pad[i]), t, STEP * 16, 0.045, 1100, b.out, 7);
       }
     }
-    // drums come in after the first four bars
     if (bar >= 4) {
-      if (st % 4 === 0) kick(t);
-      if (st === 4 || st === 12) noise(t, 0.2, 0.28, 1400);
-      if (st % 2 === 0) noise(t, 0.04, st % 4 === 2 ? 0.1 : 0.05, 7000);
-    }
-    // lead from the second pass onwards
-    if (loop >= 1 || bar >= 4) {
-      var notes = LEAD[bar % 8];
-      for (var k = 0; k < notes.length; k++) {
-        if (notes[k][0] === st) {
-          voice('square', hz(notes[k][1]), t, STEP * notes[k][2] * 0.95, 0.07, 2600, delayIn, 0);
-          voice('sawtooth', hz(notes[k][1]), t, STEP * notes[k][2] * 0.95, 0.04, 2200, delayIn, 9);
+      if (st % 4 === 0) kick(t, b.out, 140, 45, 0.28, 0.9);
+      if (st === 4 || st === 12) noise(t, 0.2, 0.28, 1400, b.out);
+      if (st % 2 === 0) noise(t, 0.04, st % 4 === 2 ? 0.1 : 0.05, 7000, b.out);
+      var notes = CW_LEAD[bar % 8];
+      for (i = 0; i < notes.length; i++) {
+        if (notes[i][0] === st) {
+          voice('square', hz(notes[i][1]), t, STEP * notes[i][2] * 0.95, 0.07, 2600, b.fx, 0);
+          voice('sawtooth', hz(notes[i][1]), t, STEP * notes[i][2] * 0.95, 0.04, 2200, b.fx, 9);
         }
       }
     }
   }
-  function pump() {
+
+  // --- 104.2 Neon Drive: fast italo / outrun with octave bass and arpeggios ---
+  var ND_BARS = [
+    { bass: 33, ch: [57, 60, 64] },
+    { bass: 29, ch: [57, 60, 65] },
+    { bass: 36, ch: [55, 60, 64] },
+    { bass: 31, ch: [55, 59, 62] }
+  ];
+  var ND_ARP = [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 3];
+  var ND_LEAD = [
+    [[0, 76, 4], [4, 74, 2], [6, 72, 2], [8, 76, 6], [14, 79, 2]],
+    [[0, 77, 6], [8, 76, 2], [10, 74, 2], [12, 72, 4]],
+    [[0, 72, 4], [4, 74, 2], [6, 76, 2], [8, 79, 8]],
+    [[0, 79, 4], [4, 77, 2], [6, 76, 2], [8, 74, 8]]
+  ];
+  function playNeon(n, t, b) {
+    var bar = Math.floor(n / 16), st = n % 16, c = ND_BARS[bar % 4], i;
+    pluck('sawtooth', hz(c.bass + (st % 2 ? 12 : 0)), t, STEP * 0.9, 0.2, 1000, b.out, 0);
+    if (st === 0) {
+      for (i = 0; i < c.ch.length; i++) {
+        voice('sawtooth', hz(c.ch[i]), t, STEP * 16, 0.028, 900, b.out, -10);
+        voice('sawtooth', hz(c.ch[i]), t, STEP * 16, 0.028, 900, b.out, 10);
+      }
+    }
+    if (bar >= 2) {
+      var tones = [c.ch[0], c.ch[1], c.ch[2], c.ch[0] + 12];
+      pluck('square', hz(tones[ND_ARP[st]] + 12), t, STEP * 1.6, 0.035, 3200, b.fx, 0);
+    }
+    if (bar >= 4) {
+      if (st % 4 === 0) kick(t, b.out, 150, 48, 0.25, 0.85);
+      if (st === 4 || st === 12) {
+        noise(t, 0.3, 0.26, 1200, b.fx);
+        voice('triangle', 190, t, 0.08, 0.12, 2000, b.out, 0);
+      }
+      if (st % 4 === 2) noise(t, 0.09, 0.08, 8000, b.out);
+      else if (st % 2 === 1) noise(t, 0.03, 0.035, 9000, b.out);
+      if (bar % 8 === 7 && st >= 12) kick(t, b.out, 260 - (st - 12) * 40, 90, 0.18, 0.45);
+    }
+    if (bar % 16 >= 8) {
+      var notes = ND_LEAD[bar % 4];
+      for (i = 0; i < notes.length; i++) {
+        if (notes[i][0] === st) {
+          voice('sawtooth', hz(notes[i][1]), t, STEP * notes[i][2] * 0.95, 0.05, 3000, b.fx, -6);
+          voice('sawtooth', hz(notes[i][1]), t, STEP * notes[i][2] * 0.95, 0.05, 3000, b.fx, 6);
+        }
+      }
+    }
+  }
+
+  // --- 89.7 Block Party: swung boom-bap with dusty keys, horns and scratches ---
+  var BP_BARS = [
+    { bass: 38, ch: [60, 64, 65, 69] },
+    { bass: 38, ch: [60, 64, 65, 69] },
+    { bass: 43, ch: [58, 62, 65, 69] },
+    { bass: 45, ch: [61, 64, 67, 71] }
+  ];
+  var BP_BASS = [[0, 0, 5], [7, 0, 2], [10, 0, 3], [14, -2, 2]];
+  function playBlock(n, t, b) {
+    var bar = Math.floor(n / 16), st = n % 16, c = BP_BARS[bar % 4], i;
+    if (Math.random() < 0.35) noise(t + Math.random() * STEP, 0.006, 0.06 + Math.random() * 0.08, 2500, b.out);
+    if (st === 0 || (st === 10 && bar % 2 === 1)) {
+      for (i = 0; i < c.ch.length; i++) rhodes(hz(c.ch[i]), t + i * 0.008, STEP * (st === 0 ? 9 : 5), 0.05, b.fx);
+    }
+    if (bar >= 1) {
+      for (i = 0; i < BP_BASS.length; i++) {
+        if (BP_BASS[i][0] === st) voice('triangle', hz(c.bass + BP_BASS[i][1]), t, STEP * BP_BASS[i][2], 0.32, 500, b.out, 0);
+      }
+    }
+    if (bar >= 2) {
+      if (st === 0 || st === 7 || st === 10 || (st === 15 && bar % 2 === 1)) kick(t, b.out, 120, 42, 0.4, 1.0);
+      if (st === 4 || st === 12) {
+        noise(t, 0.22, 0.34, 1100, b.out, 'bandpass');
+        voice('triangle', 180, t, 0.1, 0.15, 1500, b.out, 0);
+      }
+      if (st % 2 === 0) noise(t, 0.035, st % 4 === 2 ? 0.07 : 0.045, 7000, b.out);
+      else if (Math.random() < 0.25) noise(t, 0.02, 0.025, 8000, b.out);
+    }
+    if (bar >= 3 && bar % 4 === 3 && (st === 12 || st === 14)) scratch(t, b.out, STEP * 1.8);
+    if (bar >= 8 && bar % 8 >= 4 && (st === 0 || st === 3)) {
+      for (i = 1; i < c.ch.length; i++) {
+        pluck('sawtooth', hz(c.ch[i]), t, STEP * (st === 0 ? 2.5 : 1.5), 0.03, 2200, b.out, -8);
+        pluck('sawtooth', hz(c.ch[i]), t, STEP * (st === 0 ? 2.5 : 1.5), 0.03, 2200, b.out, 8);
+      }
+    }
+  }
+
+  // --- 101.5 Palmline Pop: bright 80s pop with gated snare and a bell hook ---
+  var PP_BARS = [
+    { bass: 36, ch: [60, 64, 67] },
+    { bass: 43, ch: [59, 62, 67] },
+    { bass: 45, ch: [60, 64, 69] },
+    { bass: 41, ch: [60, 65, 69] }
+  ];
+  var PP_LEAD = [
+    [[0, 72, 2], [2, 72, 2], [4, 74, 2], [6, 76, 4], [12, 74, 2], [14, 72, 2]],
+    [[0, 74, 4], [4, 71, 2], [6, 67, 6], [12, 71, 2], [14, 74, 2]],
+    [[0, 76, 2], [2, 76, 2], [4, 77, 2], [6, 79, 4], [12, 77, 2], [14, 76, 2]],
+    [[0, 77, 4], [4, 76, 2], [6, 74, 2], [8, 72, 8]]
+  ];
+  function playPalm(n, t, b) {
+    var bar = Math.floor(n / 16), st = n % 16, c = PP_BARS[bar % 4], i;
+    if (st % 2 === 0) pluck('sawtooth', hz(c.bass + (st === 6 || st === 14 ? 12 : 0)), t, STEP * 1.8, 0.22, 1200, b.out, 0);
+    if (st === 0 || st === 3 || st === 6 || st === 10) {
+      for (i = 0; i < c.ch.length; i++) {
+        pluck('sawtooth', hz(c.ch[i]), t, STEP * (st === 10 ? 5 : 2.5), 0.03, 2600, b.fx, -8);
+        pluck('sawtooth', hz(c.ch[i]), t, STEP * (st === 10 ? 5 : 2.5), 0.03, 2600, b.fx, 8);
+      }
+    }
+    if (bar >= 2) {
+      if (st % 8 === 0 || st === 10) kick(t, b.out, 130, 50, 0.3, 0.9);
+      if (st === 4 || st === 12) {
+        // tighter snare: tonal body plus a short band of noise, kept out of the echo
+        voice('triangle', 200, t, 0.09, 0.2, 1800, b.out, 0);
+        noise(t, 0.16, 0.22, 1900, b.out, 'bandpass', true);
+        noise(t + 0.012, 0.05, 0.12, 1400, b.out, 'bandpass');
+      }
+      if (st % 2 === 0) noise(t, 0.025, st % 4 === 2 ? 0.05 : 0.03, 8000, b.out);
+    }
+    if (bar >= 4 && bar % 8 >= 4) {
+      var notes = PP_LEAD[bar % 4];
+      for (i = 0; i < notes.length; i++) {
+        if (notes[i][0] === st) bell(hz(notes[i][1] + 12), t, STEP * notes[i][2] * 1.4, 0.09, b.fx);
+      }
+    }
+  }
+
+  var STATIONS = [
+    {
+      freq: '96.0', name: 'Causeway FM', genre: 'Synthwave', bpm: 96, swing: 0, delay: 3, play: playCauseway, clips: [0, 1, 2]
+    },
+    {
+      freq: '104.2', name: 'Neon Drive', genre: 'Italo and outrun', bpm: 118, swing: 0, delay: 3, play: playNeon, clips: [3]
+    },
+    {
+      freq: '89.7', name: 'Block Party', genre: 'Golden-era hip-hop', bpm: 88, swing: 0.22, delay: 2, play: playBlock, clips: []
+    },
+    {
+      freq: '101.5', name: 'Palmline Pop', genre: '80s pop hits', bpm: 120, swing: 0, delay: 3, play: playPalm, clips: []
+    }
+  ];
+  var station = 0;
+  try { station = parseInt(window.localStorage.getItem('causeway_station'), 10) || 0; } catch (e) { station = 0; }
+  if (!(station >= 0 && station < STATIONS.length)) station = 0;
+
+  function makeBus(delaySteps) {
+    var b = { out: ac.createGain(), fx: ac.createGain(), d: ac.createDelay(1) };
+    var fb = ac.createGain(), wet = ac.createGain();
+    b.out.connect(duck);
+    b.d.delayTime.value = Math.min(0.95, STEP * delaySteps);
+    fb.gain.value = 0.35; wet.gain.value = 0.4;
+    b.fx.connect(b.out);
+    b.fx.connect(b.d); b.d.connect(fb); fb.connect(b.d); b.d.connect(wet); wet.connect(b.out);
+    return b;
+  }
+  function dropBus(b) {
+    if (!b) return;
+    var t = ac.currentTime;
+    b.out.gain.cancelScheduledValues(t);
+    b.out.gain.setValueAtTime(b.out.gain.value, t);
+    b.out.gain.linearRampToValueAtTime(0, t + 0.06);
+    setTimeout(function () {
+      try { b.out.disconnect(); b.fx.disconnect(); b.d.disconnect(); } catch (e) { /* already gone */ }
+    }, 3000);
+  }
+  function duckTo(v) {
+    if (!ac || !duck) return;
+    duck.gain.cancelScheduledValues(ac.currentTime);
+    duck.gain.setTargetAtTime(v, ac.currentTime, 0.12);
+  }
+
+  // --- host: recorded voice clips (assets/radio-clips.js) plus radio-text captions ---
+  var hostVoice = true;
+  try { hostVoice = window.localStorage.getItem('causeway_host') !== 'off'; } catch (e) { hostVoice = true; }
+  var talking = false, talkEnd = 0, nextTalk = Infinity, nextTaxi = Infinity, talkIdent = false;
+  var lastClip = -1, playing = [];
+  var talkRand = rng((Date.now() & 0xffff) + 99);
+  var clips = { stat: null, taxi: null, voice: [] }, clipsLoading = false;
+  function b64buf(s) {
+    var bin = window.atob(s), a = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    return a.buffer;
+  }
+  function decodeClip(s, done) {
+    try {
+      var p = ac.decodeAudioData(b64buf(s), function (buf) { done(buf); }, function () { /* undecodable: skip it */ });
+      if (p && p.catch) p.catch(function () { /* handled by the error callback */ });
+    } catch (e) { /* skip it */ }
+  }
+  // voice slots 0-2: the 96.0 announcer; 3: the 104.2 announcer
+  function keepClip(i, data) {
+    decodeClip(data, function (b) { clips.voice[i] = b; });
+  }
+  function loadClips() {
+    var src = window.CAUSEWAY_CLIPS, i;
+    if (clipsLoading || !ac || !src) return;
+    clipsLoading = true;
+    if (src.static) decodeClip(src.static, function (b) { clips.stat = b; });
+    if (src.taxi) decodeClip(src.taxi, function (b) { clips.taxi = b; });
+    var all = src.voice || [];
+    for (i = 0; i < all.length; i++) if (all[i]) keepClip(i, all[i]);
+  }
+  // play a decoded clip; radio=true squeezes it into a narrow, AM-like band
+  function playClip(buf, vol, offset, dur, radio) {
+    var s = ac.createBufferSource(), hp = ac.createBiquadFilter(), lp = ac.createBiquadFilter(), g = ac.createGain();
+    var t = ac.currentTime + 0.02;
+    s.buffer = buf;
+    hp.type = 'highpass'; hp.frequency.value = radio ? 400 : 110;
+    lp.type = 'lowpass'; lp.frequency.value = radio ? 3000 : 7500;
+    g.gain.setValueAtTime(vol, t);
+    s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master);
+    if (dur) {
+      g.gain.setValueAtTime(vol, t + Math.max(0, dur - 0.08));
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      s.start(t, offset || 0, dur);
+    } else {
+      s.start(t, offset || 0);
+    }
+    return s;
+  }
+  function sting() {
+    var t = ac.currentTime + 0.05, n = [0, 4, 7, 12];
+    for (var i = 0; i < n.length; i++) bell(hz(79 + n[i]), t + i * 0.08, 0.5, 0.05, master);
+  }
+  function startTalk(ms, duckLevel) {
+    talking = true;
+    talkEnd = Date.now() + ms;
+    duckTo(duckLevel);
+  }
+  function quiet() {
+    talking = false;
+    for (var i = 0; i < playing.length; i++) { try { playing[i].stop(); } catch (e) { /* already stopped */ } }
+    playing = [];
+    duckTo(1);
+  }
+  function endTalk() {
+    quiet();
+    nextTalk = Date.now() + 25000 + talkRand() * 25000;
+  }
+  function stopTalk() {
+    quiet();
+    nextTalk = Infinity;
+  }
+  function checkTalk() {
+    var now = Date.now();
+    if (talking) { if (now > talkEnd) endTalk(); return; }
+    var S = STATIONS[station];
+    // now and then a taxi dispatcher bleeds into the signal
+    if (hostVoice && clips.taxi && now > nextTaxi && now < nextTalk - 8000) {
+      nextTaxi = now + 100000 + talkRand() * 120000;
+      startTalk(clips.taxi.duration * 1000 + 200, 0.6);
+      playing.push(playClip(clips.taxi, 0.7, 0, 0, true));
+      return;
+    }
+    if (now < nextTalk) return;
+    var ident = talkIdent;
+    talkIdent = false;
+    var mine = [], i;
+    for (i = 0; i < S.clips.length; i++) if (clips.voice[S.clips[i]]) mine.push(S.clips[i]);
+    // no voice on this station (or the host is muted): stay with the music
+    if (!hostVoice || !mine.length) { nextTalk = now + 25000 + talkRand() * 25000; return; }
+    if (!ident && talkRand() < 0.35) { nextTalk = now + 15000 + talkRand() * 15000; return; }
+    if (ident) sting();
+    var k = mine[(talkRand() * mine.length) | 0];
+    if (k === lastClip && mine.length > 1) k = mine[(mine.indexOf(k) + 1) % mine.length];
+    lastClip = k;
+    startTalk(clips.voice[k].duration * 1000 + 300, 0.25);
+    playing.push(playClip(clips.voice[k], 1, 0, 0, false));
+  }
+
+  // --- tuner ---
+  var elRadio = document.getElementById('radio'), elFreq = document.getElementById('stFreq');
+  var elStName = document.getElementById('stName');
+  function showStation() {
+    var S = STATIONS[station];
+    elFreq.textContent = S.freq;
+    elStName.textContent = S.name;
+    elRadio.classList.remove('flash');
+    void elRadio.offsetWidth;
+    elRadio.classList.add('flash');
+  }
+  function tune(idx, withStatic) {
+    station = ((idx % STATIONS.length) + STATIONS.length) % STATIONS.length;
+    try { window.localStorage.setItem('causeway_station', String(station)); } catch (e) { /* no storage */ }
+    showStation();
     if (!ac || !musicOn) return;
+    var S = STATIONS[station];
+    STEP = 60 / S.bpm / 4;
+    dropBus(bus);
+    bus = makeBus(S.delay);
+    nextStep = 0;
+    nextTime = ac.currentTime + (withStatic ? 0.3 : 0.08);
+    if (withStatic && clips.stat) {
+      playClip(clips.stat, 0.6, talkRand() * Math.max(0, clips.stat.duration - 0.6), 0.45, false);
+    } else if (withStatic) {
+      noise(ac.currentTime, 0.3, 0.2, 700, master, 'bandpass');
+      noise(ac.currentTime + 0.05, 0.2, 0.1, 3000, master, 'bandpass');
+    }
+    stopTalk();
+    talkIdent = true;
+    nextTalk = Date.now() + 2200;
+    nextTaxi = Date.now() + 60000 + talkRand() * 90000;
+    pump();
+  }
+
+  function pump() {
+    if (!ac || !musicOn || !bus) return;
     if (nextTime < ac.currentTime) nextTime = ac.currentTime + 0.05;
+    var S = STATIONS[station];
     while (nextTime < ac.currentTime + 0.25) {
-      scheduleStep(nextStep, nextTime);
+      S.play(nextStep, nextTime + (nextStep % 2 ? S.swing * STEP : 0), bus);
       nextStep++;
       nextTime += STEP;
     }
+    checkTalk();
   }
   function initAudio() {
     if (ac || !AC) return;
@@ -821,14 +1185,12 @@
     master.gain.value = 0;
     var comp = ac.createDynamicsCompressor();
     master.connect(comp); comp.connect(ac.destination);
-    delayIn = ac.createGain();
-    var d = ac.createDelay(1), fb = ac.createGain(), wet = ac.createGain();
-    d.delayTime.value = STEP * 3; fb.gain.value = 0.35; wet.gain.value = 0.4;
-    delayIn.connect(master);
-    delayIn.connect(d); d.connect(fb); fb.connect(d); d.connect(wet); wet.connect(master);
-    noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
+    duck = ac.createGain();
+    duck.connect(master);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
     var data = noiseBuf.getChannelData(0);
     for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    loadClips();
   }
   var btn = document.getElementById('snd'), hint = document.getElementById('hint');
   function setMusic(on) {
@@ -838,16 +1200,18 @@
         if (!ac) { btn.textContent = 'Music: unavailable'; hint.classList.add('gone'); return; }
         if (ac.state === 'suspended') ac.resume();
         musicOn = true;
-        nextTime = ac.currentTime + 0.08;
         master.gain.cancelScheduledValues(ac.currentTime);
         master.gain.setTargetAtTime(0.55, ac.currentTime, 0.3);
         if (!timer) timer = setInterval(pump, 50);
-        pump();
+        tune(station, false);
       } else {
         musicOn = false;
+        stopTalk();
         if (ac) {
           master.gain.cancelScheduledValues(ac.currentTime);
           master.gain.setTargetAtTime(0, ac.currentTime, 0.08);
+          dropBus(bus);
+          bus = null;
         }
       }
     } catch (e) {
@@ -867,12 +1231,39 @@
     startRun();
     setMusic(true);
   }
-  btn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  // next or previous station; turns the radio on if it was off
+  function changeStation(dir) {
+    begin();
+    if (musicOn) tune(station + dir, true);
+    else { tune(station + dir, false); setMusic(true); }
+  }
+  showStation();
+  function noSteer(el) { el.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); }
+  noSteer(btn);
   btn.addEventListener('click', function (e) {
     e.stopPropagation();
     if (!begun) { begin(); return; }
     setMusic(!musicOn);
   });
+  var stUp = document.getElementById('stUp'), stDown = document.getElementById('stDown');
+  noSteer(stUp); noSteer(stDown);
+  stUp.addEventListener('click', function (e) { e.stopPropagation(); changeStation(1); });
+  stDown.addEventListener('click', function (e) { e.stopPropagation(); changeStation(-1); });
+  // host voice on/off (captions stay either way)
+  var hostBtn = document.getElementById('hostBtn');
+  function showHost() {
+    hostBtn.setAttribute('aria-pressed', hostVoice ? 'true' : 'false');
+    hostBtn.title = hostVoice ? 'Host voice on (H)' : 'Host voice off (H)';
+  }
+  function toggleHost() {
+    hostVoice = !hostVoice;
+    try { window.localStorage.setItem('causeway_host', hostVoice ? 'on' : 'off'); } catch (e) { /* no storage */ }
+    if (!hostVoice && talking && playing.length) endTalk();
+    showHost();
+  }
+  showHost();
+  noSteer(hostBtn);
+  hostBtn.addEventListener('click', function (e) { e.stopPropagation(); toggleHost(); });
   app.addEventListener('pointerdown', function (e) {
     var r = app.getBoundingClientRect();
     touches[e.pointerId] = e.clientX < r.left + r.width / 2 ? -1 : 1;
@@ -886,7 +1277,13 @@
     var c = e.code;
     if (c === 'ArrowLeft' || c === 'KeyA') { keys.left = true; e.preventDefault(); }
     else if (c === 'ArrowRight' || c === 'KeyD') { keys.right = true; e.preventDefault(); }
+    else if (c === 'ArrowUp' || c === 'KeyW' || c === 'ArrowDown' || c === 'KeyS') {
+      e.preventDefault();
+      if (!e.repeat) changeStation(c === 'ArrowUp' || c === 'KeyW' ? 1 : -1);
+      return;
+    }
     else if (c === 'KeyM' && !e.repeat && begun) { setMusic(!musicOn); return; }
+    else if (c === 'KeyH') { if (!e.repeat) toggleHost(); return; }
     begin();
   });
   window.addEventListener('keyup', function (e) {
