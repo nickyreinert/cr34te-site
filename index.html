@@ -26,12 +26,18 @@
   </div>
 
   <div id="msg" hidden>Crash! Starting over</div>
-  <div id="hint">Click or tap to drive<small>Steer: &larr; &rarr; or A D, or hold the left or right side of the screen.<br>Speed: &uarr; &darr; or W S, or the gas and brake buttons. Dodge the slower cars.</small></div>
+  <div id="hint">Click or tap to drive<small>Steer: &larr; &rarr; or A D, or hold the left or right side of the screen.<br>Speed: &uarr; &darr; or W S, or the gas and brake buttons. Dodge the slower cars.<br>Radio: O and P switch stations, H mutes the host voice.</small></div>
   <div class="arrow" id="aL" aria-hidden="true">&#9664;</div>
   <div class="arrow" id="aR" aria-hidden="true">&#9654;</div>
   <div id="pedals">
     <button id="brake" class="pedal" type="button" aria-label="Brake">BRAKE</button>
     <button id="gas" class="pedal" type="button" aria-label="Gas">GAS</button>
+  </div>
+  <div id="radio">
+    <button id="stDown" class="tune" type="button" aria-label="Previous station">&#9660;</button>
+    <div id="stInfo" aria-live="polite"><span id="stFreq">96.0</span> <b id="stName">Causeway FM</b></div>
+    <button id="stUp" class="tune" type="button" aria-label="Next station">&#9650;</button>
+    <button id="hostBtn" class="tune" type="button" aria-label="Host voice" aria-pressed="true">&#127897;</button>
   </div>
   <div id="bottom">
     <div id="speed">0 km/h</div>
@@ -39,6 +45,7 @@
     <button id="snd" type="button" aria-pressed="false">Music: off</button>
   </div>
 </div>
+<script src="assets/radio-clips.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
