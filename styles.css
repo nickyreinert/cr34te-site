@@ -77,7 +77,7 @@ html, body {
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #ffd9ee;
+  color: #ffffff;
   margin-top: 0.5em;
   text-shadow: 0 1px 3px rgba(20, 0, 40, 0.95);
 }
@@ -105,7 +105,7 @@ html, body {
   font-size: clamp(8px, 1.5vmin, 12px);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 225, 245, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   text-shadow: 0 1px 3px rgba(20, 0, 40, 0.95);
 }
 
@@ -175,6 +175,42 @@ html, body {
 #aL { left: 10px; }
 #aR { right: 10px; }
 
+#pedals {
+  position: absolute;
+  right: 72px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 8px;
+}
+.pedal {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #fff;
+  width: 58px;
+  height: 52px;
+  background: rgba(30, 8, 50, 0.55);
+  border: 1px solid rgba(255, 120, 200, 0.7);
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: none;
+}
+#gas { background: rgba(30, 120, 60, 0.6); }
+#brake { background: rgba(160, 30, 40, 0.6); }
+.pedal:active { filter: brightness(1.5); }
+#speed {
+  font-size: clamp(11px, 2vmin, 15px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(20, 0, 40, 0.95);
+  min-width: 5.5em;
+  text-align: right;
+}
+
 #bottom {
   position: absolute;
   left: 50%;
@@ -192,7 +228,7 @@ html, body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(20, 0, 40, 0.95), 0 0 8px rgba(255, 70, 170, 0.7);
+  text-shadow: 0 1px 3px rgba(20, 0, 40, 0.95);
 }
 #snd {
   font: inherit;
@@ -211,52 +247,21 @@ html, body {
 }
 #snd:hover { border-color: #fff; }
 
-#radio {
-  position: absolute;
-  left: 50%;
-  bottom: calc(52px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  pointer-events: none;
-}
-#stInfo {
-  min-width: 9.5em;
-  text-align: center;
-  line-height: 1.15;
-  font-size: clamp(12px, 2.2vmin, 16px);
-  color: #fff;
-  text-shadow: 0 1px 3px rgba(20, 0, 40, 0.95), 0 0 8px rgba(255, 70, 170, 0.7);
-}
-#stFreq {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #ffc24a;
-}
-#stName { font-style: italic; font-weight: 900; }
-#radio.flash #stInfo { animation: tuned 0.9s ease-out; }
-@keyframes tuned {
-  0% { transform: scale(1.25); text-shadow: 0 0 18px #ff5fb8, 0 0 30px #ffc24a; }
-  100% { transform: scale(1); }
-}
-.tune {
-  font: inherit;
-  font-size: 12px;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  color: #fff;
-  background: rgba(30, 8, 50, 0.6);
-  border: 1px solid rgba(255, 120, 200, 0.6);
-  border-radius: 50%;
-  cursor: pointer;
-  pointer-events: auto;
-}
-.tune:hover { border-color: #fff; }
-#hostBtn[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
-
-
 @media (prefers-reduced-motion: reduce) {
-  .sep, #hint, #radio.flash #stInfo { animation: none; }
+  .sep, #hint { animation: none; }
+}
+
+@media (max-width: 620px) {
+  #pedals {
+    right: 50%;
+    transform: translateX(50%);
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .pedal { width: 64px; height: 46px; }
+  #bottom {
+    bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    gap: 8px;
+  }
+  #snd { padding: 6px 8px; min-height: 30px; font-size: 11px; }
+  .arrow { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
 }
