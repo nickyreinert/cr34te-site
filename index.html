@@ -1,51 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Causeway Countdown</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>VICE NIGHTS: LEGENDS MEMORY</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div id="app">
-  <canvas id="scene" aria-label="A car driving over a bridge towards a city skyline at sunset"></canvas>
+  <div id="app">
+    <svg id="bg-mural" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <radialGradient id="redGlow" cx="50%" cy="45%" r="65%">
+          <stop offset="0%" stop-color="#5c0628" />
+          <stop offset="55%" stop-color="#230315" />
+          <stop offset="100%" stop-color="#0a0108" />
+        </radialGradient>
+        <linearGradient id="neonPink" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff1e8a" />
+          <stop offset="100%" stop-color="#ff8c42" />
+        </linearGradient>
+        <linearGradient id="neonCyan" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#00f0ff" />
+          <stop offset="100%" stop-color="#ff1e8a" />
+        </linearGradient>
+        <filter id="muralBlur" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur stdDeviation="1.5" />
+        </filter>
+        <pattern id="brickTex" width="80" height="40" patternUnits="userSpaceOnUse">
+          <rect width="80" height="40" fill="none" stroke="rgba(255,20,100,0.06)" stroke-width="1.5" />
+          <line x1="40" y1="0" x2="40" y2="20" stroke="rgba(255,20,100,0.06)" stroke-width="1.5" />
+          <line x1="0" y1="20" x2="80" y2="20" stroke="rgba(255,20,100,0.06)" stroke-width="1.5" />
+        </pattern>
+      </defs>
+      <rect width="1200" height="700" fill="url(#redGlow)" />
+      <rect width="1200" height="700" fill="url(#brickTex)" />
+      <rect x="40" y="30" width="1120" height="640" rx="28" fill="none" stroke="#ff1e8a" stroke-opacity="0.28" stroke-width="4" />
+      <rect x="54" y="44" width="1092" height="612" rx="20" fill="none" stroke="#ffbe3b" stroke-opacity="0.18" stroke-width="2" stroke-dasharray="14 8" />
+      <g filter="url(#muralBlur)" opacity="0.42">
+        <path d="M40,30 Q260,120 180,670 L40,670 Z" fill="#42041d" />
+        <path d="M1160,30 Q940,120 1020,670 L1160,670 Z" fill="#42041d" />
+        <path d="M40,30 Q360,170 600,75 Q840,170 1160,30 L1160,130 Q840,220 600,125 Q360,220 40,130 Z" fill="#66072d" />
+        <circle cx="600" cy="330" r="210" fill="none" stroke="url(#neonPink)" stroke-width="5" opacity="0.55" />
+        <circle cx="600" cy="330" r="185" fill="#3b051e" opacity="0.5" />
+        <path d="M430,590 C435,470 465,375 515,325 C500,295 508,255 538,242 C568,230 595,252 595,282 C595,302 582,318 572,326 C605,355 615,415 600,490 L575,590 Z" fill="url(#neonCyan)" opacity="0.55" />
+        <path d="M765,590 C755,485 735,400 688,345 C705,315 698,272 668,258 C638,245 610,265 608,295 C606,314 618,328 626,336 C590,368 585,435 608,510 L635,590 Z" fill="url(#neonPink)" opacity="0.7" />
+        <path d="M675,262 C725,270 755,325 745,395 C738,440 715,465 725,515" fill="none" stroke="#ff1e8a" stroke-width="10" stroke-linecap="round" opacity="0.5" />
+        <path d="M370,560 Q490,490 605,545 T840,535 L860,640 L350,640 Z" fill="#59082b" opacity="0.85" />
+        <g fill="#ff1e8a" opacity="0.45">
+          <circle cx="310" cy="220" r="18" />
+          <circle cx="332" cy="235" r="13" />
+          <circle cx="890" cy="220" r="18" />
+          <circle cx="868" cy="235" r="13" />
+          <path d="M600,155 C600,142 582,135 575,148 C568,135 550,142 550,155 C550,172 575,186 575,186 C575,186 600,172 600,155 Z" transform="translate(25,0)" />
+        </g>
+      </g>
+    </svg>
+    <div class="crt-overlay" aria-hidden="true"></div>
 
-  <div id="hud">
-    <div id="label">GTA VI &middot; 19 November 2026</div>
-    <div id="clock" role="timer" aria-live="off">
-      <div class="unit"><span id="cd">--</span><small>days</small></div>
-      <div class="sep">:</div>
-      <div class="unit"><span id="ch">--</span><small>hours</small></div>
-      <div class="sep">:</div>
-      <div class="unit"><span id="cm">--</span><small>minutes</small></div>
-      <div class="sep">:</div>
-      <div class="unit"><span id="cs">--</span><small>seconds</small></div>
+    <header class="hud">
+      <div class="title-block">
+        <span class="badge-8bit">8-BIT VICE EDITION</span>
+        <h1>LEGENDS MEMORY</h1>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-box">
+          <span class="stat-label">PAARE</span>
+          <span id="pairs-count" class="stat-val neon-cyan">0 / 5</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">ZÜGE</span>
+          <span id="moves-count" class="stat-val neon-pink">0</span>
+        </div>
+        <button id="sound-btn" class="btn-neon" type="button" title="Ton umschalten">SFX: AN</button>
+        <button id="restart-btn" class="btn-neon btn-cyan" type="button">NEU</button>
+      </div>
+    </header>
+
+    <main class="table-area">
+      <p class="hint-bar" id="hint-bar">Klicke oder nutze Tasten 1–0 zum Aufdecken</p>
+      <section id="board" class="board" aria-label="Memory Spielfeld"></section>
+
+      <aside id="discard-pile" class="discard-pile" aria-label="Abgelegte Paare">
+        <div class="pile-slot">
+          <span class="pile-label">STAPEL</span>
+          <span id="pile-counter" class="pile-num">0</span>
+        </div>
+        <div id="pile-cards" class="pile-cards"></div>
+      </aside>
+    </main>
+
+    <div id="win-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <div class="mission-passed">MISSION PASSED!</div>
+        <div class="respect-plus">RESPECT +</div>
+        <p id="win-summary" class="win-text">Alle 5 Kult-Paare abgeräumt!</p>
+        <button id="play-again-btn" class="btn-neon btn-large" type="button">NOCHMAL SPIELEN</button>
+      </div>
     </div>
-    <div id="done" hidden>Out now</div>
-    <div id="note">counting down to midnight, your local time</div>
   </div>
-
-  <div id="msg" hidden>Crash! Starting over</div>
-  <div id="hint">Click or tap to drive<small>Steer: &larr; &rarr; or A D, or hold the left or right side of the screen.<br>Speed: &uarr; &darr; or W S, or the gas and brake buttons. Dodge the slower cars.<br>Radio: O and P switch stations, H mutes the host voice.</small></div>
-  <div class="arrow" id="aL" aria-hidden="true">&#9664;</div>
-  <div class="arrow" id="aR" aria-hidden="true">&#9654;</div>
-  <div id="pedals">
-    <button id="brake" class="pedal" type="button" aria-label="Brake">BRAKE</button>
-    <button id="gas" class="pedal" type="button" aria-label="Gas">GAS</button>
-  </div>
-  <div id="radio">
-    <button id="stDown" class="tune" type="button" aria-label="Previous station">&#9660;</button>
-    <div id="stInfo" aria-live="polite"><span id="stFreq">96.0</span> <b id="stName">Causeway FM</b></div>
-    <button id="stUp" class="tune" type="button" aria-label="Next station">&#9650;</button>
-    <button id="hostBtn" class="tune" type="button" aria-label="Host voice" aria-pressed="true">&#127897;</button>
-  </div>
-  <div id="bottom">
-    <div id="speed">0 km/h</div>
-    <div id="score">0.00 km</div>
-    <button id="snd" type="button" aria-pressed="false">Music: off</button>
-  </div>
-</div>
-<script src="assets/radio-clips.js"></script>
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
