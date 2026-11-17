@@ -1,533 +1,516 @@
-(() => {
-  const PAIRS = [
-    {
-      id: 'gina',
-      starName: 'Gina Wild',
-      workTitle: "Jetzt wird's wild",
-      year: '1999',
-      bg1: '#ff1e8a',
-      bg2: '#3a0ca3',
-      hairColor: '#ffd166',
-      hairStyle: 'long-blonde',
-      accent: '#00f0ff',
-      dvdTheme: 'sunset'
-    },
-    {
-      id: 'dolly',
-      starName: 'Dolly Buster',
-      workTitle: 'In Excess',
-      year: '1990',
-      bg1: '#f72585',
-      bg2: '#4cc9f0',
-      hairColor: '#ffe066',
-      hairStyle: 'big-curl',
-      accent: '#ffbe0b',
-      dvdTheme: 'diamonds'
-    },
-    {
-      id: 'kelly',
-      starName: 'Kelly Trump',
-      workTitle: 'Supergirl – Voll verstrahlt',
-      year: '1999',
-      bg1: '#ff0054',
-      bg2: '#0077b6',
-      hairColor: '#fff3b0',
-      hairStyle: 'glam-wave',
-      accent: '#ffbd00',
-      dvdTheme: 'hero'
-    },
-    {
-      id: 'sibel',
-      starName: 'Sibel Kekilli',
-      workTitle: 'Gegen die Wand',
-      year: '2004',
-      bg1: '#9b5de5',
-      bg2: '#f15bb5',
-      hairColor: '#1a1118',
-      hairStyle: 'sleek-dark',
-      accent: '#00bbf9',
-      dvdTheme: 'noir'
-    },
-    {
-      id: 'teresa',
-      starName: 'Teresa Orlowski',
-      workTitle: 'Foxy Lady',
-      year: '1985',
-      bg1: '#ff6d00',
-      bg2: '#7209b7',
-      hairColor: '#e07a5f',
-      hairStyle: '80s-mane',
-      accent: '#ff9e00',
-      dvdTheme: 'foxy'
-    }
-  ];
+(function () {
+'use strict';
+var B = window.BarSim, A = window.BarArt;
+var KEY = 'vicebar_save_v3', BEST = 'vicebar_best_v3', OPT = 'vicebar_opt_v3';
+var $ = function (id) { return document.getElementById(id); };
+var M = B.money;
+var S = null, tab = 'plan', speed = 1, paused = false, time = 0, acc = 0, lastOcc = 0.3, occS = 0.3;
+var feed = [], recent = [], autoNext = false, autoT = 0;
+var TICKMS = 5000;
+var canvas = $('scene'), sctx = canvas.getContext('2d');
+var SEGC = { fam: '#40a0e0', surf: '#40e0a0', stud: '#ffd040', tour: '#ff8c3c', party: '#ff5fb0', after: '#a070ff', jet: '#ffffff' };
+var PSHORT = ['Mo', 'Mi', 'Na', 'Su', 'Nt'];
 
-  const boardEl = document.getElementById('board');
-  const pairsCountEl = document.getElementById('pairs-count');
-  const movesCountEl = document.getElementById('moves-count');
-  const pileCounterEl = document.getElementById('pile-counter');
-  const pileCardsEl = document.getElementById('pile-cards');
-  const discardPileEl = document.getElementById('discard-pile');
-  const soundBtn = document.getElementById('sound-btn');
-  const restartBtn = document.getElementById('restart-btn');
-  const winModal = document.getElementById('win-modal');
-  const winSummary = document.getElementById('win-summary');
-  const playAgainBtn = document.getElementById('play-again-btn');
+// ---------- storage ----------
+function store(k, v) { try { if (v === undefined) return window.localStorage.getItem(k); window.localStorage.setItem(k, v); } catch (e) { return null; } return null; }
+function save() { if (S && !S.over && S.mode !== 'run') store(KEY, B.serialize(S)); }
+function load() { var r = store(KEY); if (!r) return null; try { return B.deserialize(r); } catch (e) { return null; } }
+function best() { try { return JSON.parse(store(BEST) || '{}') || {}; } catch (e) { return {}; } }
+function saveBest() { var b = best(); b.day = Math.max(b.day || 0, S.day); b.stage = Math.max(b.stage || 0, S.stage); b.rating = Math.max(b.rating || 0, S.bestRating); store(BEST, JSON.stringify(b)); }
+try { var o = JSON.parse(store(OPT) || '{}'); autoNext = !!o.auto; speed = o.speed || 1; } catch (e) { }
+function saveOpt() { store(OPT, JSON.stringify({ auto: autoNext, speed: speed })); }
 
-  let soundEnabled = true;
-  let audioCtx = null;
-  let cardsData = [];
-  let flippedIndices = [];
-  let matchedPairs = 0;
-  let moves = 0;
-  let pendingResetTimer = null;
+// ---------- format ----------
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function price$(v) { var r = Math.round(v * 10) / 10; return '$' + (r % 1 ? r.toFixed(1) : r.toFixed(0)).replace('.', ','); }
+function n0(v) { return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function pct(v) { return Math.round(v * 100) + ' %'; }
+function stars(v) { var o = ''; for (var i = 1; i <= 5; i++) o += v >= i - 0.25 ? '★' : (v >= i - 0.75 ? '<span style="opacity:.55">★</span>' : '<span class="off">★</span>'); return o; }
+function sgn(v) { return (v >= 0 ? '+' : '') + M(v); }
+function wname(w) { return B.WEATHER[w.k].n + ' ' + w.temp + '°'; }
+function tagFor(ratio) { return ratio < 0.88 ? '<span class="tag low">günstig</span>' : ratio <= 1.08 ? '<span class="tag ok">fair</span>' : ratio <= 1.3 ? '<span class="tag high">teuer</span>' : '<span class="tag xhigh">Wucher</span>'; }
+function nm(k) { return B.ITEMS[k] ? B.ITEMS[k].n : B.RENTALS[k] ? B.RENTALS[k].n : k; }
+function canBuild() { return S.mode === 'night' || (S.mode === 'plan' && S.phase === 0); }
+function running() { return S && S.mode === 'run'; }
+function curPh() { return running() ? S.run.ph : Math.min(4, S.phase); }
+function clock() {
+var ph = curPh(), frac = running() ? (S.run.tick + Math.min(1, acc / TICKMS)) / B.NT : 0;
+if (S.mode === 'night') return '24:00';
+var m = Math.round((B.PHASES[ph].h + frac * 3) * 60), h = Math.floor(m / 60), mm = m % 60;
+return h + ':' + (mm < 10 ? '0' : '') + mm;
+}
+function tLabel(ph, tk) { var m = B.PHASES[ph].h * 60 + tk * 15, mm = m % 60; return Math.floor(m / 60) + ':' + (mm < 10 ? '0' : '') + mm; }
 
-  function ensureAudio() {
-    if (!soundEnabled) return null;
-    if (!audioCtx) {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (Ctx) audioCtx = new Ctx();
-    }
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
-    }
-    return audioCtx;
-  }
+// ---------- layout ----------
+function fit() {
+var w = $('sceneWrap').clientWidth, vh = window.innerHeight;
+var visW = w < 560 ? 250 : 320;
+var sc = w / visW, h = Math.round(150 * sc);
+var maxH = Math.max(110, Math.round(vh * (w < 560 ? 0.3 : 0.36)));
+if (h > maxH) { sc = maxH / 150; h = maxH; }
+canvas.style.height = h + 'px';
+canvas.style.width = Math.round(320 * sc) + 'px';
+$('sceneWrap').style.height = h + 'px';
+}
+window.addEventListener('resize', function () { fit(); render(); });
 
-  function playBoing() {
-    const ctx = ensureAudio();
-    if (!ctx) return;
-    const now = ctx.currentTime;
+// ---------- header, phases, tabs ----------
+function header() {
+$('tDay').textContent = 'Tag ' + S.day + ' · ' + clock();
+$('tPhase').textContent = S.mode === 'night' ? 'Feierabend' : B.PHASES[curPh()].n;
+$('tWeatherL').textContent = S.mode === 'night' ? 'Wetter morgen' : 'Wetter';
+$('tWeather').textContent = wname(S.weather[S.mode === 'night' ? 1 : 0]);
+$('tCash').textContent = M(S.cash);
+$('tCash').className = 'money' + (S.cash < 0 ? ' neg' : '');
+$('tRatingL').textContent = 'Ruf ' + S.rating.toFixed(2).replace('.', ',');
+$('tRating').innerHTML = stars(S.rating);
+$('tStage').textContent = B.STAGES[S.stage].n;
+$('speedBtn').textContent = speed + '×';
+$('pauseBtn').textContent = paused ? '▶' : '❚❚';
+$('pauseBtn').disabled = !running();
+}
+function phaseStrip() {
+var h = '', done = S.today.phases;
+for (var i = 0; i < 5; i++) {
+var cls = 'ph', r = B.PHASES[i].t, run = running() && S.run.ph === i;
+if (i < done.length) { cls += ' done'; var pr = done[i].profit; r = '<span class="r ' + (pr >= 0 ? 'pos' : 'neg') + '">' + sgn(pr) + '</span>'; }
+else { if ((i === S.phase && S.mode === 'plan') || run) cls += ' cur'; r = '<span class="r">' + (run ? (paused ? 'Pause' : 'läuft ' + S.run.tick + '/' + B.NT) : r) + '</span>'; }
+h += '<div class="' + cls + '"><div class="n">' + B.PHASES[i].n + '</div>' + r + '</div>';
+}
+$('phases').innerHTML = h;
+}
+var TABS = [['plan', 'Schicht'], ['menu', 'Karte'], ['result', 'Ergebnis'], ['stock', 'Lager'], ['build', 'Ausbau'], ['goals', 'Ziele']];
+function lowStock() {
+if (S.mode === 'night') return false;
+var f = B.forecast(S, curPh(), S.plan), low = false;
+S.menu.forEach(function (k) { if (S.stock[k] < (f.units[k] || 0) * 0.6) low = true; });
+return low;
+}
+function tabs() {
+var ls = lowStock();
+$('tabs').innerHTML = TABS.map(function (t) {
+var dot = (t[0] === 'plan' && S.event) || (t[0] === 'stock' && ls);
+var label = t[0] === 'plan' ? (S.mode === 'night' ? 'Abend' : running() ? 'Live' : 'Schicht') : t[1];
+return '<button type="button" data-t="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '">' + label + (dot ? '<span class="dot"></span>' : '') + '</button>';
+}).join('');
+}
+$('tabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (!b) return; tab = b.getAttribute('data-t'); render(); });
 
-    const osc = ctx.createOscillator();
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    const mainGain = ctx.createGain();
+// ---------- render ----------
+function render() {
+if (!S) return;
+header(); phaseStrip(); tabs();
+var wide = window.innerWidth >= 900;
+if (wide && tab === 'result') tab = 'plan';
+var L = $('left'), Rp = $('right');
+var html = tab === 'plan' ? (S.mode === 'night' ? paneNight() : running() ? paneLive() : panePlan()) : tab === 'menu' ? paneMenu() : tab === 'result' ? paneResult() : tab === 'stock' ? paneStock() : tab === 'build' ? paneBuild() : paneGoals();
+var st = L.getAttribute('data-tab') === tab ? L.scrollTop : 0; L.innerHTML = html; L.scrollTop = st; L.setAttribute('data-tab', tab);
+if (wide) { var st2 = Rp.scrollTop; Rp.innerHTML = paneResult(); Rp.scrollTop = st2; }
+var pv = L.querySelector('canvas[data-preview]');
+if (pv) A.draw(pv.getContext('2d'), sceneData(+pv.getAttribute('data-preview'), 3, 0.7), 3);
+}
+function eventCard() {
+var e = S.event; if (!e) return '';
+return '<div class="event"><b>Ereignis</b><p>' + esc(e.t) + '</p><div class="btns"><button type="button" class="btn pri" data-a="event" data-v="1">' + esc(e.yes) + '</button>' + (e.info ? '' : '<button type="button" class="btn" data-a="event" data-v="0">' + esc(e.no) + '</button>') + '</div></div>';
+}
+function mixBar(mix) {
+var h = '<div class="mixbar">';
+B.SEGKEYS.forEach(function (g) { if (mix[g] > 0.005) h += '<i title="' + B.SEGS[g].n + '" style="width:' + (mix[g] * 100).toFixed(1) + '%;background:' + SEGC[g] + '"></i>'; });
+return h + '</div>';
+}
+function legend(mix) { return '<div class="legend">' + B.SEGKEYS.filter(function (g) { return mix[g] > 0.01; }).map(function (g) { return '<span style="--c:' + SEGC[g] + '">' + B.SEGS[g].n + ' ' + Math.round(mix[g] * 100) + ' %</span>'; }).join('') + '</div>'; }
+function missingHint(f) {
+var miss = Object.keys(f.missing).filter(function (c) { return f.missing[c] > 3; }).sort(function (a, b) { return f.missing[b] - f.missing[a]; });
+return miss.length ? '<p class="warn">Gefragt, aber nicht auf der Karte: ' + miss.map(function (c) { return B.CATS[c].n + ' (≈ ' + n0(f.missing[c]) + ')'; }).join(', ') + ' – Tab „Karte“.</p>' : '';
+}
+function staffBlock(f, ph, frac) {
+var plan = S.plan, slots = B.slots(S), capU = plan.staff * B.staffCap(S), load = f.load, util = capU ? load / capU : 9, h = '';
+h += '<div class="sec"><h3>Personal' + (running() ? ' (jetzt)' : '') + '</h3><div class="staff">';
+for (var i = 0; i <= slots; i++) h += '<button type="button" data-a="staff" data-v="' + i + '" class="' + (plan.staff === i ? 'on' : '') + '">' + i + '</button>';
+h += '</div><p class="muted">Bedarf ≈ ' + f.staffNeed + ' · Auslastung <b class="' + (util > 1 ? 'neg' : util > 0.95 ? 'warn' : util < 0.5 ? 'warn' : 'pos') + '">' + (capU ? pct(util) : '–') + '</b> · Lohn ' + M(B.wage(S)) + ' × ' + plan.staff + ' pro Phase</p>';
+h += '<div class="meter ' + (util > 1 ? 'bad' : util > 0.95 ? 'warn' : '') + '"><i style="width:' + Math.min(100, util * 100) + '%"></i></div></div>';
+var ex = '';
+if (B.canHappy(S, ph)) ex += '<div class="row"><div class="grow"><div class="name">Happy Hour</div><div class="sub">Getränke −30 %, +35 % Gäste, mehr Bestellungen</div></div><button type="button" class="btn ' + (plan.happy ? 'on' : '') + '" data-a="happy">' + (plan.happy ? 'AN' : 'AUS') + '</button></div>';
+if (B.canDJ(S, ph)) ex += '<div class="row"><div class="grow"><div class="name">DJ</div><div class="sub">' + M(B.djCost(S)) + '/Phase · +30 % Gäste, mehr Cocktails, mehr Partyvolk</div></div><button type="button" class="btn ' + (plan.dj ? 'on' : '') + '" data-a="dj">' + (plan.dj ? 'AN' : 'AUS') + '</button></div>';
+else if (ph >= 3 && S.stage >= 3 && !S.up.djpult) ex += '<p class="muted">Mit einem DJ-Pult (Ausbau) kannst du abends einen DJ buchen.</p>';
+if (ex) h += '<div class="sec"><h3>Extras</h3>' + ex + '</div>';
+return h;
+}
+function priceRows(f, rest) {
+var plan = S.plan, ph = curPh(), h = '<div class="sec"><h3>Preise' + (running() ? ' (wirken sofort)' : '') + '</h3>';
+S.menu.forEach(function (k) {
+var it = B.ITEMS[k], fp = B.fairFor(S, k, ph), pr = S.prices[k], eff = pr * (plan.happy && it.cat !== 'food' && B.canHappy(S, ph) ? 0.7 : 1);
+var need = (f.units[k] || 0) * rest, low = S.stock[k] < need;
+var sub = 'fair ' + price$(fp) + ' · EK ' + price$(S.cost[k]) + ' · ' + (running() ? 'Rest' : 'Prognose') + ' ≈ ' + n0(need) + ' · Lager <span class="' + (low ? 'neg' : '') + '">' + n0(S.stock[k]) + '</span>';
+h += '<div class="row"><div class="grow"><div class="name"><span class="swatch" style="background:' + it.c + '"></span>' + it.n + ' ' + tagFor(eff / fp) + '</div><div class="sub">' + sub + (low && running() ? ' <button type="button" class="btn sm" data-a="buy" data-v="' + k + '" data-w="' + Math.max(10, Math.ceil(need - S.stock[k] + 5)) + '">Eil +' + n0(Math.max(10, Math.ceil(need - S.stock[k] + 5))) + '</button>' : '') + '</div></div>' +
+'<div class="step"><button type="button" class="btn" data-a="price" data-v="' + k + '" data-w="-1" aria-label="billiger">−</button><span class="v">' + price$(pr) + '</span><button type="button" class="btn" data-a="price" data-v="' + k + '" data-w="1" aria-label="teurer">+</button></div></div>';
+});
+B.RKEYS.forEach(function (k) {
+if (!B.rentOffered(S, k)) return;
+var fp = B.fairPrice(S, k), pr = S.prices[k];
+h += '<div class="row"><div class="grow"><div class="name">' + B.RENTALS[k].n + ' ' + tagFor(pr / fp) + '</div><div class="sub">fair ' + price$(fp) + ' · Nachfrage ≈ ' + n0((f.rent[k] || 0) * rest) + ' · Kapazität ' + n0(B.rentCap(S, k)) + '</div></div>' +
+'<div class="step"><button type="button" class="btn" data-a="price" data-v="' + k + '" data-w="-1" aria-label="billiger">−</button><span class="v">' + price$(pr) + '</span><button type="button" class="btn" data-a="price" data-v="' + k + '" data-w="1" aria-label="teurer">+</button></div></div>';
+});
+if (!S.menu.length) h += '<p class="warn">Die Karte ist leer – ohne Angebot verkaufst du nichts.</p>';
+return h + '<div class="btns"><button type="button" class="btn sm" data-a="fair">Alle auf fair</button><button type="button" class="btn sm" data-t2="menu">Karte bearbeiten</button></div></div>';
+}
+function panePlan() {
+var ph = S.phase, f = B.forecast(S, ph, S.plan), h = eventCard();
+var LR = S.today.phases[S.today.phases.length - 1];
+if (LR && window.innerWidth < 900) {
+h += '<div class="card"><b>' + B.PHASES[LR.ph].n + ':</b> Gewinn <b class="' + (LR.profit >= 0 ? 'pos' : 'neg') + '">' + M(LR.profit) + '</b> · ' + n0(LR.guests) + ' Gäste' + (LR.turned ? ' · <span class="neg">' + n0(LR.turned) + ' abgewiesen</span>' : '') + ' · Zufr. ' + Math.round(LR.sat) + ' %' +
+LR.hints.slice(0, 2).map(function (x) { return '<div class="hint ' + x.k + '" style="margin:6px 0 0">' + esc(x.t) + '</div>'; }).join('') + '<div class="btns"><button type="button" class="btn sm" data-t2="result">Alle Zahlen</button></div></div>';
+}
+h += '<div class="sec"><h3>' + B.PHASES[ph].n + ' ' + B.PHASES[ph].t + ' Uhr – Prognose</h3>';
+h += '<div class="kgrid"><div class="k"><small>Gäste</small><b>≈ ' + n0(f.guests) + '</b><span>Nachfrage ' + n0(f.demand) + ' · Platz ' + n0(f.cap) + '</span></div>' +
+'<div class="k"><small>Bestellungen</small><b>≈ ' + n0(f.load) + '</b><span>Arbeitseinheiten</span></div>' +
+'<div class="k"><small>Personal nötig</small><b>' + f.staffNeed + '</b><span>je ' + n0(B.staffCap(S)) + ' Einheiten</span></div></div>';
+h += '<p class="muted" style="margin-top:8px">Publikum</p>' + mixBar(f.mix) + legend(f.mix);
+if (f.demand > f.cap * 1.05) h += '<p class="warn">Mehr Nachfrage als Plätze – ≈ ' + n0(f.demand - f.cap) + ' Gäste werden abgewiesen.</p>';
+h += missingHint(f) + '</div>';
+h += staffBlock(f, ph) + priceRows(f, 1);
+h += '<label class="chk"><input type="checkbox" data-a="auto" ' + (autoNext ? 'checked' : '') + '> Nächste Phase automatisch starten</label>';
+h += '<button type="button" class="btn pink big" data-a="run" ' + (S.event ? 'disabled' : '') + '>▶ ' + B.PHASES[ph].n + ' starten (' + Math.round(B.NT * TICKMS / 1000 / speed) + ' s)</button>';
+if (S.event) h += '<p class="muted">Entscheide erst über das Ereignis oben.</p>';
+return h;
+}
+function paneLive() {
+var run = S.run, R = run.R, ph = run.ph, f = B.forecast(S, ph, S.plan), rest = (B.NT - run.tick) / B.NT, h = '';
+var L = run.last;
+h += '<div class="live"><div class="clock"><span>' + B.PHASES[ph].n + ' läuft</span><b id="liveClock">' + clock() + '</b></div>';
+h += '<div class="prog"><i id="liveBar" style="width:' + ((run.tick + Math.min(1, acc / TICKMS)) / B.NT * 100).toFixed(1) + '%"></i></div>';
+h += '<div class="kgrid"><div class="k"><small>Gäste bisher</small><b>' + n0(R.guests) + '</b><span>' + (R.turned >= 1 ? '<span class="neg">' + n0(R.turned) + ' abgewiesen</span>' : 'niemand abgewiesen') + '</span></div>' +
+'<div class="k"><small>Umsatz bisher</small><b class="gold">' + M(R.rev) + '</b><span>Kosten ' + M(R.cogs + R.wages + R.dj + R.ops) + '</span></div>' +
+'<div class="k"><small>Stimmung</small><b class="' + (!L ? '' : L.sat >= 70 ? 'pos' : L.sat >= 50 ? 'warn' : 'neg') + '">' + (L ? Math.round(L.sat) + ' %' : '–') + '</b><span>Auslastung ' + (L ? pct(L.util) : '–') + '</span></div></div>';
+h += '<div class="tick" style="margin-top:8px">' + (feed.length ? feed.slice(0, 7).map(function (x) { return '<div' + (x.c ? ' class="' + x.c + '"' : '') + '><span class="t">' + x.t + '</span>' + x.m + '</div>'; }).join('') : '<div class="muted">Die ersten Gäste kommen …</div>') + '</div>';
+h += '<div class="btns"><button type="button" class="btn sm" data-a="pause">' + (paused ? '▶ Weiter' : '❚❚ Pause') + '</button><button type="button" class="btn sm" data-a="speed">Tempo ' + speed + '×</button></div></div>';
+h += missingHint({ missing: f.missing });
+h += staffBlock(f, ph) + priceRows(f, rest);
+h += '<p class="muted">Nachbestellungen laufen als Eilbestellung (+50 %). Karte und Ausbau änderst du zwischen den Phasen.</p>';
+return h;
+}
+function withTomorrow(fn) { var w0 = S.weather[0]; S.weather[0] = S.weather[1]; try { return fn(); } finally { S.weather[0] = w0; } }
+function paneNight() {
+var rep = S.reports[S.reports.length - 1], h = '';
+h += '<div class="sec"><h3>Feierabend – Tag ' + S.day + '</h3>';
+if (rep) h += '<div class="kgrid"><div class="k"><small>Tagesgewinn</small><b class="' + (rep.profit >= 0 ? 'pos' : 'neg') + '">' + M(rep.profit) + '</b><span>Umsatz ' + M(rep.revTot) + '</span></div><div class="k"><small>Gäste</small><b>' + n0(rep.guests) + '</b><span>' + n0(rep.turned) + ' abgewiesen</span></div><div class="k"><small>Ruf</small><b>' + rep.rating1.toFixed(2).replace('.', ',') + '</b><span class="' + (rep.rating1 >= rep.rating0 ? 'pos' : 'neg') + '">' + (rep.rating1 >= rep.rating0 ? '+' : '') + (rep.rating1 - rep.rating0).toFixed(2).replace('.', ',') + '</span></div></div>';
+h += '<div class="btns"><button type="button" class="btn sm" data-a="report">Tagesbilanz ansehen</button></div></div>';
+h += '<div class="sec"><h3>Wetter</h3>';
+for (var i = 1; i < 4; i++) h += '<div class="row"><div class="grow">' + (i === 1 ? 'Morgen' : 'In ' + i + ' Tagen') + '</div><b>' + wname(S.weather[i]) + '</b></div>';
+h += '<p class="muted">Hitze: mehr Softdrinks & Bier. Kühl: mehr Kaffee. Regen: kaum Gäste.</p></div>';
+var fc = withTomorrow(function () { return B.forecastDay(S); });
+h += '<div class="sec"><h3>Einkauf für morgen</h3><table class="t"><tr><th>Ware</th><th>Prognose</th><th>Lager</th><th>Fehlt</th></tr>';
+var miss = 0;
+S.menu.forEach(function (k) { var need = Math.max(0, Math.ceil(fc[k] * 1.1 - S.stock[k])); miss += need * S.cost[k]; h += '<tr><td><span class="swatch" style="background:' + B.ITEMS[k].c + '"></span>' + nm(k) + '</td><td>' + n0(fc[k]) + '</td><td>' + n0(S.stock[k]) + '</td><td class="' + (need ? 'neg' : 'pos') + '">' + n0(need) + '</td></tr>'; });
+h += '</table><div class="btns"><button type="button" class="btn pri" data-a="fillAll">Alles auffüllen (≈ ' + M(miss) + ')</button><button type="button" class="btn" data-t2="stock">Lager</button><button type="button" class="btn" data-t2="menu">Karte</button></div></div>';
+h += '<p class="muted">Jetzt ist die Zeit für Karte, Ausbau, Werbung und Kredit.</p>';
+h += '<button type="button" class="btn pink big" data-a="next">▶ Tag ' + (S.day + 1) + ' starten</button>';
+return h;
+}
+function paneMenu() {
+var slots = B.menuSlots(S), used = S.menu.length, edit = !running(), h = '';
+var f5 = [], ph0 = S.mode === 'night' ? 0 : curPh(), plan = { staff: S.plan.staff, happy: false, dj: false };
+var calc = function () { for (var ph = 0; ph < 5; ph++) f5.push(B.forecast(S, ph, { staff: plan.staff, happy: false, dj: B.canDJ(S, ph) })); };
+if (S.mode === 'night') withTomorrow(calc); else calc();
+h += '<div class="sec"><h3>Karte – ' + used + ' von ' + slots + ' Plätzen</h3><p class="muted">Jede Tageszeit und jedes Publikum will anderes: morgens kalte Softdrinks und Kaffee, nachmittags Bier, abends Wein, Cocktails und Shots. Zahlen = erwartete Bestellungen je Phase' + (S.mode === 'night' ? ' (morgen)' : '') + '.</p>';
+if (!edit) h += '<p class="warn">Während einer Phase kann die Karte nicht geändert werden.</p>';
+h += '</div><div class="sec"><h3>Publikum je Tageszeit</h3>';
+for (var ph = 0; ph < 5; ph++) h += '<div class="mixrow"><span>' + B.PHASES[ph].n + '</span>' + mixBar(f5[ph].mix) + '</div>';
+var tot = {}; B.SEGKEYS.forEach(function (g) { tot[g] = 0; f5.forEach(function (f) { tot[g] += f.mix[g] * f.guests; }); });
+var sum = 0; B.SEGKEYS.forEach(function (g) { sum += tot[g]; }); B.SEGKEYS.forEach(function (g) { tot[g] = sum ? tot[g] / sum : 0; });
+h += legend(tot) + '<p class="muted">Je besser Bar und Ruf, desto zahlungskräftiger das Publikum.</p>';
+var miss = {}; f5.forEach(function (f) { for (var c in f.missing) miss[c] = (miss[c] || 0) + f.missing[c]; });
+var mk = Object.keys(miss).filter(function (c) { return miss[c] > 4; });
+if (mk.length) h += '<p class="warn">Den ganzen Tag gefragt, nicht im Angebot: ' + mk.map(function (c) { return B.CATS[c].n + ' (≈ ' + n0(miss[c]) + ')'; }).join(', ') + '</p>';
+h += '</div>';
+B.CKEYS.forEach(function (c) {
+var keys = B.IKEYS.filter(function (k) { return B.ITEMS[k].cat === c; });
+h += '<div class="catH">' + B.CATS[c].n + '</div>';
+keys.forEach(function (k) {
+var it = B.ITEMS[k], on = B.onMenu(S, k), un = B.unlocked(S, k);
+if (!un) { h += '<div class="row locked"><div class="grow"><div class="name"><span class="swatch" style="background:' + it.c + '"></span>' + it.n + '</div><div class="sub">🔒 ' + esc(B.lockWhy(S, k)) + '</div></div></div>'; return; }
+var pots = f5.map(function (f) { return f.potential[k] || 0; }), mx = Math.max.apply(null, pots);
+var margin = S.prices[k] - S.cost[k];
+h += '<div class="row' + (on ? '' : ' off') + '"><div class="grow"><div class="name"><span class="swatch" style="background:' + it.c + '"></span>' + it.n + (it.lux ? ' <span class="gold">★</span>' : '') + '</div><div class="sub">VK ' + price$(S.prices[k]) + ' · EK ' + price$(S.cost[k]) + ' · Marge ' + price$(margin) + (it.spoil ? ' · verderblich' : '') + (S.stock[k] ? ' · Lager ' + n0(S.stock[k]) : '') + '</div>' +
+'<div class="pot">' + pots.map(function (v, i) { return '<span class="' + (v >= mx * 0.75 && v >= 1 ? 'hi' : '') + (i === ph0 && S.mode !== 'night' ? ' cur' : '') + '">' + PSHORT[i] + ' ' + (v >= 0.5 ? n0(v) : '–') + '</span>'; }).join('') + '</div></div>' +
+'<button type="button" class="btn sm ' + (on ? 'on' : '') + '" data-a="menu" data-v="' + k + '" ' + (edit && (on || used < slots) ? '' : 'disabled') + '>' + (on ? 'Auf Karte' : '+ Aufnehmen') + '</button></div>';
+});
+});
+h += '<p class="muted">Mehr Kartenplätze gibt es mit jeder Ausbaustufe und der zweiten Theke. Eine vielfältige Karte zieht mehr Gäste an.</p>';
+return h;
+}
+function paneResult() {
+var live = running(), R = live ? S.run.R : S.today.phases[S.today.phases.length - 1], h = '';
+if (!R && S.mode === 'night' && S.reports.length) { var ps = S.reports[S.reports.length - 1].phases; R = ps[ps.length - 1]; }
+if (!R) h += '<h3 class="pink">Ergebnis</h3><p class="muted">Noch keine Phase gespielt. Stell Karte, Preise und Personal ein und starte die erste Schicht.</p>';
+else {
+var cost = R.cogs + R.wages + R.dj + R.ops, profit = R.rev - cost, sat = live ? (R.satW ? R.satSum / R.satW : 0) : R.sat, util = live ? (R.capU ? R.load / R.capU : 0) : R.util;
+h += '<h3 class="pink">' + (live ? 'Live: ' : 'Ergebnis: ') + B.PHASES[R.ph].n + '</h3>';
+h += '<div class="kgrid">' +
+'<div class="k"><small>Gäste</small><b>' + n0(R.guests) + '</b><span>von ' + n0(R.demand) + ' Nachfrage</span></div>' +
+'<div class="k"><small>Abgewiesen</small><b class="' + (R.turned >= 1 ? 'neg' : '') + '">' + n0(R.turned) + '</b><span>kein Platz</span></div>' +
+'<div class="k"><small>Umsatz</small><b class="gold">' + M(R.rev) + '</b><span>Ø ' + price$(R.guests ? R.rev / R.guests : 0) + ' pro Gast</span></div>' +
+'<div class="k"><small>Kosten</small><b>' + M(cost) + '</b><span>Ware ' + M(R.cogs) + ' · Personal ' + M(R.wages) + '</span></div>' +
+'<div class="k"><small>Gewinn</small><b class="' + (profit >= 0 ? 'pos' : 'neg') + '">' + M(profit) + '</b><span>Marge ' + (R.rev ? pct(profit / R.rev) : '–') + '</span></div>' +
+'<div class="k"><small>Zufriedenheit</small><b class="' + (sat >= 70 ? 'pos' : sat >= 50 ? 'warn' : 'neg') + '">' + Math.round(sat) + ' %</b><span>Auslastung ' + pct(util) + '</span></div></div>';
+h += '<p class="muted" style="margin-top:8px">Publikum</p>' + mixBar(R.mix);
+h += '<table class="t" style="margin-top:8px"><tr><th>Produkt</th><th>Preis</th><th>Verkauft</th><th>Wollten</th><th>Fehlt</th><th>Umsatz</th></tr>';
+var keys = Object.keys(R.prod).sort(function (a, b) { return R.prod[b].rev - R.prod[a].rev; });
+keys.forEach(function (key) {
+var p = R.prod[key], miss = (p.lostStock || 0) + (p.lostService || 0);
+h += '<tr><td><span class="swatch" style="background:' + B.ITEMS[key].c + '"></span>' + nm(key) + '</td><td>' + price$(p.price) + '</td><td>' + n0(p.sold) + '</td><td>' + n0(p.req) + '</td><td class="' + (miss >= 1 ? 'neg' : '') + '">' + n0(miss) + '</td><td>' + M(p.rev) + '</td></tr>';
+});
+Object.keys(R.rent).forEach(function (key) { var p = R.rent[key]; h += '<tr><td>' + nm(key) + '</td><td>' + price$(p.price) + '</td><td>' + n0(p.sold) + '</td><td>' + n0(p.req) + '</td><td class="' + (p.lostPlace >= 1 ? 'neg' : '') + '">' + n0(p.lostPlace) + '</td><td>' + M(p.rev) + '</td></tr>'; });
+h += '</table>';
+var mc = Object.keys(R.missing || {}).filter(function (c) { return R.missing[c] >= 1; });
+if (mc.length) h += '<p class="warn">Nicht im Angebot, aber gefragt: ' + mc.map(function (c) { return B.CATS[c].n + ' ' + n0(R.missing[c]) + '×'; }).join(', ') + '</p>';
+if (!live && R.hints) h += '<div style="margin-top:8px">' + R.hints.map(function (x) { return '<div class="hint ' + x.k + '">' + esc(x.t) + '</div>'; }).join('') + '</div>';
+}
+var phs = S.mode === 'night' && S.reports.length ? S.reports[S.reports.length - 1].phases : S.today.phases;
+if (phs.length) {
+var mx = 1; phs.forEach(function (x) { mx = Math.max(mx, Math.abs(x.profit)); });
+h += '<h3 style="margin-top:12px">Heute pro Phase</h3><div class="bars">';
+for (var i = 0; i < 5; i++) { var x = phs[i]; h += '<div>' + (x ? '<span>' + M(x.profit) + '</span><i class="' + (x.profit < 0 ? 'neg' : '') + '" style="height:' + Math.max(2, Math.abs(x.profit) / mx * 52) + 'px"></i>' : '<i style="height:2px;background:#3a2456"></i>') + B.PHASES[i].n.slice(0, 5) + '</div>'; }
+h += '</div>';
+var tr = 0, tc = 0, tw = 0, td = 0, to = 0; phs.forEach(function (x) { tr += x.rev; tc += x.cogs; tw += x.wages; td += x.dj; to += x.ops; });
+h += '<table class="t"><tr><td>Umsatz</td><td class="pos">' + M(tr) + '</td></tr><tr><td>Wareneinsatz</td><td>−' + M(tc) + '</td></tr><tr><td>Personal</td><td>−' + M(tw) + '</td></tr>' + (td ? '<tr><td>DJ</td><td>−' + M(td) + '</td></tr>' : '') + '<tr><td>Betriebskosten</td><td>−' + M(to) + '</td></tr><tr class="tot"><td>Deckungsbeitrag</td><td class="' + (tr - tc - tw - td - to >= 0 ? 'pos' : 'neg') + '">' + M(tr - tc - tw - td - to) + '</td></tr></table>';
+h += '<p class="muted">Abends kommen Pacht ' + M(B.STAGES[S.stage].fix) + ', Wartung ' + M(B.upkeep(S)) + (S.loan ? ', Zinsen ' + M(S.loan * 0.015) : '') + ' und Verderb dazu.</p>';
+}
+return h;
+}
+function restOfDay() {
+var tot = {}; B.IKEYS.forEach(function (k) { tot[k] = 0; });
+for (var ph = curPh(); ph < 5; ph++) { var f = B.forecast(S, ph, { staff: S.plan.staff, happy: false, dj: B.canDJ(S, ph) }), w = running() && ph === S.run.ph ? (B.NT - S.run.tick) / B.NT : 1; for (var k in f.units) tot[k] += f.units[k] * w; }
+return tot;
+}
+function paneStock() {
+var rush = B.rushActive(S), used = B.stockUsed(S), cap = B.storeCap(S), h = '';
+h += '<div class="sec"><h3>Lager</h3><p>Belegt <b>' + n0(used) + '</b> von ' + n0(cap) + ' Plätzen</p><div class="meter ' + (used / cap > 0.9 ? 'warn' : '') + '"><i style="width:' + Math.min(100, used / cap * 100) + '%"></i></div>';
+h += rush ? '<p class="warn">Der Tag läuft: Nachbestellungen sind Eilbestellungen (+50 %). Günstiger kaufst du abends oder vor dem Morgen.</p>' : '<p class="muted">Einkaufspreise schwanken täglich. Verderbliches (Smoothies, Cocktail-Sets, Essen) verdirbt nachts teilweise – ein Kühlraum hilft.</p>';
+h += '</div>';
+var fc = S.mode === 'night' ? withTomorrow(function () { return B.forecastDay(S); }) : restOfDay();
+var keys = S.menu.concat(B.IKEYS.filter(function (k) { return !B.onMenu(S, k) && S.stock[k] > 0; }));
+keys.forEach(function (k) {
+var it = B.ITEMS[k], on = B.onMenu(S, k), unit = S.cost[k] * (rush ? 1.5 : 1), need = on ? Math.max(0, Math.ceil(fc[k] * 1.1 - S.stock[k])) : 0, trend = S.cost[k] / it.cost;
+h += '<div class="row"><div class="grow"><div class="name"><span class="swatch" style="background:' + it.c + '"></span>' + it.n + ' · <span class="gold">' + n0(S.stock[k]) + '</span>' + (on ? '' : ' <span class="muted">(nicht auf der Karte)</span>') + '</div><div class="sub">EK ' + price$(unit) + (trend > 1.07 ? ' <span class="neg">(teuer heute)</span>' : trend < 0.93 ? ' <span class="pos">(günstig heute)</span>' : '') + ' · VK ' + price$(S.prices[k]) + (on ? ' · ' + (S.mode === 'night' ? 'Prognose morgen' : 'Bedarf heute noch') + ' ≈ ' + n0(fc[k]) : '') + (it.spoil ? ' · verdirbt ' + Math.round(it.spoil * (1 - 0.35 * S.up.kuehl) * 100) + ' %/Nacht' : '') + '</div>' +
+'<div class="btns"><button type="button" class="btn sm" data-a="buy" data-v="' + k + '" data-w="20">+20</button><button type="button" class="btn sm" data-a="buy" data-v="' + k + '" data-w="100">+100</button>' +
+(need ? '<button type="button" class="btn sm pri" data-a="buy" data-v="' + k + '" data-w="' + need + '">Auffüllen +' + n0(need) + ' (' + M(need * unit) + ')</button>' : on ? '<span class="muted">reicht</span>' : '') + '</div></div></div>';
+});
+if (!keys.length) h += '<p class="muted">Nichts auf der Karte.</p>';
+return h;
+}
+function paneBuild() {
+var h = '', ok = canBuild();
+if (!ok) h += '<p class="warn">Ausbau, Werbung und Kredit sind nur vor dem Morgen oder abends nach Feierabend möglich.</p>';
+var si = B.stageInfo(S);
+h += '<div class="sec"><h3>Ausbaustufe</h3>';
+if (si) {
+var d = si.def, cur = B.STAGES[S.stage];
+var newP = B.IKEYS.filter(function (k) { return B.ITEMS[k].stage === si.stage; }).map(nm);
+var newG = B.SEGKEYS.filter(function (g) { return B.SEGS[g].stg[si.stage] > 0 && !B.SEGS[g].stg[S.stage]; }).map(function (g) { return B.SEGS[g].n; });
+h += '<div class="card"><canvas width="320" height="150" data-preview="' + si.stage + '"></canvas><div class="name"><b>' + si.stage + ' · ' + d.n + '</b> <span class="gold">' + M(si.cost) + '</span></div><p class="muted">' + esc(d.d) + '</p>' +
+'<table class="t"><tr><th></th><th>jetzt</th><th>danach</th></tr><tr><td>Grundnachfrage</td><td>' + cur.base + '</td><td class="pos">' + d.base + '</td></tr><tr><td>Plätze pro Phase</td><td>' + cur.cap + '</td><td class="pos">' + d.cap + '</td></tr><tr><td>Personalplätze</td><td>' + cur.slots + '</td><td class="pos">' + d.slots + '</td></tr><tr><td>Kartenplätze</td><td>' + cur.menu + '</td><td class="pos">' + d.menu + '</td></tr><tr><td>Preisniveau</td><td>×' + String(cur.sm).replace('.', ',') + '</td><td class="pos">×' + String(d.sm).replace('.', ',') + '</td></tr><tr><td>Max. Ruf</td><td>' + String(cur.rmax).replace('.', ',') + '★</td><td class="pos">' + String(d.rmax).replace('.', ',') + '★</td></tr><tr><td>Lohn pro Kopf/Phase</td><td>' + M(cur.wage) + '</td><td class="neg">' + M(d.wage) + '</td></tr><tr><td>Pacht pro Tag</td><td>' + M(cur.fix) + '</td><td class="neg">' + M(d.fix) + '</td></tr><tr><td>Betriebskosten/Gast</td><td>' + price$(cur.ops) + '</td><td class="neg">' + price$(d.ops) + '</td></tr></table>' +
+(newP.length ? '<p>Neu im Angebot: ' + newP.join(', ') + '</p>' : '') + (newG.length ? '<p>Neue Gäste: ' + newG.join(', ') + '</p>' : '') +
+(si.locked ? '<p class="warn">Benötigt: ' + si.why + ' (Rekord: ' + S.bestRating.toFixed(2).replace('.', ',') + '★)</p>' : '') +
+'<button type="button" class="btn ' + (si.ok && ok ? 'pink' : '') + '" data-a="expand" ' + (si.ok && ok ? '' : 'disabled') + '>Ausbauen für ' + M(si.cost) + '</button></div>';
+} else h += '<p class="pos">Voll ausgebaut – das Vice Beach Resort!</p>';
+h += '</div><div class="sec"><h3>Zusatz-Ausbauten</h3>';
+B.UKEYS.forEach(function (k) {
+var u = B.UPGRADES[k], i = B.upgradeInfo(S, k), lvl = S.up[k];
+h += '<div class="row"><div class="grow"><div class="name">' + u.n + (u.max > 1 ? ' <span class="muted">(' + lvl + '/' + u.max + ')</span>' : (lvl ? ' <span class="pos">✓</span>' : '')) + '</div><div class="sub">' + u.d + (i.done ? '' : ' · <span class="gold">' + M(i.cost) + '</span>') + (S.stage < u.stage ? ' · <span class="warn">' + i.why + '</span>' : '') + '</div></div>' +
+(i.done ? '' : '<button type="button" class="btn sm ' + (i.ok && ok ? 'pri' : '') + '" data-a="up" data-v="' + k + '" ' + (i.ok && ok ? '' : 'disabled') + '>Kaufen</button>') + '</div>';
+});
+h += '</div><div class="sec"><h3>Werbung</h3>';
+Object.keys(B.MKT).forEach(function (k) {
+var m = B.MKT[k], c = B.mktCost(S, k), run = S.mkt.filter(function (x) { return x.k === k; })[0];
+var can = ok && S.stage >= m.stage && !run && S.cash >= c;
+h += '<div class="row"><div class="grow"><div class="name">' + m.n + '</div><div class="sub">+' + Math.round(m.boost * 100) + ' % Gäste für ' + m.days + ' Tag' + (m.days > 1 ? 'e' : '') + ' · <span class="gold">' + M(c) + '</span>' + (S.stage < m.stage ? ' · <span class="warn">ab Stufe ' + m.stage + '</span>' : '') + (run ? ' · <span class="pos">läuft noch ' + run.left + ' Tag(e)</span>' : '') + '</div></div><button type="button" class="btn sm ' + (can ? 'pri' : '') + '" data-a="mkt" data-v="' + k + '" ' + (can ? '' : 'disabled') + '>Buchen</button></div>';
+});
+var lim = B.loanLimit(S), step = 1000 * S.stage;
+h += '</div><div class="sec"><h3>Bankkredit</h3><p>Schulden <b class="' + (S.loan ? 'neg' : '') + '">' + M(S.loan) + '</b> von ' + M(lim) + ' Rahmen · Zinsen 1,5 % pro Tag' + (S.loan ? ' (≈ ' + M(S.loan * 0.015) + ' täglich)' : '') + '</p>' +
+'<div class="btns"><button type="button" class="btn" data-a="borrow" data-v="' + step + '" ' + (ok && S.loan < lim ? '' : 'disabled') + '>+' + M(step) + ' leihen</button><button type="button" class="btn" data-a="repay" data-v="' + step + '" ' + (ok && S.loan > 0 ? '' : 'disabled') + '>' + M(step) + ' tilgen</button><button type="button" class="btn" data-a="repay" data-v="999999999" ' + (ok && S.loan > 0 ? '' : 'disabled') + '>Alles tilgen</button></div>' +
+'<p class="muted">Rutscht die Kasse abends ins Minus, wird automatisch Kredit gezogen. Ist der Rahmen voll und das Konto 3 Tage im Minus, ist die Bar pleite.</p></div>';
+return h;
+}
+function paneGoals() {
+var cur = B.currentGoal(S), h = '<div class="sec"><h3>Ziele</h3>';
+B.GOALS.forEach(function (g) { var d = S.goalsDone[g.id]; h += '<div class="goal ' + (d ? 'done' : '') + (cur && cur.id === g.id ? ' cur' : '') + '">' + (d ? '✓ ' : cur && cur.id === g.id ? '▶ ' : '') + esc(g.n) + (g.r ? ' <span class="gold">+' + M(g.r) + '</span>' : '') + '</div>'; });
+h += '</div>';
+if (S.history.length) {
+var mx = 1; S.history.forEach(function (x) { mx = Math.max(mx, Math.abs(x.p)); });
+h += '<div class="sec"><h3>Gewinn der letzten Tage</h3><div class="bars">';
+S.history.slice(-10).forEach(function (x) { h += '<div><i class="' + (x.p < 0 ? 'neg' : '') + '" style="height:' + Math.max(2, Math.abs(x.p) / mx * 58) + 'px"></i>T' + x.d + '</div>'; });
+h += '</div></div>';
+}
+var b = best();
+h += '<div class="sec"><h3>Statistik</h3><table class="t"><tr><td>Ruf-Rekord</td><td>' + S.bestRating.toFixed(2).replace('.', ',') + '★</td></tr><tr><td>Bester Tagesgewinn</td><td>' + M(S.bestProfit) + '</td></tr><tr><td>Meiste Gäste</td><td>' + n0(S.bestGuests) + '</td></tr><tr><td>Gesamtumsatz</td><td>' + M(S.earned) + '</td></tr>' + (b.day ? '<tr><td>Allzeit-Rekord</td><td>Tag ' + b.day + ', Stufe ' + b.stage + '</td></tr>' : '') + '</table></div>';
+h += '<div class="btns"><button type="button" class="btn red" data-a="restart">Neues Spiel</button></div>';
+return h;
+}
 
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(145, now);
-    osc.frequency.exponentialRampToValueAtTime(340, now + 0.14);
-    osc.frequency.exponentialRampToValueAtTime(175, now + 0.55);
+// ---------- modals ----------
+function modal(title, html) { $('mTitle').textContent = title; $('mBody').innerHTML = html; $('modal').hidden = false; $('mBody').scrollTop = 0; }
+function closeModal() { $('modal').hidden = true; }
+function reportModal() {
+var r = S.reports[S.reports.length - 1]; if (!r) return;
+var h = '<table class="t">';
+Object.keys(r.rev).sort(function (a, b) { return r.rev[b] - r.rev[a]; }).forEach(function (k) { if (r.rev[k] >= 1) h += '<tr><td>' + nm(k) + ' <span class="muted">(' + n0(r.sold[k]) + ')</span></td><td class="pos">' + M(r.rev[k]) + '</td></tr>'; });
+h += '<tr class="tot"><td>Umsatz</td><td class="pos">' + M(r.revTot) + '</td></tr>';
+[['Wareneinsatz', r.cogs], ['Personal', r.wages], ['DJ', r.dj], ['Betriebskosten', r.ops], ['Werbung & Ereignisse', r.mkt], ['Verderb (' + r.spoil + ' Stk.)', r.spoilVal], ['Pacht', r.fix], ['Wartung', r.upkeep], ['Kreditzinsen', r.interest]].forEach(function (x) { if (x[1] >= 0.5) h += '<tr><td>' + x[0] + '</td><td class="neg">−' + M(x[1]) + '</td></tr>'; });
+h += '<tr class="tot"><td>Tagesgewinn</td><td class="' + (r.profit >= 0 ? 'pos' : 'neg') + '">' + M(r.profit) + '</td></tr></table>';
+if (r.invest || r.buy) h += '<p class="muted">Außerdem ausgegeben: Einkauf ' + M(r.buy) + (r.invest ? ', Ausbau ' + M(r.invest) : '') + '. Kasse jetzt ' + M(r.cash) + '.</p>';
+var lost = r.lost.stock + r.lost.service + r.lost.place;
+h += '<div class="kgrid" style="margin-top:8px"><div class="k"><small>Gäste</small><b>' + n0(r.guests) + '</b><span>' + n0(r.turned) + ' abgewiesen</span></div><div class="k"><small>Verlorene Verkäufe</small><b class="' + (lost >= 1 ? 'neg' : 'pos') + '">' + n0(lost) + '</b><span>Lager ' + n0(r.lost.stock) + ' · Personal ' + n0(r.lost.service) + ' · Platz ' + n0(r.lost.place) + '</span></div><div class="k"><small>Nicht im Angebot</small><b class="' + (r.lost.menu >= 1 ? 'warn' : 'pos') + '">' + n0(r.lost.menu) + '</b><span>Wünsche ohne passende Karte</span></div><div class="k"><small>Zufriedenheit</small><b>' + Math.round(r.sat) + ' %</b><span>Ruf ' + r.rating0.toFixed(2).replace('.', ',') + ' → ' + r.rating1.toFixed(2).replace('.', ',') + '</span></div></div>';
+if (r.rating1 >= B.STAGES[S.stage].rmax - 0.01 && B.stageInfo(S)) h += '<p class="warn">Dein Ruf ist für die ' + B.STAGES[S.stage].n + ' am Maximum. Mehr geht erst nach dem nächsten Ausbau.</p>';
+if (r.goals && r.goals.length) h += r.goals.map(function (g) { return '<p class="gold">Ziel geschafft: ' + esc(g.n) + (g.r ? ' (+' + M(g.r) + ')' : '') + '</p>'; }).join('');
+if (r.autoLoan) h += '<p class="neg">Konto war im Minus – ' + M(r.autoLoan) + ' Kredit automatisch aufgenommen.</p>';
+if (r.debt) h += '<p class="neg"><b>Konto im Minus! Tag ' + r.debt + ' von 3 – danach ist die Bar pleite.</b></p>';
+h += '<div class="btns"><button type="button" class="btn pink" data-a="closeReport">Weiter</button></div>';
+modal('Tagesbilanz Tag ' + r.day, h);
+}
+function startModal() {
+var sv = load(), b = best();
+var h = '<div class="title"><div class="sub">VICE BEACH</div><h1>BEACH BAR BOSS</h1><div class="sub">Zahlen · Sonne · Cocktails</div></div>' +
+'<ul class="help"><li>Ein Tag hat 5 Phasen, jede läuft live etwa eine Minute (Tempo 1×). Preise, Personal, Happy Hour und DJ kannst du auch während der Phase ändern.</li>' +
+'<li>Stell deine <b>Karte</b> zusammen: morgens kalte Softdrinks und Kaffee, nachmittags Bier, abends Wein, Cocktails und Champagner. Die Kartenplätze sind begrenzt.</li>' +
+'<li>Je besser Bar und Ruf, desto zahlungskräftiger das Publikum – vom Surfer bis zum Jetset.</li>' +
+'<li>Abends günstig einkaufen (tagsüber nur Eilbestellung +50 %), ausbauen, werben. Drei Tage im Minus ohne Kreditrahmen = pleite.</li></ul>' +
+'<div class="btns" style="justify-content:center">' + (sv ? '<button type="button" class="btn pink" data-a="cont">Weiter (Tag ' + sv.day + ')</button>' : '') + '<button type="button" class="btn ' + (sv ? '' : 'pink') + '" data-a="new">Neues Spiel</button></div>' +
+(b.day ? '<p class="muted" style="text-align:center">Rekord: Tag ' + b.day + ' · Stufe ' + b.stage + ' · ' + (b.rating || 0).toFixed(2).replace('.', ',') + '★</p>' : '');
+modal('Willkommen', h);
+}
+function overModal() { modal('Pleite', '<p class="neg"><b>Drei Tage im Minus – die Bar ist pleite.</b></p><p>Geschafft bis Tag ' + S.day + ', Stufe ' + S.stage + ' (' + B.STAGES[S.stage].n + '), Ruf-Rekord ' + S.bestRating.toFixed(2).replace('.', ',') + '★.</p><p class="muted">Tipp: Karte zur Tageszeit passend wählen, abends günstig einkaufen, Personal an die Prognose anpassen.</p><div class="btns"><button type="button" class="btn pink" data-a="new">Neues Spiel</button></div>'); }
+function winModal() { modal('Legende!', '<div class="title"><h1>LEGENDE!</h1><div class="sub">Vice Beach Resort mit 4,8★ an Tag ' + S.day + '</div></div><p>Du hast die beste Bar von Vice Beach. Spiel gerne weiter und knack deine Rekorde.</p><div class="btns"><button type="button" class="btn pink" data-a="closeModal">Weiterspielen</button></div>'); }
 
-    lfo.type = 'sine';
-    lfo.frequency.setValueAtTime(26, now);
-    lfo.frequency.linearRampToValueAtTime(14, now + 0.55);
+// ---------- actions ----------
+function msgFlash(t) { var el = document.createElement('div'); el.className = 'hint bad'; el.textContent = t; var L = $('left'); L.insertBefore(el, L.firstChild); L.scrollTop = 0; setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 2500); }
+var LIVEOK = { price: 1, fair: 1, staff: 1, happy: 1, dj: 1, buy: 1, pause: 1, speed: 1, report: 1, closeModal: 1, auto: 1 };
+var ACT = {
+price: function (k, d) { var p = S.prices[k], step = p < 10 ? 0.5 : p < 50 ? 1 : 5; B.setPrice(S, k, Math.max(0, p + (+d) * step)); save(); render(); },
+fair: function () { var ph = curPh(); B.IKEYS.forEach(function (k) { if (B.unlocked(S, k)) B.setPrice(S, k, B.fairFor(S, k, ph)); }); B.RKEYS.forEach(function (k) { if (B.rentOffered(S, k)) B.setPrice(S, k, B.fairPrice(S, k)); }); save(); render(); },
+staff: function (v) { S.plan.staff = +v; save(); render(); },
+happy: function () { S.plan.happy = !S.plan.happy; render(); },
+dj: function () { S.plan.dj = !S.plan.dj; render(); },
+menu: function (k) { var e = B.toggleMenu(S, k); if (e) msgFlash(e); save(); render(); },
+event: function (v) { B.answerEvent(S, v === '1'); save(); render(); },
+run: function () { startPhase(); },
+pause: function () { paused = !paused; render(); },
+speed: function () { cycleSpeed(); },
+auto: function (v, w, el) { autoNext = el.checked; saveOpt(); },
+next: function () { B.nextDay(S); S.plan.happy = false; S.plan.dj = false; feed = []; save(); saveBest(); tab = 'plan'; render(); },
+report: function () { reportModal(); },
+closeReport: function () { closeModal(); if (S.over) { overModal(); return; } if (S.won && !S.winShown) { S.winShown = true; save(); winModal(); } },
+closeModal: function () { closeModal(); },
+buy: function (k, q) { var e = B.buy(S, k, +q); if (e) msgFlash(e); save(); render(); },
+fillAll: function () {
+var fc = withTomorrow(function () { return B.forecastDay(S); });
+S.menu.forEach(function (k) { var need = Math.ceil(fc[k] * 1.1 - S.stock[k]); if (need > 0) B.buy(S, k, need); });
+save(); render();
+},
+expand: function () { var e = B.expand(S); if (e) msgFlash(e); save(); render(); },
+up: function (k) { var e = B.buyUpgrade(S, k); if (e) msgFlash(e); save(); render(); },
+mkt: function (k) { var e = B.buyMkt(S, k); if (e) msgFlash(e); save(); render(); },
+borrow: function (v) { var e = B.borrow(S, +v); if (e) msgFlash(e); save(); render(); },
+repay: function (v) { var e = B.repay(S, +v); if (e) msgFlash(e); save(); render(); },
+restart: function (v, w, el) { if (el.getAttribute('data-sure') !== '1') { el.setAttribute('data-sure', '1'); el.textContent = 'Wirklich? Spielstand wird gelöscht'; return; } newGame(); },
+new: function (v, w, el) { if (load() && !S.over && el.getAttribute('data-sure') !== '1' && $('mTitle').textContent === 'Willkommen') { el.setAttribute('data-sure', '1'); el.textContent = 'Alten Spielstand überschreiben?'; return; } newGame(); },
+cont: function () { S = load() || B.newGame(seed()); closeModal(); tab = 'plan'; render(); }
+};
+function seed() { return (Date.now() & 0x7fffffff) || 7; }
+function newGame() { S = B.newGame(seed()); feed = []; paused = false; save(); closeModal(); tab = 'plan'; render(); }
+function cycleSpeed() { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; saveOpt(); render(); }
+document.addEventListener('click', function (e) {
+var t2 = e.target.closest('[data-t2]'); if (t2) { tab = t2.getAttribute('data-t2'); render(); return; }
+var el = e.target.closest('[data-a]'); if (!el || el.disabled || !S && el.getAttribute('data-a') !== 'new') return;
+var a = el.getAttribute('data-a');
+if (running() && !LIVEOK[a]) return;
+var f = ACT[a]; if (f) f(el.getAttribute('data-v'), el.getAttribute('data-w'), el);
+});
+$('speedBtn').addEventListener('click', cycleSpeed);
+$('pauseBtn').addEventListener('click', function () { if (running()) { paused = !paused; render(); } });
+window.addEventListener('keydown', function (e) {
+if (!S || !$('modal').hidden) { if (e.key === 'Enter' && !$('modal').hidden) { var b = $('mBody').querySelector('.btn.pink'); if (b) b.click(); } return; }
+if (e.key === 'Enter' || e.key === ' ') {
+if (e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') && e.key === ' ') return;
+e.preventDefault();
+if (running()) { paused = !paused; render(); }
+else if (S.mode === 'plan' && !S.event) startPhase(); else if (S.mode === 'night') ACT.next();
+}
+var n = +e.key; if (n >= 1 && n <= 6) { tab = TABS[n - 1][0]; render(); }
+});
 
-    lfoGain.gain.setValueAtTime(55, now);
-    lfoGain.gain.exponentialRampToValueAtTime(4, now + 0.55);
+// ---------- live phase ----------
+function startPhase() {
+if (S.mode !== 'plan' || S.event) return;
+save();
+if (!B.beginPhase(S)) return;
+acc = 0; paused = false; autoT = 0;
+feed.unshift({ t: tLabel(S.run.ph, 0), m: '— ' + B.PHASES[S.run.ph].n + ' beginnt —', c: 'muted' });
+if (tab === 'plan') $('left').setAttribute('data-tab', '');
+render();
+}
+function onTick() {
+var ph = S.run.ph, tk = S.run.tick, before = {};
+S.menu.forEach(function (k) { before[k] = S.stock[k]; });
+var miss0 = {}; for (var c in S.run.R.missing) miss0[c] = S.run.R.missing[c];
+var R = B.tick(S), L = R ? null : S.run.last;
+var last = L || (R ? R.last : null);
+if (last) {
+var top = last.sales.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 3).map(function (x) { return nm(x[0]) + ' ×' + Math.round(x[1]); }).join(', ');
+feed.unshift({ t: tLabel(ph, tk + 1), m: Math.round(last.guests) + ' Gäste · ' + M(last.rev) + (top ? ' · ' + top : '') });
+last.sales.forEach(function (x) { for (var i = 0; i < Math.min(3, Math.ceil(x[1] / 4)); i++) recent.push(B.ITEMS[x[0]].c); });
+while (recent.length > 14) recent.shift();
+S.menu.forEach(function (k) { if (before[k] > 0 && S.stock[k] < 0.5) feed.unshift({ t: tLabel(ph, tk + 1), m: '⚠ ' + nm(k) + ' ausverkauft!', c: 'neg' }); });
+if (last.util > 1.05) feed.unshift({ t: tLabel(ph, tk + 1), m: '⚠ Personal überlastet – Gäste warten', c: 'warn' });
+if (last.turned >= 2) feed.unshift({ t: tLabel(ph, tk + 1), m: '⚠ ' + Math.round(last.turned) + ' Gäste finden keinen Platz', c: 'warn' });
+var mm = (L ? S.run.R.missing : R.missing) || {};
+for (c in mm) if (mm[c] - (miss0[c] || 0) > 1.5 && tk % 3 === 1) feed.unshift({ t: tLabel(ph, tk + 1), m: 'Gäste fragen nach ' + B.CATS[c].n, c: 'warn' });
+occS = S.run ? S.run.occ : (R && R.occ != null ? R.occ : occS);
+if (feed.length > 30) feed.length = 30;
+}
+if (R) {
+lastOcc = Math.min(1, R.guests / Math.max(1, R.cap)); paused = false;
+feed.unshift({ t: tLabel(ph, B.NT), m: '— ' + B.PHASES[ph].n + ' vorbei: Gewinn ' + M(R.profit) + ' —', c: R.profit >= 0 ? 'pos' : 'neg' });
+if (S.mode === 'night') { save(); saveBest(); render(); reportModal(); }
+else { save(); render(); if (autoNext) autoT = 1800; }
+} else render();
+}
 
-    mainGain.gain.setValueAtTime(0.001, now);
-    mainGain.gain.linearRampToValueAtTime(0.32, now + 0.03);
-    mainGain.gain.exponentialRampToValueAtTime(0.001, now + 0.58);
+// ---------- loop ----------
+var lastTs = 0;
+function sceneData(stage, ph, occ) {
+var menu = S.menu.map(function (k) { return { k: k, c: B.ITEMS[k].c, cat: B.ITEMS[k].cat, p: S.prices[k] }; });
+var sold = S.today.sold, topK = null; for (var k in sold) if (B.ITEMS[k] && (!topK || sold[k] > sold[topK])) topK = k;
+var sales = recent.length ? recent : menu.filter(function (m) { return m.cat !== 'food'; }).map(function (m) { return m.c; });
+return {
+stage: stage, up: S.up, phase: ph, mode: running() ? 'run' : 'plan', t: running() ? (S.run.tick + Math.min(1, acc / TICKMS)) / B.NT : 0, occ: occ,
+staff: S.plan.staff, menu: menu, mix: B.segMix(S, Math.min(4, ph), S.plan), sales: sales, dj: S.plan.dj && B.canDJ(S, Math.min(4, ph)), happy: S.plan.happy && B.canHappy(S, Math.min(4, ph)),
+top: topK ? { k: topK, p: S.prices[topK] } : null, rain: S.weather[0].k === 'regen' && S.mode !== 'night'
+};
+}
+function frame(ts) {
+var dt = Math.min(0.1, (ts - lastTs) / 1000 || 0); lastTs = ts; time += dt;
+if (S) {
+if (running() && $('modal').hidden) {
+if (!paused) { acc += dt * 1000 * speed; if (acc >= TICKMS) { acc -= TICKMS; onTick(); } }
+var bar = $('liveBar'); if (bar && running()) bar.style.width = ((S.run.tick + Math.min(1, acc / TICKMS)) / B.NT * 100).toFixed(1) + '%';
+var ck = $('liveClock'); if (ck) ck.textContent = clock();
+if (((time * 4) | 0) % 2 === 0) $('tDay').textContent = 'Tag ' + S.day + ' · ' + clock();
+} else if (autoT > 0 && S.mode === 'plan' && $('modal').hidden) { autoT -= dt * 1000; if (autoT <= 0 && autoNext && !S.event) startPhase(); }
+var occ, ph;
+if (running()) { ph = S.run.ph; occ = occS; }
+else if (S.mode === 'night') { ph = 5; occ = 0; }
+else { ph = S.phase; occ = S.phase === 0 ? 0.15 : lastOcc * 0.6; }
+A.draw(sctx, sceneData(S.stage, ph, occ), time);
+}
+window.requestAnimationFrame(frame);
+}
 
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc.frequency);
-    osc.connect(mainGain);
-    mainGain.connect(ctx.destination);
-
-    osc.start(now);
-    lfo.start(now);
-    osc.stop(now + 0.6);
-    lfo.stop(now + 0.6);
-  }
-
-  function playSynthSigh() {
-    const ctx = ensureAudio();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const duration = 0.78;
-
-    const bufferSize = Math.floor(ctx.sampleRate * duration);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuffer;
-
-    const bandpass = ctx.createBiquadFilter();
-    bandpass.type = 'bandpass';
-    bandpass.frequency.setValueAtTime(680, now);
-    bandpass.frequency.exponentialRampToValueAtTime(410, now + duration);
-    bandpass.Q.setValueAtTime(2.6, now);
-
-    const breathGain = ctx.createGain();
-    breathGain.gain.setValueAtTime(0.001, now);
-    breathGain.gain.linearRampToValueAtTime(0.24, now + 0.14);
-    breathGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    noise.connect(bandpass);
-    bandpass.connect(breathGain);
-    breathGain.connect(ctx.destination);
-
-    const voice = ctx.createOscillator();
-    const formant = ctx.createBiquadFilter();
-    const voiceGain = ctx.createGain();
-
-    voice.type = 'sawtooth';
-    voice.frequency.setValueAtTime(235, now + 0.04);
-    voice.frequency.exponentialRampToValueAtTime(148, now + duration);
-
-    formant.type = 'lowpass';
-    formant.frequency.setValueAtTime(560, now);
-    formant.frequency.exponentialRampToValueAtTime(320, now + duration);
-    formant.Q.setValueAtTime(3.2, now);
-
-    voiceGain.gain.setValueAtTime(0.001, now);
-    voiceGain.gain.linearRampToValueAtTime(0.16, now + 0.12);
-    voiceGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    voice.connect(formant);
-    formant.connect(voiceGain);
-    voiceGain.connect(ctx.destination);
-
-    noise.start(now);
-    voice.start(now + 0.03);
-    noise.stop(now + duration);
-    voice.stop(now + duration);
-  }
-
-  function createCardBackSVG() {
-    return `
-      <svg viewBox="0 0 80 80" shape-rendering="crispEdges" aria-hidden="true">
-        <rect x="12" y="12" width="56" height="56" rx="6" fill="#240636" stroke="#00f0ff" stroke-width="3" />
-        <circle cx="40" cy="36" r="16" fill="#ff2a85" />
-        <rect x="22" y="38" width="36" height="4" fill="#1b062b" />
-        <rect x="24" y="45" width="32" height="3" fill="#1b062b" />
-        <rect x="38" y="34" width="4" height="26" fill="#09020d" />
-        <rect x="26" y="28" width="12" height="4" fill="#09020d" />
-        <rect x="42" y="28" width="12" height="4" fill="#09020d" />
-        <rect x="29" y="24" width="22" height="4" fill="#09020d" />
-        <rect x="22" y="32" width="6" height="4" fill="#09020d" />
-        <rect x="52" y="32" width="6" height="4" fill="#09020d" />
-      </svg>
-    `;
-  }
-
-  function createStarPortraitSVG(item) {
-    let hairBack = '';
-    let hairFront = '';
-    if (item.hairStyle === 'long-blonde') {
-      hairBack = `<path d="M24,36 Q20,76 28,96 L72,96 Q80,76 76,36 Z" fill="${item.hairColor}" />`;
-      hairFront = `<path d="M28,38 Q35,18 50,18 Q65,18 72,38 Q62,27 50,29 Q38,27 28,38 Z" fill="${item.hairColor}" />`;
-    } else if (item.hairStyle === 'big-curl') {
-      hairBack = `<circle cx="30" cy="42" r="18" fill="${item.hairColor}" /><circle cx="70" cy="42" r="18" fill="${item.hairColor}" /><circle cx="50" cy="26" r="20" fill="${item.hairColor}" />`;
-      hairFront = `<path d="M30,36 Q50,20 70,36 Q58,28 50,31 Q42,28 30,36 Z" fill="${item.hairColor}" />`;
-    } else if (item.hairStyle === 'glam-wave') {
-      hairBack = `<path d="M22,38 C16,65 26,92 32,96 L68,96 C74,92 84,65 78,38 Z" fill="${item.hairColor}" />`;
-      hairFront = `<path d="M28,38 C32,16 68,16 72,38 C60,26 42,26 28,38 Z" fill="${item.hairColor}" />`;
-    } else if (item.hairStyle === 'sleek-dark') {
-      hairBack = `<path d="M27,36 L25,94 L75,94 L73,36 Z" fill="${item.hairColor}" />`;
-      hairFront = `<path d="M28,39 Q50,17 72,39 L66,31 L50,28 L34,31 Z" fill="${item.hairColor}" />`;
-    } else {
-      hairBack = `<path d="M20,35 C12,58 20,90 30,96 L70,96 C80,90 88,58 80,35 Z" fill="${item.hairColor}" />`;
-      hairFront = `<path d="M26,38 Q38,14 50,22 Q62,14 74,38 Q58,26 42,28 Z" fill="${item.hairColor}" />`;
-    }
-
-    return `
-      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <defs>
-          <linearGradient id="grad_${item.id}" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="${item.bg1}" />
-            <stop offset="100%" stop-color="${item.bg2}" />
-          </linearGradient>
-        </defs>
-        <rect width="100" height="100" fill="url(#grad_${item.id})" />
-        <circle cx="50" cy="46" r="36" fill="none" stroke="${item.accent}" stroke-width="2" stroke-dasharray="6 4" opacity="0.7" />
-        ${hairBack}
-        <path d="M22,96 C26,76 38,70 50,70 C62,70 74,76 78,96 Z" fill="#160726" stroke="${item.accent}" stroke-width="2" />
-        <rect x="44" y="58" width="12" height="15" rx="4" fill="#f7c59f" />
-        <ellipse cx="50" cy="44" rx="16" ry="20" fill="#fbd3b4" />
-        ${hairFront}
-        <rect x="36" y="40" width="12" height="7" rx="2" fill="#09020d" stroke="${item.accent}" stroke-width="1.4" />
-        <rect x="52" y="40" width="12" height="7" rx="2" fill="#09020d" stroke="${item.accent}" stroke-width="1.4" />
-        <line x1="48" y1="43" x2="52" y2="43" stroke="${item.accent}" stroke-width="1.5" />
-        <path d="M44,54 Q50,51 56,54 Q50,59 44,54 Z" fill="#ff1e6e" />
-      </svg>
-    `;
-  }
-
-  function createDVDCoverSVG(item) {
-    let motif = '';
-    if (item.dvdTheme === 'sunset') {
-      motif = `
-        <circle cx="50" cy="54" r="26" fill="#ffbe0b" />
-        <rect x="15" y="64" width="70" height="36" fill="#240046" />
-        <line x1="15" y1="72" x2="85" y2="72" stroke="#ff2a85" stroke-width="2" />
-        <line x1="15" y1="82" x2="85" y2="82" stroke="#00f0ff" stroke-width="2" />
-      `;
-    } else if (item.dvdTheme === 'diamonds') {
-      motif = `
-        <polygon points="50,18 76,46 50,82 24,46" fill="none" stroke="#00f0ff" stroke-width="3" />
-        <polygon points="50,28 66,46 50,70 34,46" fill="rgba(255,42,133,0.45)" />
-      `;
-    } else if (item.dvdTheme === 'hero') {
-      motif = `
-        <polygon points="50,16 82,38 70,82 30,82 18,38" fill="#d90429" stroke="#ffd166" stroke-width="3" />
-        <polygon points="50,24 62,50 48,50 56,76 34,46 48,46" fill="#ffd166" />
-      `;
-    } else if (item.dvdTheme === 'noir') {
-      motif = `
-        <rect x="18" y="18" width="64" height="64" fill="none" stroke="#f15bb5" stroke-width="2.5" />
-        <circle cx="50" cy="50" r="24" fill="rgba(0,187,249,0.35)" stroke="#00bbf9" stroke-width="2" />
-      `;
-    } else {
-      motif = `
-        <path d="M24,24 L36,42 L64,42 L76,24 L72,68 L50,82 L28,68 Z" fill="rgba(255,158,0,0.4)" stroke="#ffbe0b" stroke-width="2.5" />
-      `;
-    }
-
-    return `
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="dvd_${item.id}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="${item.bg2}" />
-            <stop offset="100%" stop-color="${item.bg1}" />
-          </linearGradient>
-        </defs>
-        <rect width="100" height="100" fill="url(#dvd_${item.id})" />
-        ${motif}
-      </svg>
-    `;
-  }
-
-  function shuffle(array) {
-    const arr = array.slice();
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }
-
-  function buildDeck() {
-    const deck = [];
-    PAIRS.forEach((p) => {
-      deck.push({ pairId: p.id, kind: 'star', data: p, matched: false, flipped: false });
-      deck.push({ pairId: p.id, kind: 'dvd', data: p, matched: false, flipped: false });
-    });
-    return shuffle(deck);
-  }
-
-  function updateHUD() {
-    pairsCountEl.textContent = `${matchedPairs} / ${PAIRS.length}`;
-    movesCountEl.textContent = String(moves);
-    pileCounterEl.textContent = String(matchedPairs * 2);
-  }
-
-  function renderBoard() {
-    boardEl.innerHTML = '';
-    cardsData.forEach((card, idx) => {
-      const cardEl = document.createElement('div');
-      cardEl.className = 'card';
-      cardEl.tabIndex = 0;
-      cardEl.dataset.index = String(idx);
-      const keyLabel = idx === 9 ? '0' : String(idx + 1);
-      cardEl.setAttribute('role', 'button');
-      cardEl.setAttribute('aria-label', `Karte ${keyLabel}`);
-
-      const frontHTML =
-        card.kind === 'star'
-          ? `
-            <div class="card-face card-front type-star">
-              <div class="star-art">${createStarPortraitSVG(card.data)}</div>
-              <div class="star-nameplate">${card.data.starName}</div>
-            </div>
-          `
-          : `
-            <div class="card-face card-front type-dvd">
-              <div class="dvd-case">
-                <div class="dvd-header">
-                  <span>DVD VIDEO</span>
-                  <span class="dvd-badge-night">LATE NIGHT</span>
-                </div>
-                <div class="dvd-art">
-                  ${createDVDCoverSVG(card.data)}
-                  <div class="dvd-title">${card.data.workTitle}</div>
-                  <div class="dvd-year">${card.data.year}</div>
-                </div>
-              </div>
-            </div>
-          `;
-
-      cardEl.innerHTML = `
-        <div class="card-inner">
-          <div class="card-face card-back">
-            <span class="card-key-hint">${keyLabel}</span>
-            ${createCardBackSVG()}
-          </div>
-          ${frontHTML}
-        </div>
-      `;
-
-      cardEl.addEventListener('click', () => handleCardSelect(idx));
-      cardEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleCardSelect(idx);
-        }
-      });
-
-      boardEl.appendChild(cardEl);
-    });
-  }
-
-  function flyCardToPile(cardEl) {
-    const rect = cardEl.getBoundingClientRect();
-    const pileRect = discardPileEl.getBoundingClientRect();
-
-    const clone = document.createElement('div');
-    clone.className = 'flying-card';
-    clone.style.left = `${rect.left}px`;
-    clone.style.top = `${rect.top}px`;
-    clone.style.width = `${rect.width}px`;
-    clone.style.height = `${rect.height}px`;
-    clone.innerHTML = cardEl.querySelector('.card-front').outerHTML;
-    const innerFront = clone.querySelector('.card-front');
-    if (innerFront) {
-      innerFront.style.transform = 'none';
-      innerFront.style.position = 'relative';
-      innerFront.style.width = '100%';
-      innerFront.style.height = '100%';
-    }
-    document.body.appendChild(clone);
-
-    cardEl.classList.add('collected');
-
-    const targetX = pileRect.left + pileRect.width / 2 - (rect.left + rect.width / 2);
-    const targetY = pileRect.top + pileRect.height / 2 - (rect.top + rect.height / 2);
-    const scaleX = Math.max(0.35, (pileRect.width - 10) / rect.width);
-    const scaleY = Math.max(0.35, (pileRect.height - 10) / rect.height);
-    const rot = (Math.random() * 18 - 9).toFixed(1);
-
-    requestAnimationFrame(() => {
-      clone.style.transform = `translate(${targetX}px, ${targetY}px) scale(${scaleX}, ${scaleY}) rotate(${rot}deg)`;
-      clone.style.opacity = '0.9';
-    });
-
-    setTimeout(() => {
-      clone.remove();
-      addMiniCardToPile(rot);
-      discardPileEl.classList.remove('pulse');
-      void discardPileEl.offsetWidth;
-      discardPileEl.classList.add('pulse');
-    }, 640);
-  }
-
-  function addMiniCardToPile(rot) {
-    const mini = document.createElement('div');
-    mini.className = 'pile-mini';
-    mini.style.transform = `rotate(${rot}deg)`;
-    pileCardsEl.appendChild(mini);
-  }
-
-  function clearPendingMismatch() {
-    if (pendingResetTimer !== null) {
-      clearTimeout(pendingResetTimer);
-      pendingResetTimer = null;
-    }
-    flippedIndices.forEach((i) => {
-      if (!cardsData[i].matched) {
-        cardsData[i].flipped = false;
-        const el = boardEl.children[i];
-        if (el) el.classList.remove('flipped');
-      }
-    });
-    flippedIndices = [];
-  }
-
-  function handleCardSelect(index) {
-    const card = cardsData[index];
-    if (!card || card.matched) return;
-
-    if (flippedIndices.length === 2) {
-      clearPendingMismatch();
-    }
-
-    if (card.flipped) return;
-
-    ensureAudio();
-    card.flipped = true;
-    flippedIndices.push(index);
-    const cardEl = boardEl.children[index];
-    if (cardEl) cardEl.classList.add('flipped');
-
-    if (flippedIndices.length === 2) {
-      moves += 1;
-      const [idxA, idxB] = flippedIndices;
-      const cardA = cardsData[idxA];
-      const cardB = cardsData[idxB];
-
-      if (cardA.pairId === cardB.pairId) {
-        cardA.matched = true;
-        cardB.matched = true;
-        matchedPairs += 1;
-        updateHUD();
-        playSynthSigh();
-
-        const elA = boardEl.children[idxA];
-        const elB = boardEl.children[idxB];
-        if (elA) elA.classList.add('matched');
-        if (elB) elB.classList.add('matched');
-
-        flippedIndices = [];
-
-        setTimeout(() => {
-          if (elA) flyCardToPile(elA);
-          if (elB) flyCardToPile(elB);
-        }, 420);
-
-        if (matchedPairs === PAIRS.length) {
-          setTimeout(() => {
-            winSummary.textContent = `Alle 5 Kult-Paare in ${moves} Zügen auf den Stapel befördert!`;
-            winModal.classList.remove('hidden');
-          }, 1150);
-        }
-      } else {
-        updateHUD();
-        playBoing();
-        pendingResetTimer = setTimeout(() => {
-          clearPendingMismatch();
-        }, 900);
-      }
-    }
-  }
-
-  function startNewGame() {
-    if (pendingResetTimer !== null) {
-      clearTimeout(pendingResetTimer);
-      pendingResetTimer = null;
-    }
-    flippedIndices = [];
-    matchedPairs = 0;
-    moves = 0;
-    pileCardsEl.innerHTML = '';
-    winModal.classList.add('hidden');
-    cardsData = buildDeck();
-    updateHUD();
-    renderBoard();
-  }
-
-  soundBtn.addEventListener('click', () => {
-    soundEnabled = !soundEnabled;
-    soundBtn.textContent = soundEnabled ? 'SFX: AN' : 'SFX: AUS';
-    if (soundEnabled) ensureAudio();
-  });
-
-  restartBtn.addEventListener('click', startNewGame);
-  playAgainBtn.addEventListener('click', startNewGame);
-
-  window.addEventListener('keydown', (e) => {
-    if (e.key >= '1' && e.key <= '9') {
-      handleCardSelect(Number(e.key) - 1);
-    } else if (e.key === '0') {
-      handleCardSelect(9);
-    } else if (e.key === 'r' || e.key === 'R') {
-      startNewGame();
-    }
-  });
-
-  startNewGame();
+// ---------- boot ----------
+fit();
+S = load() || B.newGame(seed());
+render();
+startModal();
+window.requestAnimationFrame(frame);
+setTimeout(fit, 60);
 })();
