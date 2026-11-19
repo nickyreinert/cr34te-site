@@ -35,7 +35,8 @@ var GAMEKEYS = ['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight
 function sndScene() {
 if (mode === 'title') SND.scene({ kind: 'title', seed: 3 });
 else if (P) SND.scene({ kind: 'planet', seed: P.p.seed, star: sys.star.type, weather: P.weather });
-else if (sys) SND.scene({ kind: 'space', seed: sys.star.seed, star: sys.star.type });
+else if (mode === 'ending') SND.scene({ kind: 'home', seed: 7 });
+else if (sys) SND.scene({ kind: 'space', seed: sys.star.seed, star: sys.star.type, home: sys.star.id === 'sol' });
 }
 window.addEventListener('keydown', function (e) {
 if (!$('modal').hidden) { if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') { e.preventDefault(); closeModal(); } return; }
@@ -132,6 +133,7 @@ toast(p.name + ': ' + Wt.n + (p.life ? ' · ' + p.life + ' Arten' : '') + (res.l
 save();
 }
 function land(p) {
+if (p.sol === 'erde') { startFade(startEnding, 1.4); return; }
 startFade(function () {
 P = PL.enter(S, p, sys.star.type); mode = 'planet'; o2warn = false; S.lastPlanet = p.i; sndScene();
 handlePlanetEvents();
@@ -215,7 +217,14 @@ $('letter').innerHTML = '<div class="lab ac">' + esc(m.from) + (sub ? ' · ' + e
 show('modal', true); $('letter').scrollTop = 0;
 }
 function openMsg(id) { var e = S.msgs.filter(function (m) { return m.id === id; })[0], m = W.msgById(id); if (!m) return; e.read = true; if (m.from === 'Lena') SND.lena(W.curSection(S)); letter({ from: m.from, t: m.t, b: m.b, year: e.year }); hud(true); save(); }
-function closeModal() { show('modal', false); }
+var autoQ = [], END = null;
+function closeModal() { show('modal', false); if (mode === 'ending') { endCont(); return; } if (autoQ.length) { var nx = autoQ.shift(); setTimeout(function () { openMsg(nx); }, 450); } }
+function startEnding() { mode = 'ending'; END = window.Ending.start(S); show('hud', false); show('ctl', false); show('hint', false); S.flags.home = 1; save(); sndScene(); }
+function epilogueModal() {
+$('letter').innerHTML = '<div class="lab ac">Epilog · Erdjahr ' + Math.floor(S.year) + '</div><h2>Heimkehr</h2>' + W.epilogue(S).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') + '<button type="button" class="go pri" data-a="endCont">Weiterfliegen</button><button type="button" class="go" data-a="endNew">Neue Reise beginnen</button>';
+show('modal', true); $('letter').scrollTop = 0;
+}
+function endCont() { show('modal', false); mode = 'space'; END = null; showPlay(); sndScene(); toast('Du kannst weiterfliegen, so lange du willst. Die Galaxie bleibt offen.'); }
 
 // ---------- map ----------
 function openMap(kind) {
@@ -255,7 +264,7 @@ $('sheet').innerHTML = h; show('sheet', !!h);
 }
 
 // ---------- panels ----------
-function openMenu() { if (mode === 'title' || mode === 'tunnel') return; panelKind = 'menu'; panelTab = panelTab && ['schiff', 'crew', 'log'].indexOf(panelTab) >= 0 ? panelTab : 'schiff'; renderPanel(); show('panel', true); }
+function openMenu() { if (mode === 'title' || mode === 'tunnel' || mode === 'ending') return; panelKind = 'menu'; panelTab = panelTab && ['schiff', 'crew', 'log'].indexOf(panelTab) >= 0 ? panelTab : 'schiff'; renderPanel(); show('panel', true); }
 function openStation() { panelKind = 'station'; panelTab = 'handel'; renderPanel(); show('panel', true); }
 function closePanel() { show('panel', false); panelKind = null; save(); }
 function renderPanel() {
@@ -335,6 +344,8 @@ else if (act === 'sell') { var got = W.sell(S, v, S.res[v], sys.station); toast(
 else if (act === 'fuel') { var er = W.buyFuel(S, sys.station); if (er) toast(er); renderPanel(); save(); }
 else if (act === 'up') { var e2 = W.upgrade(S, v); if (e2) toast(e2); else toast(W.MODS[v].n + ' ausgebaut.'); renderPanel(); save(); }
 else if (act === 'recruit') { var before = S.msgs.length, e3 = W.recruit(S, v); if (e3) toast(e3); else { toast(W.CREW[v].n + ' ist an Bord.'); S.msgs.slice(before).forEach(function (x) { notifyMsg(x.id); }); } renderPanel(); save(); }
+else if (act === 'endCont') endCont();
+else if (act === 'endNew') { store(''); S = null; END = null; show('modal', false); titleScreen(); }
 else if (act === 'music') { S.music = S.music === false; SND.setOn(S.music); renderPanel(); save(); }
 else if (act === 'alb') { S.flags.albatros = 1; S.flags.albWahl = v; if (v === 'boje') { S.forschung += 40; toast('Boje gesetzt. Die Sternkarten der Albatros: +40 Forschung.'); } else toast('Die Kapsel ist an Bord. Die beiden schlafen weiter, bis zur Erde.'); closeModal(); W.deliver(S).forEach(notifyMsg); save(); }
 else if (act === 'reset') { if (a.getAttribute('data-sure') !== '1') { a.setAttribute('data-sure', '1'); a.textContent = 'Wirklich löschen?'; return; } store(''); S = null; closePanel(); titleScreen(); }
@@ -369,8 +380,9 @@ W.SKEYS.map(function (k) { var s = W.SHIPS[k]; return '<button type="button" cla
 function startGame() {
 show('title', false);
 sys = W.system(S, W.findStar(S, S.star)); F = SP.enter(S, sys); mode = 'space'; showPlay(); SND.setOn(S.music !== false); sndScene();
-var first = S.msgs.filter(function (m) { return !m.read; })[0];
-if (first) openMsg(first.id);
+autoQ = S.jumps === 0 ? S.msgs.filter(function (m) { return !m.read; }).map(function (m) { return m.id; }) : [];
+var first = autoQ.length ? autoQ.shift() : (S.msgs.filter(function (m) { return !m.read; })[0] || {}).id;
+if (first) openMsg(first);
 }
 function showPlay() { show('hud', true); show('ctl', true); show('hint', !touch); hud(true); }
 
@@ -412,6 +424,10 @@ ctx.fillStyle = 'rgba(7,8,10,0.45)'; ctx.fillRect(0, 0, CW, CH);
 } else if (mode === 'tunnel' && tunnel) {
 tunnel.t += dt; SP.drawTunnel(ctx, CW, CH, tunnel.t / 2.4, time);
 if (tunnel.t >= 2.4) { arrive(); showPlay(); }
+} else if (mode === 'ending' && END) {
+window.Ending.draw(ctx, END, CW, CH, time, dt);
+if (END.t > 7.8 && !END.theme) { END.theme = 1; SND.lena(6); }
+if (END.t > 13 && !END.shown) { END.shown = 1; epilogueModal(); }
 } else if (mode === 'galaxy') { gstars = SP.drawGalaxy(ctx, S, gview, gsel, time); }
 else if (mode === 'system') { SP.drawSystem(ctx, S, F, SP.sysView(F, CW, CH), time); }
 else if (mode === 'space' && F) {
@@ -431,7 +447,7 @@ if (P) PL.draw(ctx, S, P, CW, CH, time);
 hud();
 }
 if (fade) { var k = 1 - Math.abs(fade.t / fade.d * 2 - 1); ctx.fillStyle = 'rgba(7,8,10,' + Math.min(1, k * 1.2) + ')'; ctx.fillRect(0, 0, CW, CH); }
-if (S && mode !== 'title' && time - lastSave > 20 && mode !== 'tunnel') save();
+if (S && mode !== 'title' && time - lastSave > 20 && mode !== 'tunnel' && mode !== 'ending') save();
 requestAnimationFrame(frame);
 }
 

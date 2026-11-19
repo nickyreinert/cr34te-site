@@ -2,7 +2,7 @@
 'use strict';
 // Spherical, melancholic ambient music, synthesised live. No audio files.
 var A = null, master, dry, wet, on = true, vol = 1, scene = null, nextChord = 0, nextBell = 0, nextTick = 0, chord = 0, prog = null, wind = null, drone = null, failed = false;
-var MODES = { aeolisch: [0, 2, 3, 5, 7, 8, 10], dorisch: [0, 2, 3, 5, 7, 9, 10], phrygisch: [0, 1, 3, 5, 7, 8, 10] };
+var MODES = { aeolisch: [0, 2, 3, 5, 7, 8, 10], dorisch: [0, 2, 3, 5, 7, 9, 10], phrygisch: [0, 1, 3, 5, 7, 8, 10], ionisch: [0, 2, 4, 5, 7, 9, 11] };
 var PROGS = [[0, 5, 3, 6], [0, 3, 5, 4], [0, 6, 5, 3], [0, 4, 5, 3], [5, 3, 0, 6]];
 
 function hz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
@@ -73,9 +73,9 @@ var key = sc.kind + ':' + sc.seed + ':' + (sc.weather || '');
 if (scene && scene.key === key) return;
 sc.key = key; scene = sc;
 var r = rng(sc.seed || 1), modeNames = Object.keys(MODES);
-var mode = MODES[sc.star === 'loch' ? 'phrygisch' : modeNames[Math.floor(r() * 2)]];
+var home = sc.home || sc.kind === 'home', mode = MODES[home ? 'ionisch' : sc.star === 'loch' ? 'phrygisch' : modeNames[Math.floor(r() * 2)]];
 var root = 45 + Math.floor(r() * 7) - (sc.star === 'rot' ? 3 : 0) + (sc.star === 'blau' ? 3 : 0);
-prog = { mode: mode, root: root, seq: PROGS[Math.floor(r() * PROGS.length)], bright: sc.star === 'blau' ? 0.9 : sc.star === 'rot' ? 0.25 : sc.kind === 'planet' ? 0.35 : 0.55, len: sc.kind === 'title' ? 11 : 9 };
+prog = { mode: mode, root: root, seq: home ? [5, 3, 0, 4] : PROGS[Math.floor(r() * PROGS.length)], bright: sc.star === 'blau' ? 0.9 : sc.star === 'rot' ? 0.25 : sc.kind === 'planet' ? 0.35 : 0.55, len: sc.kind === 'title' ? 11 : 9 };
 chord = 0; nextChord = A.currentTime + 0.5; nextBell = A.currentTime + 4;
 stopNode(wind); wind = null; stopNode(drone); drone = null;
 if (sc.kind === 'planet') wind = startWind(sc.weather === 'sand' || sc.weather === 'asche' ? 0.4 : 0.22, sc.weather === 'regen' ? 1800 : 500);
@@ -104,6 +104,7 @@ var t = A.currentTime + 0.2, slow = 1 + (chapter || 1) * 0.08;
 LENA.forEach(function (n) { box(n[0], t + n[1] * slow, 0.28); });
 if (chapter >= 3) LENA.forEach(function (n, i) { if (i % 3 === 0) box(n[0] - 12, t + n[1] * slow, 0.16); });
 if (chapter >= 4) pad(64, t, 6 * slow, 0.4, 0.15);
+if (chapter >= 6) [[52, 55, 59], [48, 52, 55], [43, 47, 50], [50, 54, 57]].forEach(function (ch, i) { ch.forEach(function (m) { pad(m, t + i * 1.4 * slow, 2.6 * slow, 0.5, 0.12); }); pad(ch[0] - 12, t + i * 1.4 * slow, 2.6 * slow, 0.3, 0.16); });
 }
 function sfx(k) {
 if (!A || !on) return;

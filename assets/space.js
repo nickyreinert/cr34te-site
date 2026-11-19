@@ -108,7 +108,9 @@ if (l < lim && l - r < best) { best = l - r; F.near = { kind: o.kind, i: o.i, d:
 }
 
 // ---------- drawing space ----------
+var SOLC = { merkur: ['#b4aca4', '#3a3632'], venus: ['#f0e0b4', '#6a5a3a'], erde: ['#6aa4e0', '#0e2a4e'], mars: ['#d4743e', '#4a1e10'], jupiter: ['#e0c49a', '#6a4a30'], saturn: ['#ecdcac', '#7a6a48'] };
 function planetColors(p) {
+if (p.sol && SOLC[p.sol]) return { lit: SOLC[p.sol][0], dark: SOLC[p.sol][1] };
 var Wt = W.WORLDS[p.type], c0 = hex(Wt.c[0]), c1 = hex(Wt.c[1]), j = (p.hue - 0.5) * 30;
 return { lit: 'rgb(' + Math.min(255, c0[0] + j) + ',' + Math.min(255, c0[1] + j * 0.5) + ',' + Math.min(255, c0[2] - j * 0.3) + ')', dark: 'rgb(' + c1[0] + ',' + c1[1] + ',' + c1[2] + ')' };
 }
@@ -119,11 +121,15 @@ ctx.fillStyle = col.dark; ctx.fillRect(x - r, y - r, r * 2, r * 2);
 if (r > 6) {
 var rr = W.rng(p.seed);
 if (p.type === 'gas') { for (var i = 0; i < 9; i++) { ctx.fillStyle = rgba(i % 2 ? col.lit : '#2a1e18', 0.35); ctx.fillRect(x - r, y - r + i * r * 0.23 + rr() * 4, r * 2, r * (0.08 + rr() * 0.12)); } }
+else if (p.sol === 'venus' || p.sol === 'merkur') { for (i = 0; i < 14; i++) { ctx.fillStyle = rgba(p.sol === 'venus' ? '#fff4d8' : '#2a2622', 0.18); circle(x + (rr() - 0.5) * r * 1.8, y + (rr() - 0.5) * r * 1.8, r * (0.04 + rr() * 0.12)); ctx.fill(); } }
+else if (p.sol === 'erde') { for (i = 0; i < 26; i++) { ctx.fillStyle = rgba(i % 3 === 0 ? '#f4f6f8' : i % 3 === 1 ? '#4a7a3a' : '#9a8a5a', i % 3 === 0 ? 0.3 : 0.55); ctx.beginPath(); ctx.ellipse(x + (rr() - 0.5) * r * 1.7, y + (rr() - 0.5) * r * 1.7, r * (0.06 + rr() * 0.14) * (i % 3 === 0 ? 1.4 : 1), r * (0.04 + rr() * 0.08), rr() * 3, 0, Math.PI * 2); ctx.fill(); } }
 else { for (i = 0; i < 22; i++) { ctx.fillStyle = rgba(p.type === 'leben' || p.type === 'ozean' ? (i % 3 ? '#3a5a3a' : '#e8ece8') : (i % 2 ? '#2a2420' : col.lit), p.type === 'ozean' ? 0.3 : 0.24); var bx = x + (rr() - 0.5) * r * 1.8, by = y + (rr() - 0.5) * r * 1.8, br = r * (0.05 + rr() * 0.17); ctx.beginPath(); ctx.ellipse(bx, by, br * 1.8, br, 0, 0, Math.PI * 2); ctx.fill(); } }
 }
 var gx = x + lx * r * 0.7, gy = y + ly * r * 0.7, g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 1.9);
 g.addColorStop(0, rgba(col.lit, 0.95 * lit)); g.addColorStop(0.45, rgba(col.lit, 0.55 * lit)); g.addColorStop(0.75, 'rgba(7,8,10,0.55)'); g.addColorStop(1, 'rgba(7,8,10,0.97)');
 ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+if (p.sol === 'jupiter' && r > 5) { ctx.fillStyle = rgba('#c0603a', 0.7 * lit); ctx.beginPath(); ctx.ellipse(x + r * 0.25, y + r * 0.22, r * 0.18, r * 0.1, 0, 0, Math.PI * 2); ctx.fill(); }
+if (p.sol === 'erde' && r > 6) { var cr = W.rng(7); for (i = 0; i < 70; i++) { var cx2 = (cr() - 0.5) * 1.8, cy2 = (cr() - 0.5) * 1.8; if (cx2 * cx2 + cy2 * cy2 > 0.8 || cx2 * lx + cy2 * ly > -0.25) continue; ctx.fillStyle = rgba('#ffc878', 0.5 + cr() * 0.4); ctx.fillRect(x + cx2 * r, y + cy2 * r, Math.max(1, r * 0.03), Math.max(1, r * 0.03)); } }
 ctx.restore();
 if (p.type !== 'gas' && p.type !== 'fels') { ctx.strokeStyle = rgba(p.type === 'wueste' ? '#ffd0a0' : '#c8e0ff', 0.25 * lit); ctx.lineWidth = Math.max(1, r * 0.06); circle(x, y, r * 1.02); ctx.stroke(); }
 }
@@ -179,9 +185,10 @@ return;
 var ld = sub([0, 0, 0], o.p), ll = len(ld) || 1; ld = [ld[0] / ll, ld[1] / ll, ld[2] / ll];
 var lx = dot(ld, B.r), ly = -dot(ld, B.u), lz = -dot(ld, B.f);
 var lxy = Math.hypot(lx, ly) || 1; lx /= lxy; ly /= lxy;
-if (o.pl.type === 'gas' && o.pl.hue > 0.45) { ctx.strokeStyle = rgba('#d8c8a0', 0.5); ctx.lineWidth = Math.max(1, r * 0.12); ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.1, r * 0.42, -0.25, Math.PI, Math.PI * 2); ctx.stroke(); }
+var rings = o.pl.sol ? o.pl.sol === 'saturn' : o.pl.type === 'gas' && o.pl.hue > 0.45;
+if (rings) { ctx.strokeStyle = rgba('#d8c8a0', 0.5); ctx.lineWidth = Math.max(1, r * 0.12); ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.1, r * 0.42, -0.25, Math.PI, Math.PI * 2); ctx.stroke(); }
 drawPlanetDisc(q.x, q.y, Math.max(1.2, r), o.pl, lx, ly, lz);
-if (o.pl.type === 'gas' && o.pl.hue > 0.45) { ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.1, r * 0.42, -0.25, 0, Math.PI); ctx.stroke(); }
+if (rings) { ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.1, r * 0.42, -0.25, 0, Math.PI); ctx.stroke(); }
 });
 // heat haze near star
 if (F.inZone) { ctx.fillStyle = rgba(AC, Math.min(0.25, F.heat / 400)); ctx.fillRect(0, 0, w, h); }

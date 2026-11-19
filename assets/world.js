@@ -114,7 +114,7 @@ var r = rng(star.seed ^ 0x9e3779b9), d = Math.hypot(star.x, star.y), sec = secti
 var sys = { star: star, sec: sec, planets: [], station: null };
 if (star.id === 'sol') {
 [['Merkur', 'fels', 9, 320], ['Venus', 'wueste', 14, 470], ['Erde', 'leben', 15, 640], ['Mars', 'wueste', 11, 820], ['Jupiter', 'gas', 34, 1150], ['Saturn', 'gas', 30, 1500]].forEach(function (p, i) {
-sys.planets.push(makePlanet(S, star, i, p[1], r, p[0], p[2], p[3]));
+sys.planets.push(makePlanet(S, star, i, p[1], r, p[0], p[2], p[3])); sys.planets[i].sol = p[0].toLowerCase();
 });
 sys.station = { orbit: 700, ang: 1.2, name: 'Luna-Werft' };
 cacheSys[ck] = sys; return sys;
@@ -292,7 +292,7 @@ return { cr: cr, f: f };
 // ---------- story ----------
 var MSG = [
 { id: 'm0', at: { jumps: 0 }, from: 'Logbuch', t: 'Der Sprung', b: 'Testflug 7, Sprungantrieb Mark II. Ein Lichtblitz, dann Stille. Die Sternkarte erkennt nichts wieder. Nach der Rechnung des Bordcomputers liegt die Erde 2.500 Lichtjahre entfernt.\n\nDer Antrieb funktioniert noch, nur nicht so weit. Ich werde nach Hause springen, ein System nach dem anderen. Und mit jedem Sprung vergehen dort Jahre, die ich nicht erlebe.' },
-{ id: 'm1', at: { jumps: 1 }, from: 'Lena', t: 'Papa?', b: 'Mama sagt, dein Schiff ist verschwunden, aber nicht kaputt. Ich glaube ihr. Ich habe dir ein Bild gemalt, mit einem Raumschiff und einem großen Stern. Der Mann vom Raumfahrtzentrum sagt, er schickt es mit dem Funk hinterher.\n\nKommst du zu meinem Geburtstag?' },
+{ id: 'm1', at: { jumps: 0 }, from: 'Lena', t: 'Papa', b: "Mama sagt, ich soll nicht weinen, weil du nicht kaputt bist, nur sehr weit weg. Ich weine trotzdem. Aber nur abends, wenn sie es nicht sieht.\n\nIch habe dein Hemd mit den Sternen genommen. Ich schlafe darin. Es riecht noch nach dir, nach Kaffee und ein bisschen nach Maschine.\n\nDer Mann vom Raumfahrtzentrum sagt, sie schicken meine Nachricht hinter dir her, so schnell es geht. Er sagt, sie braucht sehr lange. Ich habe gesagt, das macht nichts. Ich kann warten. Ich bin gut im Warten.\n\nIch habe einen Kalender gemalt. Jeden Abend mache ich ein Kreuz. Wenn er voll ist, male ich einen neuen.\n\nKomm nach Hause, Papa. Ich lasse das Licht im Flur an.\n\nDeine Lena, neun Dreiviertel" },
 { id: 'm2', at: { jumps: 3 }, from: 'Raumfahrtzentrum', t: 'Signal empfangen', b: 'An den Piloten von Testflug 7: Wir haben Ihre Sprungsignatur aufgefangen. Sie sind am Leben, und Sie sind weit weg. Ihre Familie ist informiert.\n\nUnsere Nachrichten sind langsamer als Sie. Wenn Sie diese lesen, sind hier Jahre vergangen. Wir halten den Kanal offen.' },
 { id: 'm3', at: { jumps: 5 }, from: 'Lena', t: 'Zwölf', b: 'Ich bin jetzt zwölf. Ich habe einen Teleskop-Kurs angefangen, weil ich wissen will, wo du bist. Man kann dich nicht sehen. Aber ich weiß ungefähr, in welche Richtung ich schauen muss.\n\nMama hat wieder angefangen zu lachen. Das ist gut, oder?' },
 { id: 'm4', at: { crew: 'ida' }, from: 'Logbuch', t: 'Nicht mehr allein', b: 'Ida hat in einer Nacht den Wärmetauscher neu verkabelt. Wir tanken jetzt am Stern, ohne dass ich daran denken muss. Sie redet nicht viel, aber sie summt bei der Arbeit. Das Schiff klingt anders, seit sie da ist.' },
@@ -307,7 +307,7 @@ function deliver(S) {
 var got = [], sec = curSection(S);
 MSG.forEach(function (m) {
 if (S.msgs.some(function (x) { return x.id === m.id; })) return;
-var a = m.at, ok = (a.jumps != null && S.jumps >= a.jumps) || (a.section && sec >= a.section) || (a.crew && hasCrew(S, a.crew)) || (a.flag && (S.flags[a.flag] || 0) >= a.n) || (a.bases && (S.bases || []).length >= a.bases);
+var a = m.at, ok = (a.jumps != null && S.jumps >= a.jumps) || (a.section && sec >= a.section) || (a.crew && hasCrew(S, a.crew)) || (a.flag && (S.flags[a.flag] || 0) >= a.n) || (a.bases && (S.bases || []).length >= a.bases) || (a.dist && dist(S) <= a.dist) || (a.star && S.star === a.star);
 if (ok) { S.msgs.push({ id: m.id, year: Math.floor(S.year), read: false }); got.push(m.id); }
 });
 return got;
@@ -425,5 +425,30 @@ W.ALBATROS = {
 t: 'Die Kapsel der Albatros',
 b: 'Im Orbit des schwarzen Lochs treibt eine Rettungskapsel. Ihr Peilsender ist der, dem wir seit dem Nebelgürtel folgen. Darin schlafen zwei Menschen der Albatros, seit 140 Jahren, kaum gealtert.\n\nRena sagt, wir könnten sie mitnehmen, schlafend, bis zur Erde. Oder wir setzen eine Boje mit ihrer Position und lassen die Erde sie holen. Dann bekommen wir ihre Sternkarten.',
 a: 'Mitnehmen bis zur Erde', bb: 'Boje setzen, Karten nehmen'
+};
+
+[    { id: 'm21', at: { section: 5 }, from: 'Logbuch', t: 'Heimat', b: "Heute habe ich den Orion wiedererkannt. Verzerrt, die Schulter zu weit links, aber er ist es. Ida hat gelacht, als ich es gesagt habe, und dann hat sie lange aus dem Fenster geschaut.\n\nNoch 500 Lichtjahre. Zum ersten Mal sind die Sterne vor uns welche, die auch von der Erde aus zu sehen sind." },
+{ id: 'm22', at: { dist: 420 }, from: 'Raumfahrtzentrum', t: 'Der schnelle Kanal', b: "An Testflug 7: Ab jetzt laufen unsere Nachrichten über die Relaiskette, die das Programm „Heimkehr“ für Sie gebaut hat. Sie werden uns schneller erreichen als je zuvor.\n\nJemand möchte Ihnen etwas sagen." },
+{ id: 'm23', at: { dist: 300 }, from: 'Lena', t: 'Deine Stimme', b: "Papa. Ich habe heute zum ersten Mal deine Stimme gehört. Nur zwölf Sekunden, verrauscht, aus deinem Logbuch, aber es war deine Stimme.\n\nIch bin jetzt älter, als du warst, als du losgeflogen bist. Das ist seltsam, oder? Ich habe graue Haare. Ich habe deine Hände.\n\nDas Licht im Flur ist immer noch an. Mara sagt, das ist Verschwendung. Ich sage, das ist ein Versprechen." },
+{ id: 'm24', at: { dist: 120 }, from: 'Mara', t: 'Hallo Opa', b: "Hallo Opa, ich bin Mara. Ich kenne dich nur aus Mamas Geschichten und von einem Foto, auf dem du einen Helm unter dem Arm trägst und lachst.\n\nIch bin Pilotin geworden, so wie du. Mama ist sehr aufgeregt, auch wenn sie so tut, als wäre sie es nicht. Sie hat einen Kuchen gebacken. Er wird alt sein, wenn du ankommst. Sie backt einfach einen neuen.\n\nWir sehen uns bald." },
+{ id: 'm25', at: { star: 'sol' }, from: 'Lena', t: 'Ich sehe dich', b: "Das Teleskop zeigt einen hellen Punkt neben Jupiter. Das bist du.\n\nIch habe mein halbes Leben auf diesen Punkt gewartet, und jetzt, wo er da ist, weiß ich nicht, was ich sagen soll. Also nur das: Wir warten am Raumhafen. Lande auf der Erde, Papa. Komm nach Hause." }
+].forEach(function (m) { W.MSG.push(m); });
+
+// ---------- homecoming ----------
+W.epilogue = function (S) {
+var y = Math.floor(S.year), age = Math.floor(W.ageLena(S)), out = [];
+out.push('Es ist das Jahr ' + y + '. Du warst ' + S.jumps + ' Sprünge und ' + W.fmt(S.stats.ly) + ' Lichtjahre unterwegs. Für dich waren es Monate. Auf der Erde sind ' + (y - W.START_YEAR) + ' Jahre vergangen.');
+out.push(age < 60 ? 'Lena läuft dir über das Landefeld entgegen, schneller, als es sich für eine Frau von ' + age + ' gehört. Sie sagt nichts. Sie hält dich einfach fest, lange.' : age < 76 ? 'Lena steht am Rand des Landefelds, ' + age + ' Jahre alt, die Haare weiß. Als du die Rampe herunterkommst, legt sie die Hand auf den Mund. Dann sagt sie: „Du bist zu spät zum Abendessen.“ Und lacht und weint gleichzeitig.' : 'Lena sitzt am Rand des Landefelds, eine Decke über den Knien, ' + age + ' Jahre alt. Sie steht auf, als sie dich sieht, ganz allein, und niemand wagt, ihr zu helfen. „Ich habe das Licht angelassen“, sagt sie.');
+out.push('Neben ihr steht Mara in einer Pilotenjacke, die deiner sehr ähnlich sieht.');
+var cn = S.crew.map(function (k) { return W.CREW[k].n.split(' ')[0]; });
+out.push(cn.length ? (cn.length > 1 ? cn.slice(0, -1).join(', ') + ' und ' + cn[cn.length - 1] : cn[0]) + ' gehen hinter dir die Rampe hinunter. Ihr seid zusammen angekommen, und das wird so bleiben.' : 'Du gehst allein die Rampe hinunter. Das Schiff hinter dir knistert, als es abkühlt.');
+if (S.flags.albWahl === 'mit') out.push('Die beiden Schläfer der Albatros werden im Krankenhaus des Raumhafens geweckt. Draußen warten ihre Nachfahren, die sie nur aus Familienalben kennen.');
+else if (S.flags.albWahl === 'boje') out.push('Ein Bergungsschiff bricht in derselben Woche zur Boje der Albatros auf, entlang deiner Route.');
+var nb = (S.bases || []).length;
+if (nb) out.push(nb === 1 ? 'Deine Basis sendet weiter ihr Signal durch die Nacht. Sie ist der erste Stein eines Weges.' : 'Deine ' + nb + ' Basen senden weiter ihr Signal. Auf den Karten des Raumfahrtzentrums sind sie mit einer roten Linie verbunden. Darüber steht: „Die Straße“.');
+if (S.flags.pulsars) out.push('Lenas Observatorium hat deine ' + S.flags.pulsars + ' Pulsarmessungen veröffentlicht. Man nennt sie die Weiss-Uhren.');
+if (S.stats.species) out.push('Der Katalog deiner Reise umfasst ' + S.stats.species + ' Arten, die kein Mensch je zuvor gesehen hat.');
+out.push('Am Abend sitzt du in Lenas Küche. Im Flur brennt das Licht. Du bist zu Hause.');
+return out;
 };
 })(typeof window !== 'undefined' ? window : globalThis);
