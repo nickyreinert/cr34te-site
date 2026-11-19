@@ -3,35 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Beach Bar Boss</title>
+<title>Lichtjahre</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div id="app">
-<header id="top">
-<div class="kpi"><small id="tDay">Tag 1</small><b id="tPhase">Morgen</b></div>
-<div class="kpi"><small id="tWeatherL">Wetter</small><b id="tWeather">–</b></div>
-<div class="kpi"><small>Kasse</small><b id="tCash" class="money">$0</b></div>
-<div class="kpi"><small id="tRatingL">Ruf</small><b id="tRating" class="stars"></b></div>
-<div class="kpi hide-s"><small>Stufe</small><b id="tStage">Strandbude</b></div>
-<div class="ctl"><button type="button" id="pauseBtn" title="Pause (Leertaste)">❚❚</button><button type="button" id="speedBtn" title="Tempo">1×</button></div>
-</header>
-<div id="sceneWrap"><canvas id="scene" width="320" height="150" aria-label="Die Strandbar"></canvas></div>
-<nav id="phases"></nav>
-<div id="tabs" role="tablist"></div>
-<main id="main">
-<section id="left" class="pane"></section>
-<section id="right" class="pane"></section>
-</main>
-<div id="modal" hidden>
-<div class="win" role="dialog" aria-modal="true" aria-labelledby="mTitle">
-<div class="whead"><span id="mTitle"></span></div>
-<div id="mBody"></div>
+<canvas id="cv" aria-label="Spielansicht"></canvas>
+<div id="hud" hidden>
+<div id="meters"></div>
+<div id="info"></div>
 </div>
+<div id="mapbar" hidden>
+<button type="button" data-a="mapGal">Galaxie</button>
+<button type="button" data-a="mapSys">System</button>
+<button type="button" data-a="mapClose" aria-label="Karte schließen">Schließen</button>
 </div>
+<div id="sheet" hidden></div>
+<div id="ctl" hidden>
+<div id="joy" aria-hidden="true"><i></i></div>
+<div id="btns">
+<button type="button" id="bAlt">Schub</button>
+<button type="button" id="bAct">Aktion</button>
 </div>
-<script src="assets/sim.js"></script>
-<script src="assets/art.js"></script>
+<button type="button" id="bMenu" aria-label="Menü">Menü<span id="badge" hidden></span></button>
+</div>
+<div id="hint" hidden></div>
+<div id="toasts"></div>
+<div id="panel" hidden>
+<div class="ph"><nav id="tabs"></nav><button type="button" class="x" data-a="closePanel" aria-label="Schließen">&times;</button></div>
+<div id="pbody"></div>
+</div>
+<div id="modal" hidden><div class="letter" id="letter"></div></div>
+<div id="title"></div>
+</div>
+<script src="assets/world.js"></script>
+<script src="assets/space.js"></script>
+<script src="assets/planet.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
