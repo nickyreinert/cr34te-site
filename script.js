@@ -31,7 +31,7 @@ function unread() { return S ? S.msgs.filter(function (m) { return !m.read; }).l
 // ---------- input ----------
 var keys = {}, actPressed = false, jumpPressed = false, bActHeld = false, bAltHeld = false, joy = { x: 0, y: 0, id: null };
 var GAMEKEYS = ['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], SND = window.Sound;
-['pointerdown', 'keydown'].forEach(function (t) { window.addEventListener(t, function () { SND.resume(); }, true); });
+['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(function (t) { window.addEventListener(t, function () { SND.resume(); }, true); });
 function sndScene() {
 if (mode === 'title') SND.scene({ kind: 'title', seed: 3 });
 else if (P) SND.scene({ kind: 'planet', seed: P.p.seed, star: sys.star.type, weather: P.weather });

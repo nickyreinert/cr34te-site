@@ -1,7 +1,7 @@
 (function (root) {
 'use strict';
 // Spherical, melancholic ambient music, synthesised live. No audio files.
-var A = null, master, dry, wet, on = true, vol = 0.32, scene = null, nextChord = 0, nextBell = 0, nextTick = 0, chord = 0, prog = null, wind = null, drone = null, failed = false;
+var A = null, master, dry, wet, on = true, vol = 1, scene = null, nextChord = 0, nextBell = 0, nextTick = 0, chord = 0, prog = null, wind = null, drone = null, failed = false;
 var MODES = { aeolisch: [0, 2, 3, 5, 7, 8, 10], dorisch: [0, 2, 3, 5, 7, 9, 10], phrygisch: [0, 1, 3, 5, 7, 8, 10] };
 var PROGS = [[0, 5, 3, 6], [0, 3, 5, 4], [0, 6, 5, 3], [0, 4, 5, 3], [5, 3, 0, 6]];
 
@@ -16,10 +16,11 @@ return b;
 function init() {
 if (A || failed) return;
 try { A = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { failed = true; return; }
-master = A.createGain(); master.gain.value = 0; master.connect(A.destination);
+var comp = A.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.connect(A.destination);
+master = A.createGain(); master.gain.value = 0; master.connect(comp);
 var rev = A.createConvolver(); rev.buffer = impulse(5);
-wet = A.createGain(); wet.gain.value = 0.9; wet.connect(rev); var rg = A.createGain(); rg.gain.value = 0.55; rev.connect(rg); rg.connect(master);
-dry = A.createGain(); dry.gain.value = 0.35; dry.connect(master);
+wet = A.createGain(); wet.gain.value = 0.9; wet.connect(rev); var rg = A.createGain(); rg.gain.value = 0.9; rev.connect(rg); rg.connect(master);
+dry = A.createGain(); dry.gain.value = 0.7; dry.connect(master);
 setOn(on);
 }
 function resume() { init(); if (A && A.state === 'suspended') A.resume(); if (A && scene && !scene.key) { var s0 = scene; scene = null; setScene(s0); } }
@@ -77,8 +78,8 @@ var root = 45 + Math.floor(r() * 7) - (sc.star === 'rot' ? 3 : 0) + (sc.star ===
 prog = { mode: mode, root: root, seq: PROGS[Math.floor(r() * PROGS.length)], bright: sc.star === 'blau' ? 0.9 : sc.star === 'rot' ? 0.25 : sc.kind === 'planet' ? 0.35 : 0.55, len: sc.kind === 'title' ? 11 : 9 };
 chord = 0; nextChord = A.currentTime + 0.5; nextBell = A.currentTime + 4;
 stopNode(wind); wind = null; stopNode(drone); drone = null;
-if (sc.kind === 'planet') wind = startWind(sc.weather === 'sand' || sc.weather === 'asche' ? 0.12 : 0.06, sc.weather === 'regen' ? 1800 : 500);
-if (sc.star === 'loch') drone = startDrone(28, 0.22);
+if (sc.kind === 'planet') wind = startWind(sc.weather === 'sand' || sc.weather === 'asche' ? 0.4 : 0.22, sc.weather === 'regen' ? 1800 : 500);
+if (sc.star === 'loch') drone = startDrone(33, 0.5);
 }
 function note(deg, oct) { var m = prog.mode, d = ((deg % 7) + 7) % 7, o = Math.floor(deg / 7); return prog.root + m[d] + 12 * (o + (oct || 0)); }
 function update() {
@@ -86,12 +87,12 @@ if (!A || !on || !scene || !prog || A.state !== 'running') return;
 var t = A.currentTime;
 if (t >= nextChord) {
 var deg = prog.seq[chord % prog.seq.length], L = prog.len;
-[0, 2, 4].forEach(function (k, i) { pad(note(deg + k, i === 0 ? 0 : 0), nextChord, L + 2, prog.bright, 0.045); });
-pad(note(deg, -1), nextChord, L + 2, prog.bright * 0.5, 0.05);
+[0, 2, 4].forEach(function (k, i) { pad(note(deg + k, 0), nextChord, L + 2, prog.bright, 0.3); });
+pad(note(deg, -1), nextChord, L + 2, prog.bright * 0.5, 0.34);
 chord++; nextChord += L;
 }
-if (t >= nextBell) { var r = Math.random(); bell(note([0, 2, 4, 6, 7][Math.floor(r * 5)], 2), nextBell, 0.035); nextBell += 4 + Math.random() * 7; }
-if (scene.star === 'pulsar' && scene.kind === 'space') { if (t >= nextTick) { tick(nextTick, 0.08, 1800); nextTick = Math.max(nextTick + 0.75, t); } }
+if (t >= nextBell) { var r = Math.random(); bell(note([0, 2, 4, 6, 7][Math.floor(r * 5)], 2), nextBell, 0.12); nextBell += 4 + Math.random() * 7; }
+if (scene.star === 'pulsar' && scene.kind === 'space') { if (t >= nextTick) { tick(nextTick, 0.3, 1800); nextTick = Math.max(nextTick + 0.75, t); } }
 else nextTick = t;
 }
 
@@ -100,19 +101,19 @@ var LENA = [[76, 0], [79, 0.45], [81, 0.9], [83, 1.35], [81, 2.0], [79, 2.45], [
 function lena(chapter) {
 resume(); if (!A || !on) return;
 var t = A.currentTime + 0.2, slow = 1 + (chapter || 1) * 0.08;
-LENA.forEach(function (n) { box(n[0], t + n[1] * slow, 0.09); });
-if (chapter >= 3) LENA.forEach(function (n, i) { if (i % 3 === 0) box(n[0] - 12, t + n[1] * slow, 0.05); });
-if (chapter >= 4) pad(64, t, 6 * slow, 0.4, 0.05);
+LENA.forEach(function (n) { box(n[0], t + n[1] * slow, 0.28); });
+if (chapter >= 3) LENA.forEach(function (n, i) { if (i % 3 === 0) box(n[0] - 12, t + n[1] * slow, 0.16); });
+if (chapter >= 4) pad(64, t, 6 * slow, 0.4, 0.15);
 }
 function sfx(k) {
 if (!A || !on) return;
 var t = A.currentTime;
-if (k === 'scan') { box(88, t, 0.05); box(93, t + 0.12, 0.05); }
-else if (k === 'mine') { tick(t, 0.12, 900); tick(t + 0.09, 0.08, 1300); }
-else if (k === 'dock') { bell(72, t, 0.06); bell(79, t + 0.25, 0.05); }
+if (k === 'scan') { box(88, t, 0.16); box(93, t + 0.12, 0.16); }
+else if (k === 'mine') { tick(t, 0.4, 900); tick(t + 0.09, 0.3, 1300); }
+else if (k === 'dock') { bell(72, t, 0.18); bell(79, t + 0.25, 0.15); }
 else if (k === 'jump') {
 var s = A.createBufferSource(); s.buffer = noiseBuf(2.6); var f = A.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(3000, t + 2.2);
-var g = A.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 1.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.5);
+var g = A.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 1.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.5);
 s.connect(f); f.connect(g); out(g, 0.6); s.start(t);
 }
 }
