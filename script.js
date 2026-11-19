@@ -30,7 +30,13 @@ function unread() { return S ? S.msgs.filter(function (m) { return !m.read; }).l
 
 // ---------- input ----------
 var keys = {}, actPressed = false, jumpPressed = false, bActHeld = false, bAltHeld = false, joy = { x: 0, y: 0, id: null };
-var GAMEKEYS = ['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+var GAMEKEYS = ['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], SND = window.Sound;
+['pointerdown', 'keydown'].forEach(function (t) { window.addEventListener(t, function () { SND.resume(); }, true); });
+function sndScene() {
+if (mode === 'title') SND.scene({ kind: 'title', seed: 3 });
+else if (P) SND.scene({ kind: 'planet', seed: P.p.seed, star: sys.star.type, weather: P.weather });
+else if (sys) SND.scene({ kind: 'space', seed: sys.star.seed, star: sys.star.type });
+}
 window.addEventListener('keydown', function (e) {
 if (!$('modal').hidden) { if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') { e.preventDefault(); closeModal(); } return; }
 if (GAMEKEYS.indexOf(e.code) >= 0 && !(e.target && e.target.tagName === 'BUTTON' && e.code === 'Space' && mode === 'title')) e.preventDefault();
@@ -93,6 +99,7 @@ if (!n) return { l: 'Erkunden', idle: 1 };
 if (n.k === 'node') return { l: 'Abbauen · halten', hold: 1 };
 if (n.k === 'species') return { l: 'Scannen · halten', hold: 1 };
 if (n.k === 'wreck') return { l: 'Untersuchen · halten', hold: 1 };
+if (n.k === 'site') return P.site.built ? { l: 'Deine Basis', idle: 1 } : { l: 'Basis bauen' };
 return { l: 'Abheben', fn: leavePlanet };
 }
 if (mode !== 'space' || !F) return null;
@@ -103,6 +110,7 @@ var p = sys.planets[near.i];
 if (!S.scanned[p.key]) return { l: 'Scannen', fn: function () { scan(p); } };
 if (W.WORLDS[p.type].land) return { l: 'Landen', fn: function () { land(p); } };
 }
+if (near && near.kind === 'star' && W.measurable(S)) return { l: sys.star.type === 'loch' ? 'Schwarzes Loch vermessen' : 'Pulsar vermessen', fn: measureStar };
 if (near && near.kind === 'star' && F.inZone && W.STARS[sys.star.type].fuel > 0) {
 if (S.fuel < W.tankMax(S) - 0.5) return { l: 'Auftanken · halten', hold: 1 };
 }
@@ -119,12 +127,13 @@ else SP.setTarget(F, o, true);
 function scan(p) {
 var r = W.scanPlanet(S, p); if (!r) return;
 var Wt = W.WORLDS[p.type], res = Object.keys(p.res).map(function (k) { return W.RES[k].n; });
+SND.sfx('scan');
 toast(p.name + ': ' + Wt.n + (p.life ? ' · ' + p.life + ' Arten' : '') + (res.length ? ' · ' + res.join(', ') : '') + ' · +' + r.cr + ' Cr, +' + r.f + ' Forschung');
 save();
 }
 function land(p) {
 startFade(function () {
-P = PL.enter(S, p, sys.star.type); mode = 'planet'; o2warn = false; S.lastPlanet = p.i;
+P = PL.enter(S, p, sys.star.type); mode = 'planet'; o2warn = false; S.lastPlanet = p.i; sndScene();
 handlePlanetEvents();
 }, 0.9);
 }
@@ -132,7 +141,7 @@ function leavePlanet(abort) {
 var p = P.p, loot = P.loot, cr = P.cr;
 startFade(function () {
 var lost = abort ? PL.abort(S, P) : null;
-SP.warpTo(F, { kind: 'planet', i: p.i }); mode = 'space'; P = null;
+SP.warpTo(F, { kind: 'planet', i: p.i }); mode = 'space'; P = null; sndScene();
 var got = W.RKEYS.filter(function (k) { return loot[k]; }).map(function (k) { return (loot[k] - (lost && lost[k] || 0)) + ' t ' + W.RES[k].n; });
 if (abort) toast('Notrückruf: Der Sauerstoff war leer. Die Hälfte der Ausbeute blieb auf ' + p.name + '.');
 if (got.length || cr) toast('Ausbeute: ' + got.concat(cr ? ['+' + fmt(cr) + ' Cr'] : []).join(', '));
@@ -146,19 +155,41 @@ ev.forEach(function (e) {
 if (e.k === 'species') toast((e.auto ? 'Rena hat erfasst: ' : 'Neue Art: ') + e.sp.name + (e.sp.rare ? ' (selten)' : '') + ' · +' + e.res.cr + ' Cr, +' + e.res.f + ' Forschung');
 if (e.k === 'wreck') letter({ from: 'Fundstück', t: 'Ein Wrack', b: e.text });
 if (e.k === 'leave') leavePlanet(false);
+if (e.k === 'mined') SND.sfx('mine');
+if (e.k === 'drones') toast('Deine Drohnen haben abgebaut: ' + Object.keys(e.got).map(function (k) { return e.got[k] + ' t ' + W.RES[k].n; }).join(', '));
+if (e.k === 'build') { var nb = S.msgs.length, be = W.buildBase(S, P.p); if (be) toast(be); else { P.site.built = true; SND.sfx('dock'); toast('Basis auf ' + P.p.name + ' errichtet. Sie liefert bei jedem Sprung Nachschub.'); S.msgs.slice(nb).forEach(function (x) { notifyMsg(x.id); }); save(); } }
 if (e.k === 'o2out' && !fade) leavePlanet(true);
 });
 }
-function dock() { F.speed = 0; F.auto = false; openStation(); }
+function dock() {
+F.speed = 0; F.auto = false; SND.sfx('dock');
+if (W.hasCrew(S, 'mira')) {
+var keep = { eisen: 20, kristall: 10, sporen: 10, exotik: 16 }, sold = [], sum = 0;
+W.RKEYS.forEach(function (k) { var n = (S.res[k] || 0) - keep[k]; if (n > 0 && sys.station.price[k] >= W.RES[k].p * 1.02) { sum += W.sell(S, k, n, sys.station); sold.push(n + ' t ' + W.RES[k].n); } });
+if (sold.length) toast('Mira hat verkauft: ' + sold.join(', ') + ' · +' + fmt(sum) + ' Cr');
+}
+openStation();
+}
+function measureStar() {
+var r = W.measure(S); if (!r) return; SND.sfx('scan');
+toast((r.hole ? 'Schwarzes Loch vermessen' : 'Pulsar vermessen') + ' · +' + r.f + ' Forschung, +' + r.ex + ' t Exotische Materie, +' + fmt(r.cr) + ' Cr');
+r.msgs.forEach(notifyMsg); save();
+}
+function albatros() {
+var A2 = W.ALBATROS;
+$('letter').innerHTML = '<div class="lab ac">Funde · Der Schlund</div><h2>' + esc(A2.t) + '</h2>' + A2.b.split('\n\n').map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') + '<button type="button" class="go pri" data-a="alb" data-v="mit">' + esc(A2.a) + '</button><button type="button" class="go" data-a="alb" data-v="boje">' + esc(A2.bb) + '</button>';
+show('modal', true);
+}
 function doJump(st) {
 var r = W.jump(S, st); if (!r.ok) { toast(r.why); return; }
 S.trail = S.trail || []; var cur = st; S.trail.push([cur.x, cur.y]); if (S.trail.length > 80) S.trail.shift();
-closeMap(true); mode = 'tunnel'; tunnel = { t: 0, star: st, res: r };
+closeMap(true); mode = 'tunnel'; tunnel = { t: 0, star: st, res: r }; SND.sfx('jump');
 show('hud', false); show('ctl', false);
 }
 function arrive() {
 var r = tunnel.res; tunnel = null;
-sys = W.system(S, W.findStar(S, S.star)); F = SP.enter(S, sys); mode = 'space'; gsel = null;
+sys = W.system(S, W.findStar(S, S.star)); F = SP.enter(S, sys); mode = 'space'; gsel = null; sndScene();
+if (r.sling) toast('Schleudersprung: ' + fmt(r.d) + ' Lichtjahre. Nahe am Loch verging die Zeit langsamer, auf der Erde 8 Jahre mehr.');
 var st = sys.star, T = W.STARS[st.type];
 toast(st.name + ' · ' + T.n + ' · ' + sys.planets.length + ' Planeten' + (sys.station ? ' · Station' : '') + ' · auf der Erde ist es jetzt ' + Math.floor(S.year));
 r.news.auto.forEach(function (t) { toast(t); });
@@ -167,8 +198,9 @@ var sec = r.news.sectionUp, nm = W.MKEYS.filter(function (k) { return W.MODS[k].
 var wl = Object.keys(W.WORLDS).filter(function (k) { return W.WORLDS[k].sec === sec; }).map(function (k) { return W.WORLDS[k].n; });
 letter({ from: 'Abschnitt ' + sec, t: W.SECTIONS[sec], b: 'Neuer Abschnitt der Reise erreicht. Noch ' + fmt(W.dist(S)) + ' Lichtjahre bis zur Erde.' + (wl.length ? '\n\nNeue Welten: ' + wl.join(', ') + '.' : '') + (nm.length ? '\nNeue Module an Stationen: ' + nm.join(', ') + '.' : '') });
 }
-r.news.crew.forEach(function (k) { var C = W.CREW[k]; toast(C.n + ' (' + C.role + ') sucht eine Mitfahrgelegenheit. Du findest sie auf der nächsten Station.'); });
+r.news.crew.forEach(function (k) { var C = W.CREW[k]; toast(C.n + ' (' + C.role + ') sucht eine Mitfahrgelegenheit – auf der nächsten Station.'); });
 r.news.msgs.forEach(notifyMsg);
+if (sys.star.type === 'loch' && W.curSection(S) >= 4 && !S.flags.albatros) setTimeout(albatros, 1200);
 save();
 }
 function notifyMsg(id) { var m = W.msgById(id); toast('Nachricht · ' + m.from + ': „' + m.t + '“', 'Lesen', function () { openMsg(id); }); }
@@ -182,7 +214,7 @@ var age = S ? Math.floor(W.ageLena(S)) : 9, sub = m.year ? 'Erdjahr ' + m.year +
 $('letter').innerHTML = '<div class="lab ac">' + esc(m.from) + (sub ? ' · ' + esc(sub) : '') + '</div><h2>' + esc(m.t) + '</h2>' + m.b.split('\n\n').map(function (p) { return '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>'; }).join('') + '<button type="button" class="go pri" data-a="closeModal" style="max-width:260px;margin-top:10px">Weiter</button>';
 show('modal', true); $('letter').scrollTop = 0;
 }
-function openMsg(id) { var e = S.msgs.filter(function (m) { return m.id === id; })[0], m = W.msgById(id); if (!m) return; e.read = true; letter({ from: m.from, t: m.t, b: m.b, year: e.year }); hud(true); save(); }
+function openMsg(id) { var e = S.msgs.filter(function (m) { return m.id === id; })[0], m = W.msgById(id); if (!m) return; e.read = true; if (m.from === 'Lena') SND.lena(W.curSection(S)); letter({ from: m.from, t: m.t, b: m.b, year: e.year }); hud(true); save(); }
 function closeModal() { show('modal', false); }
 
 // ---------- map ----------
@@ -202,9 +234,9 @@ var d = W.dist(S);
 if (!gsel) h = '<div class="lab">Sternkarte</div><h2>Nach Hause</h2><p class="p">Tippe einen Stern im orangen Kreis an. Je näher er an Sol liegt, desto näher bist du der Erde.</p><div class="kv"><div><div class="lab">Bis Sol</div><b>' + fmt(d) + '<small>LJ</small></b></div><div><div class="lab">Tank</div><b>' + Math.round(S.fuel) + '<small>/ ' + W.tankMax(S) + '</small></b></div></div>';
 else {
 var c = W.canJump(S, gsel), T = W.STARS[gsel.type], nd = Math.hypot(gsel.x, gsel.y);
-h = '<div class="lab ac">' + esc(T.n) + (S.visited[gsel.id] ? ' · besucht' : '') + '</div><h2>' + esc(gsel.name) + '</h2>' +
+h = (c.sling ? '<div class="lab ac">Schleudersprung am schwarzen Loch</div>' : '') + '<div class="lab ac">' + esc(T.n) + (S.visited[gsel.id] ? ' · besucht' : '') + '</div><h2>' + esc(gsel.name) + '</h2>' +
 '<div class="kv"><div><div class="lab">Distanz</div><b>' + num(c.d || 0) + '<small>LJ</small></b></div><div><div class="lab">Treibstoff</div><b>' + (c.fuel || W.fuelCost(S, c.d || 0)) + '<small>/ ' + Math.round(S.fuel) + '</small></b></div>' +
-'<div><div class="lab">Danach bis Sol</div><b>' + fmt(nd) + '<small>LJ</small></b></div><div><div class="lab">Auf der Erde</div><b>+' + num(W.yearsFor(c.d || 0), 1) + '<small>JAHRE</small></b></div></div>' +
+'<div><div class="lab">Danach bis Sol</div><b>' + fmt(nd) + '<small>LJ</small></b></div><div><div class="lab">Auf der Erde</div><b>+' + num(c.years || W.yearsFor(c.d || 0), 1) + '<small>JAHRE</small></b></div></div>' +
 '<button type="button" class="go pri" data-a="jump" ' + (c.ok ? '' : 'disabled') + '>Springen</button>' + (c.ok ? '' : '<p class="why">' + esc(c.why) + (c.why === 'Zu wenig Treibstoff' ? ' – tanke am Stern auf oder kaufe an einer Station.' : '') + '</p>');
 }
 } else if (mode === 'system') {
@@ -242,6 +274,7 @@ var sh = W.SHIPS[S.ship], h = '<div class="lab">' + esc(sh.d) + '</div><h1>' + e
 h += '<div class="lab" style="margin-bottom:6px">Module · Einbau an Stationen</div>';
 W.MKEYS.forEach(function (k) { var M = W.MODS[k]; h += '<div class="row"><div><div class="n">' + M.n + lv(S.mods[k]) + '</div><div class="d">' + M.d + ' · jetzt ' + fmtMod(k) + '</div></div></div>'; });
 h += '<div class="lab" style="margin:22px 0 6px">Fracht</div>' + W.RKEYS.map(function (k) { return '<div class="row"><div class="n">' + W.RES[k].n + '</div><div class="d">' + (S.res[k] || 0) + ' t</div></div>'; }).join('');
+h += '<div class="lab" style="margin:22px 0 6px">Basen · ' + (S.bases || []).length + '</div>' + ((S.bases || []).length ? S.bases.map(function (b) { return '<div class="row"><div><div class="n">' + esc(b.name) + '</div><div class="d">liefert ' + W.RES[b.k].n + ' bei jedem Sprung</div></div></div>'; }).join('') : '<p class="p">Ab dem Nebelgürtel kannst du neben deinem Landeplatz eine Basis bauen (' + fmt(W.BASE_COST.cr) + ' Cr, ' + W.BASE_COST.eisen + ' t Eisen, ' + W.BASE_COST.kristall + ' t Kristall).</p>');
 return h;
 },
 crew: function () {
@@ -253,9 +286,9 @@ return h;
 },
 log: function () {
 var h = '<div class="lab">Erdjahr ' + Math.floor(S.year) + ' · Lena ist ' + Math.floor(W.ageLena(S)) + '</div><h1>Logbuch</h1>';
-h += '<div class="grid2"><div class="stat"><div class="lab">Bis Sol</div><b>' + fmt(W.dist(S)) + ' Lj</b></div><div class="stat"><div class="lab">Sprünge</div><b>' + S.jumps + '</b></div><div class="stat"><div class="lab">Planeten gescannt</div><b>' + S.stats.planets + '</b></div><div class="stat"><div class="lab">Arten entdeckt</div><b>' + S.stats.species + '</b></div></div>';
+h += '<div class="grid2"><div class="stat"><div class="lab">Bis Sol</div><b>' + fmt(W.dist(S)) + ' Lj</b></div><div class="stat"><div class="lab">Sprünge</div><b>' + S.jumps + '</b></div><div class="stat"><div class="lab">Planeten gescannt</div><b>' + S.stats.planets + '</b></div><div class="stat"><div class="lab">Arten entdeckt</div><b>' + S.stats.species + '</b></div><div class="stat"><div class="lab">Pulsare vermessen</div><b>' + (S.flags.pulsars || 0) + '</b></div><div class="stat"><div class="lab">Schwarze Löcher</div><b>' + (S.flags.holes || 0) + '</b></div><div class="stat"><div class="lab">Basen</div><b>' + (S.bases || []).length + '</b></div></div>';
 S.msgs.slice().reverse().forEach(function (e) { var m = W.msgById(e.id); h += '<button type="button" class="msg' + (e.read ? '' : ' new') + '" data-msg="' + e.id + '"><div class="lab">' + esc(m.from) + ' · Erdjahr ' + e.year + '</div><div class="n">' + esc(m.t) + '</div></button>'; });
-h += '<div class="row" style="margin-top:20px"><div><div class="n">Musik</div><div class="d">Sphärische Klänge folgen mit dem nächsten Abschnitt der Reise.</div></div></div>';
+h += '<div class="row" style="margin-top:20px"><div><div class="n">Musik</div><div class="d">Sphärische Klänge, live erzeugt</div></div><button type="button" class="go act" data-a="music">' + (S.music !== false ? 'An · ausschalten' : 'Aus · einschalten') + '</button></div>';
 h += '<div class="row"><div><div class="n">Neue Reise</div><div class="d">Löscht den Spielstand.</div></div><button type="button" class="go act" data-a="reset">Neu beginnen</button></div>';
 return h;
 },
@@ -302,6 +335,8 @@ else if (act === 'sell') { var got = W.sell(S, v, S.res[v], sys.station); toast(
 else if (act === 'fuel') { var er = W.buyFuel(S, sys.station); if (er) toast(er); renderPanel(); save(); }
 else if (act === 'up') { var e2 = W.upgrade(S, v); if (e2) toast(e2); else toast(W.MODS[v].n + ' ausgebaut.'); renderPanel(); save(); }
 else if (act === 'recruit') { var before = S.msgs.length, e3 = W.recruit(S, v); if (e3) toast(e3); else { toast(W.CREW[v].n + ' ist an Bord.'); S.msgs.slice(before).forEach(function (x) { notifyMsg(x.id); }); } renderPanel(); save(); }
+else if (act === 'music') { S.music = S.music === false; SND.setOn(S.music); renderPanel(); save(); }
+else if (act === 'alb') { S.flags.albatros = 1; S.flags.albWahl = v; if (v === 'boje') { S.forschung += 40; toast('Boje gesetzt. Die Sternkarten der Albatros: +40 Forschung.'); } else toast('Die Kapsel ist an Bord. Die beiden schlafen weiter, bis zur Erde.'); closeModal(); W.deliver(S).forEach(notifyMsg); save(); }
 else if (act === 'reset') { if (a.getAttribute('data-sure') !== '1') { a.setAttribute('data-sure', '1'); a.textContent = 'Wirklich löschen?'; return; } store(''); S = null; closePanel(); titleScreen(); }
 else if (act === 'newGame') titleShips();
 else if (act === 'continue') { S = load(); if (S) startGame(); }
@@ -324,7 +359,7 @@ var sv = load();
 $('title').innerHTML = '<div class="in"><div class="lab">Logbuch · Tag 1</div><h1>Lichtjahre</h1><p class="p">Ein Sprungtest geht schief. Die Erde liegt 2.500 Lichtjahre entfernt. Jeder Sprung bringt dich näher – und auf der Erde vergehen die Jahre.</p>' +
 '<div class="menu">' + (sv ? '<button type="button" class="go pri" data-a="continue">Weiterfliegen · Sprung ' + sv.jumps + '</button>' : '') + '<button type="button" class="go ' + (sv ? '' : 'pri') + '" data-a="newGame">Neue Reise</button></div>' +
 '<div class="foot">' + (touch ? 'TIPPEN ZUM SPIELEN' : 'KLICKEN ZUM SPIELEN · MAUS ODER TASTATUR') + '</div></div>';
-show('title', true);
+show('title', true); sndScene();
 }
 function titleShips() {
 $('title').innerHTML = '<div class="in"><div class="lab">Vor dem Start</div><h1 style="font-size:clamp(40px,6vw,64px)">Wähle dein Schiff</h1><div class="ships">' +
@@ -333,7 +368,7 @@ W.SKEYS.map(function (k) { var s = W.SHIPS[k]; return '<button type="button" cla
 }
 function startGame() {
 show('title', false);
-sys = W.system(S, W.findStar(S, S.star)); F = SP.enter(S, sys); mode = 'space'; showPlay();
+sys = W.system(S, W.findStar(S, S.star)); F = SP.enter(S, sys); mode = 'space'; showPlay(); SND.setOn(S.music !== false); sndScene();
 var first = S.msgs.filter(function (m) { return !m.read; })[0];
 if (first) openMsg(first.id);
 }
@@ -366,7 +401,7 @@ $('hint').textContent = mode === 'planet' ? 'A/D LAUFEN · W SPRINGEN, HALTEN = 
 var lastTs = 0;
 function frame(ts) {
 var dt = Math.min(0.05, (ts - lastTs) / 1000 || 0); lastTs = ts; time += dt;
-var paused = !$('panel').hidden || !$('modal').hidden;
+var paused = !$('panel').hidden || !$('modal').hidden; SND.update();
 var inp = input();
 if (fade) { fade.t += dt; if (!fade.done && fade.t >= fade.d / 2) { fade.done = true; fade.mid(); } if (fade.t >= fade.d) fade = null; }
 if (mode === 'title') {

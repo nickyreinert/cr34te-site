@@ -71,8 +71,8 @@ for (var i = 0; i < n; i++) {
 var px = (sx + r()) * SECT, py = (sy + r()) * SECT, d = Math.hypot(px, py);
 if (d < 60) continue;
 var sec = section(d), w = { gelb: 30, rot: 40, blau: 8, weiss: 10 };
-if (sec >= 3) w.pulsar = 3;
-if (sec >= 4) w.loch = 2;
+if (sec >= 3) w.pulsar = 12;
+if (sec >= 4) w.loch = 8;
 var st = { id: sx + '_' + sy + '_' + i, x: px, y: py, seed: hash(seed, sx * 31 + i, sy * 17 + i * 3) };
 var rr = rng(st.seed); st.type = wpick(rr, w); st.name = starName(rr);
 out.push(st);
@@ -129,7 +129,7 @@ if (star.id === 'start' && i === 1) t = 'leben';
 if (star.id === 'start' && i === 0) t = 'fels';
 sys.planets.push(makePlanet(S, star, i, t, r, null, null, orbit));
 }
-var hasStation = star.id === 'start' || r() < 0.38 || (hash(S.seed, star.seed, 9) % 3 === 0 && r() < 0.5);
+var hasStation = star.id === 'start' || star.type === 'loch' || r() < 0.38 || (hash(S.seed, star.seed, 9) % 3 === 0 && r() < 0.5);
 if (hasStation) { var pp = sys.planets[Math.floor(r() * sys.planets.length)]; sys.station = { orbit: pp.orbit + 90, ang: pp.ang + 0.25, name: word(r, 2) + '-Hafen', price: {} }; RKEYS.forEach(function (k) { sys.station.price[k] = Math.round(RES[k].p * (0.75 + r() * 0.55)); }); sys.station.fuel = Math.round(3 + r() * 3); }
 if (sys.station && !sys.station.price) { sys.station.price = {}; RKEYS.forEach(function (k) { sys.station.price[k] = RES[k].p; }); sys.station.fuel = 4; }
 var wr = r();
@@ -149,6 +149,7 @@ weather: W.weather.length ? pick(pr, W.weather) : '', res: {}
 };
 for (var k in W.res) if (pr() < 0.4 + W.res[k] * 0.18) p.res[k] = Math.round(W.res[k] * (2 + pr() * 3));
 if (star.id === 'sol') { p.life = type === 'leben' ? 6 : 0; }
+if ((star.type === 'pulsar' || star.type === 'loch') && W.land) p.res.exotik = 2 + Math.floor(pr() * 4);
 return p;
 }
 function planetPos(p, t) { var a = p.ang + (t || 0) * 0.002 / Math.sqrt(p.orbit / 300); return [Math.cos(a) * p.orbit, Math.sin(a * 0.9) * p.orbit * 0.04, Math.sin(a) * p.orbit]; }
@@ -179,7 +180,9 @@ rena: { n: 'Rena Solberg', role: 'Biologin', auto: 'scannt beim Landen alle sich
 var CKEYS = ['ida', 'tomas', 'rena'];
 
 function modVal(S, k) { var v = MODS[k].val[S.mods[k] || 0], sh = SHIPS[S.ship]; if (k === 'antrieb') v += sh.range; if (k === 'tank') v += sh.tank; if (k === 'laderaum') v += sh.cargo; if (k === 'anzug') v += sh.o2; if (k === 'quartiere') v += sh.quarters; return v; }
-function range(S) { return modVal(S, 'antrieb'); }
+function baseRange(S) { return modVal(S, 'antrieb'); }
+function sling(S) { var st = findStar(S, S.star); return st && st.type === 'loch' && S.mods.gravi > 0 ? MODS.gravi.val[S.mods.gravi] : 0; }
+function range(S) { return Math.max(baseRange(S), sling(S)); }
 function tankMax(S) { return modVal(S, 'tank'); }
 function cargoMax(S) { return modVal(S, 'laderaum'); }
 function cargoUsed(S) { var n = 0; RKEYS.forEach(function (k) { n += S.res[k] || 0; }); return n; }
@@ -195,7 +198,7 @@ function curSection(S) { return section(dist(S)); }
 function newGame(seed, ship) {
 var S = {
 v: VERSION, seed: seed >>> 0, ship: ship || 'kranich', star: 'start', jumps: 0, year: START_YEAR, cr: 600, res: { eisen: 0, kristall: 0, sporen: 0 }, forschung: 0,
-fuel: 0, mods: {}, crew: [], recruitable: [], msgs: [], scanned: {}, species: {}, mined: {}, wrecks: {}, visited: {}, flags: {}, music: true, stats: { ly: 0, planets: 0, species: 0 }
+fuel: 0, mods: {}, crew: [], recruitable: [], bases: [], msgs: [], scanned: {}, species: {}, mined: {}, wrecks: {}, visited: {}, flags: {}, music: true, stats: { ly: 0, planets: 0, species: 0 }
 };
 MKEYS.forEach(function (k) { S.mods[k] = 0; });
 S.fuel = Math.round(tankMax(S) * 0.6);
@@ -210,20 +213,20 @@ function canJump(S, target) {
 var cur = findStar(S, S.star), d = Math.hypot(target.x - cur.x, target.y - cur.y);
 if (target.id === S.star) return { ok: false, why: 'Hier bist du schon', d: 0 };
 if (d > range(S)) return { ok: false, why: 'Außer Reichweite (' + Math.round(range(S)) + ' Lj)', d: d };
-var f = fuelCost(S, d);
+var sl = d > baseRange(S), f = fuelCost(S, Math.min(d, baseRange(S)));
 if (S.fuel < f) return { ok: false, why: 'Zu wenig Treibstoff', d: d, fuel: f };
-return { ok: true, d: d, fuel: f, years: yearsFor(d) };
+return { ok: true, d: d, fuel: f, years: yearsFor(d) + (sl ? 8 : 0), sling: sl };
 }
 function jump(S, target) {
 var c = canJump(S, target); if (!c.ok) return c;
-var before = curSection(S);
+var before = curSection(S), prod = production(S, findStar(S, S.star));
 S.fuel -= c.fuel; S.star = target.id; S.jumps++; S.year += c.years; S.stats.ly += c.d;
 S.visited[target.id] = 1;
 var after = curSection(S);
-var news = { sectionUp: after > before ? after : 0, msgs: deliver(S), crew: [], auto: [] };
+var news = { sectionUp: after > before ? after : 0, msgs: deliver(S), crew: [], auto: prod };
 CKEYS.forEach(function (k) { var C = CREW[k]; if (S.recruitable.indexOf(k) < 0 && !hasCrew(S, k) && after >= C.sec && S.jumps >= C.jumps && (!C.sec || after >= C.sec)) { S.recruitable.push(k); news.crew.push(k); } });
 if (hasCrew(S, 'ida')) { var st = STARS[target.type]; if (st.fuel > 0) { var add = tankMax(S) - S.fuel; if (add > 0) { S.fuel = tankMax(S); news.auto.push('Ida hat am Stern ' + Math.round(add) + ' E nachgetankt.'); } } }
-return { ok: true, d: c.d, years: c.years, news: news };
+return { ok: true, d: c.d, years: c.years, sling: c.sling, news: news };
 }
 
 // ---------- refuel ----------
@@ -258,7 +261,7 @@ return { ok: !miss.length, why: miss.length ? 'Es fehlen ' + miss.join(', ') : '
 function upgrade(S, k) {
 var u = canUpgrade(S, k); if (!u.ok) return u.why;
 var c = u.cost; S.cr -= c.cr; RKEYS.forEach(function (r) { if (c[r]) S.res[r] -= c[r]; }); if (c.forschung) S.forschung -= c.forschung;
-var oldT = tankMax(S); S.mods[k]++; if (k === 'tank') S.fuel += tankMax(S) - oldT;
+var oldT = tankMax(S); S.mods[k] = (S.mods[k] || 0) + 1; if (k === 'tank') S.fuel += tankMax(S) - oldT;
 return '';
 }
 function recruit(S, k) {
@@ -304,7 +307,7 @@ function deliver(S) {
 var got = [], sec = curSection(S);
 MSG.forEach(function (m) {
 if (S.msgs.some(function (x) { return x.id === m.id; })) return;
-var a = m.at, ok = (a.jumps != null && S.jumps >= a.jumps) || (a.section && sec >= a.section) || (a.crew && hasCrew(S, a.crew));
+var a = m.at, ok = (a.jumps != null && S.jumps >= a.jumps) || (a.section && sec >= a.section) || (a.crew && hasCrew(S, a.crew)) || (a.flag && (S.flags[a.flag] || 0) >= a.n) || (a.bases && (S.bases || []).length >= a.bases);
 if (ok) { S.msgs.push({ id: m.id, year: Math.floor(S.year), read: false }); got.push(m.id); }
 });
 return got;
@@ -316,16 +319,111 @@ var WRECKS = [
 'Ein halb verschütteter Container. Darin Saatgut, sorgfältig beschriftet, und ein Kinderfoto. Auf der Rückseite: „Für die Erde. Falls wir es schaffen.“'
 ];
 
+// ---------- bases, measuring, production ----------
+function mainRes(p) { var best = null; for (var k in p.res) if (!best || p.res[k] > p.res[best]) best = k; return best || 'eisen'; }
+function canBuild(S, p) {
+if ((S.bases || []).some(function (b) { return b.key === p.key; })) return { ok: false, built: true, why: 'Hier steht schon eine Basis' };
+if (curSection(S) < 2) return { ok: false, why: 'Basen ab Abschnitt 2 (Nebelgürtel)' };
+var c = root.World.BASE_COST || { cr: 2500, eisen: 20, kristall: 8 }, miss = [];
+if (S.cr < c.cr) miss.push(fmt(c.cr - S.cr) + ' Cr');
+RKEYS.forEach(function (k) { if (c[k] && (S.res[k] || 0) < c[k]) miss.push((c[k] - (S.res[k] || 0)) + ' t ' + RES[k].n); });
+return { ok: !miss.length, why: miss.length ? 'Es fehlen ' + miss.join(', ') : '', cost: c };
+}
+function buildBase(S, p) {
+var u = canBuild(S, p); if (!u.ok) return u.why;
+S.cr -= u.cost.cr; RKEYS.forEach(function (k) { if (u.cost[k]) S.res[k] -= u.cost[k]; });
+S.bases.push({ key: p.key, name: p.name, k: mainRes(p) });
+deliver(S); return '';
+}
+function production(S, leaving) {
+var out = [], mult = hasCrew(S, 'ben') ? 2 : 1, cr = 0, got = {};
+(S.bases || []).forEach(function (b) { var a = addRes(S, b.k, 3 * mult); got[b.k] = (got[b.k] || 0) + a; cr += 120 * mult + (3 * mult - a) * 20; });
+if (S.bases && S.bases.length) { S.cr += cr; out.push('Deine ' + S.bases.length + ' Basen liefern ' + Object.keys(got).filter(function (k) { return got[k]; }).map(function (k) { return got[k] + ' t ' + RES[k].n; }).concat([fmt(cr) + ' Cr']).join(', ') + '.'); }
+if (hasCrew(S, 'kofi') && leaving) {
+var sys = system(S, leaving), cnt = {}, best = 'eisen';
+sys.planets.forEach(function (p) { for (var k in p.res) cnt[k] = (cnt[k] || 0) + p.res[k]; });
+for (var k in cnt) if (!cnt[best] || cnt[k] > cnt[best]) best = k;
+var n = addRes(S, best, 2 + 3 * (S.mods.drohnen || 0));
+if (n) out.push('Kofis Drohnen bringen ' + n + ' t ' + RES[best].n + ' mit.');
+}
+return out;
+}
+function measurable(S) { var st = findStar(S, S.star); return (st.type === 'pulsar' || st.type === 'loch') && !(S.flags.measured && S.flags.measured[st.id]); }
+function measure(S) {
+if (!measurable(S)) return null;
+var st = findStar(S, S.star), hole = st.type === 'loch';
+S.flags.measured = S.flags.measured || {}; S.flags.measured[st.id] = 1;
+var key = hole ? 'holes' : 'pulsars'; S.flags[key] = (S.flags[key] || 0) + 1;
+var f = hole ? 30 : 20, ex = addRes(S, 'exotik', hole ? 4 : 2), cr = hole ? 900 : 600;
+S.forschung += f; S.cr += cr;
+return { hole: hole, f: f, ex: ex, cr: cr, msgs: deliver(S) };
+}
+
 function serialize(S) { return JSON.stringify(S); }
-function deserialize(s) { var o = JSON.parse(s); return o && o.v === VERSION && o.mods ? o : null; }
+function deserialize(s) {
+var o = JSON.parse(s); if (!o || o.v !== VERSION || !o.mods) return null;
+MKEYS.forEach(function (k) { if (o.mods[k] == null) o.mods[k] = 0; }); RKEYS.forEach(function (k) { if (o.res[k] == null) o.res[k] = 0; });
+o.bases = o.bases || []; o.flags = o.flags || {};
+return o;
+}
 
 root.World = {
 VERSION: VERSION, SECT: SECT, START_YEAR: START_YEAR, hash: hash, rng: rng, clamp: clamp, fmt: fmt, word: word,
 STARS: STARS, WORLDS: WORLDS, RES: RES, RKEYS: RKEYS, SECTIONS: SECTIONS, SHIPS: SHIPS, SKEYS: SKEYS, MODS: MODS, MKEYS: MKEYS, CREW: CREW, CKEYS: CKEYS, MSG: MSG, WRECKS: WRECKS,
 section: section, curSection: curSection, dist: dist, starsNear: starsNear, findStar: findStar, solStar: solStar, system: system, planetPos: planetPos,
-newGame: newGame, ageLena: ageLena, canJump: canJump, jump: jump, refuelRate: refuelRate, range: range, tankMax: tankMax, cargoMax: cargoMax, cargoUsed: cargoUsed,
+newGame: newGame, ageLena: ageLena, baseRange: baseRange, sling: sling, canBuild: canBuild, buildBase: buildBase, measurable: measurable, measure: measure, canJump: canJump, jump: jump, refuelRate: refuelRate, range: range, tankMax: tankMax, cargoMax: cargoMax, cargoUsed: cargoUsed,
 crewMax: crewMax, o2Max: o2Max, modVal: modVal, hasCrew: hasCrew, fuelCost: fuelCost, yearsFor: yearsFor, addRes: addRes, sell: sell, buyFuel: buyFuel,
 modCost: modCost, canUpgrade: canUpgrade, upgrade: upgrade, recruit: recruit, scanPlanet: scanPlanet, scanSpecies: scanSpecies, msgById: msgById, deliver: deliver,
 serialize: serialize, deserialize: deserialize
+};
+})(typeof window !== 'undefined' ? window : globalThis);
+(function (root) {
+'use strict';
+var W = root.World;
+
+// ---------- worlds of the Pulsarfeld and the Schlund ----------
+W.WORLDS.kristall = { n: 'Kristallwelt', land: 1, sec: 3, c: ['#b8c8e8', '#4a5a8a'], grav: [0.6, 1.0], res: { kristall: 4, exotik: 0.6 }, life: [0, 3], weather: ['klar', 'glitzer'] };
+W.WORLDS.lava = { n: 'Lavawelt', land: 1, sec: 4, c: ['#c8603a', '#2a1410'], grav: [0.9, 1.4], res: { eisen: 3, exotik: 1 }, life: [0, 2], weather: ['asche', 'klar'] };
+W.WORLDS.gift = { n: 'Giftwelt', land: 1, sec: 4, c: ['#a8c070', '#3a4a22'], grav: [0.7, 1.2], res: { sporen: 3, exotik: 0.6 }, life: [2, 5], weather: ['nebel', 'sporen'] };
+
+W.RES.exotik = { n: 'Exotische Materie', p: 260 };
+W.RKEYS.push('exotik');
+
+// ---------- modules ----------
+W.MODS.drohnen = { n: 'Drohnen-Hangar', d: 'Drohnen bauen beim Landen selbst ab', val: [0, 1, 2, 3], unit: 'Drohnen', sec: 3, cost: [{ cr: 4000, eisen: 25, kristall: 10 }, { cr: 8000, kristall: 20, exotik: 4 }, { cr: 14000, exotik: 10, forschung: 40 }] };
+W.MODS.gravi = { n: 'Gravitationsschild', d: 'Schleudersprung an schwarzen Löchern', val: [0, 300, 400, 500], unit: 'Lj', sec: 4, cost: [{ cr: 9000, kristall: 20, exotik: 8 }, { cr: 15000, exotik: 16, forschung: 40 }, { cr: 24000, exotik: 24, forschung: 60 }] };
+W.MKEYS.push('drohnen', 'gravi');
+
+// ---------- crew ----------
+W.CREW.kofi = { n: 'Kofi Mensah', role: 'Geologe', auto: 'bringt bei jedem Sprung Rohstoffe aus dem verlassenen System mit', cost: 2500, sec: 3, jumps: 0, intro: 'Kofi hat drei Jahre lang allein Asteroiden vermessen und spricht mit seinen Drohnen wie mit Kollegen. „Gib mir einen Hangar und einen Grund, morgens aufzustehen.“' };
+W.CREW.mira = { n: 'Mira Castell', role: 'Händlerin', auto: 'verkauft beim Andocken Überschüsse zum guten Preis', cost: 2000, sec: 3, jumps: 0, intro: 'Mira kennt die Preise jeder Station im Pulsarfeld auswendig. „Du fliegst, ich rechne. Am Ende bist du reicher und ich bin näher an der Erde. Abgemacht?“' };
+W.CREW.ben = { n: 'Ben Arvidsson', role: 'Baumeister', auto: 'Basen liefern doppelt so viel', cost: 3000, sec: 4, jumps: 0, intro: 'Ben hat Habitate auf Monden gebaut, die heute niemand mehr besucht. „Ich will etwas bauen, das bleibt. Am besten entlang eines Weges, den andere nach uns gehen.“' };
+W.CKEYS.push('kofi', 'mira', 'ben');
+
+// ---------- story: chapters 3 and 4 ----------
+[
+{ id: 'm11', at: { flag: 'pulsars', n: 1 }, from: 'Lena', t: 'Ich habe dich', b: 'Heute Nacht hat die Antenne ein Signal aufgefangen, das im Takt eines Pulsars schwingt. Es war deins. Ich habe dreimal nachgerechnet und dann geweint, im Kontrollraum, vor allen.\n\nIch weiß jetzt, wo du bist. Nicht genau, aber genug. Miss weiter, Papa. Jeder Pulsar macht dein Signal schärfer.' },
+{ id: 'm12', at: { crew: 'kofi' }, from: 'Logbuch', t: 'Kofis Drohnen', b: 'Kofi hat seinen drei Drohnen Namen gegeben: Ebbe, Flut und Mittwoch. Er sagt, Mittwoch sei die fleißigste. Seit er an Bord ist, kommen wir aus jedem System mit vollen Kisten zurück.' },
+{ id: 'm13', at: { flag: 'pulsars', n: 2 }, from: 'Lena', t: 'Mara', b: 'Du hast eine Enkelin. Sie heißt Mara und ist heute vier Jahre alt geworden. Sie fragt, warum Opa im Himmel wohnt, und ich sage: Er wohnt nicht dort, er ist auf dem Heimweg.\n\nSie hat ein Raumschiff aus Pappe gebaut. Es hat einen Ring in der Mitte, so wie deins.' },
+{ id: 'm14', at: { crew: 'mira' }, from: 'Logbuch', t: 'Mira rechnet', b: 'Mira hat eine Tabelle aller Stationen angelegt, die wir passiert haben, mit Preisen, Ankunftszeiten und einer Spalte „Kaffee: gut/schlecht“. Sie sagt, die Spalte sei die wichtigste.' },
+{ id: 'm15', at: { flag: 'pulsars', n: 3 }, from: 'Raumfahrtzentrum', t: 'Empfangsprogramm', b: 'An Testflug 7: Mit den Pulsardaten Ihrer Tochter können wir Ihren Kurs vorausberechnen. Das Programm „Heimkehr“ ist genehmigt. Wenn Sie Sol erreichen, wird jemand auf Sie warten.\n\nDr. Lena Weiss leitet das Programm.' },
+{ id: 'm16', at: { section: 4 }, from: 'Logbuch', t: 'Der Schlund', b: 'Hier verschlucken schwarze Löcher das Licht ganzer Sternhaufen. Die Karte zeigt Lavawelten und Planeten, deren Luft nach Metall schmeckt. Der Peilsender der Albatros ist jetzt laut und klar.\n\nNoch 1.000 Lichtjahre. Zum ersten Mal fühlt sich die Erde nah an.' },
+{ id: 'm17', at: { flag: 'holes', n: 1 }, from: 'Logbuch', t: 'Die Zeit am Rand', b: 'Wir haben ein schwarzes Loch vermessen. Nahe am Rand vergehen für uns Minuten, auf der Erde Wochen. Rena hat die Uhren verglichen und nichts gesagt. Wir wissen beide, was das bedeutet: Abkürzungen gibt es hier, aber sie kosten Zeit, die nicht uns gehört.' },
+{ id: 'm18', at: { crew: 'ben' }, from: 'Logbuch', t: 'Ben baut', b: 'Ben hat die Pläne aller unserer Basen an die Kabinenwand gepinnt und mit einer roten Schnur verbunden. „Das ist kein Fluchtweg“, sagt er, „das ist eine Straße.“' },
+{ id: 'm19', at: { bases: 3 }, from: 'Lena', t: 'Eine Straße nach Hause', b: 'Die Sender deiner Basen kommen hier an, einer nach dem anderen. Das Zentrum nennt sie „die Brotkrumen“. Mara will Pilotin werden, um sie eines Tages abzufliegen.\n\nIch habe ihr gesagt, dass sie das von dir hat.' },
+{ id: 'm20', at: { flag: 'albatros', n: 1 }, from: 'Lena', t: 'Die Albatros', b: 'Das Zentrum hat deinen Bericht über die Albatros bestätigt. Sie galt seit 140 Jahren als verschollen. Auf der Erde gibt es noch Nachfahren der Crew. Sie haben mir geschrieben. Sie danken dir.\n\nIch bin so stolz auf dich, dass es wehtut.' }
+].forEach(function (m) { W.MSG.push(m); });
+
+W.WRECKS.push(
+'Ein Messgerät, noch warm von einer Batterie, die seit Jahrzehnten leer sein müsste. Auf dem Display ein Puls im Takt eines fernen Pulsars, darunter: „Takt 7 von 12 vermessen“.',
+'Ein Grabstein aus einem Rumpfblech, sorgfältig geschweißt: „Jonas Varga, Maschinist der Albatros. Er hat den Antrieb bis zuletzt am Leben gehalten.“',
+'Ein Kartentisch, auf dem jemand mit Kreide eine Route zu einem schwarzen Loch gezeichnet hat. Daneben: „Die Schlafkapsel bleibt im Orbit. Irgendwer wird kommen.“'
+);
+
+W.BASE_COST = { cr: 2500, eisen: 20, kristall: 8 };
+W.ALBATROS = {
+t: 'Die Kapsel der Albatros',
+b: 'Im Orbit des schwarzen Lochs treibt eine Rettungskapsel. Ihr Peilsender ist der, dem wir seit dem Nebelgürtel folgen. Darin schlafen zwei Menschen der Albatros, seit 140 Jahren, kaum gealtert.\n\nRena sagt, wir könnten sie mitnehmen, schlafend, bis zur Erde. Oder wir setzen eine Boje mit ihrer Position und lassen die Erde sie holen. Dann bekommen wir ihre Sternkarten.',
+a: 'Mitnehmen bis zur Erde', bb: 'Boje setzen, Karten nehmen'
 };
 })(typeof window !== 'undefined' ? window : globalThis);

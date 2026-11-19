@@ -152,9 +152,17 @@ var r = o.r * q.s;
 if (o.kind === 'star') {
 if (st.type === 'loch') {
 var g0 = ctx.createRadialGradient(q.x, q.y, r * 0.8, q.x, q.y, r * 7); g0.addColorStop(0, rgba(AC, 0.7)); g0.addColorStop(0.3, rgba('#ffb37a', 0.25)); g0.addColorStop(1, rgba(AC, 0)); ctx.fillStyle = g0; circle(q.x, q.y, r * 7); ctx.fill();
-ctx.fillStyle = '#000'; circle(q.x, q.y, r); ctx.fill(); return;
+ctx.strokeStyle = rgba('#ffd8a8', 0.55); ctx.lineWidth = Math.max(1, r * 0.18); ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.6, r * 0.5, -0.2, 0, Math.PI * 2); ctx.stroke();
+ctx.fillStyle = '#000'; circle(q.x, q.y, r); ctx.fill(); ctx.strokeStyle = rgba('#ffe2c0', 0.85); ctx.lineWidth = Math.max(1, r * 0.05); circle(q.x, q.y, r * 1.04); ctx.stroke();
+ctx.strokeStyle = rgba('#ffd8a8', 0.75); ctx.lineWidth = Math.max(1, r * 0.18); ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.6, r * 0.5, -0.2, 0.15, Math.PI - 0.15); ctx.stroke(); return;
 }
 var pul = st.type === 'pulsar' ? 0.6 + 0.4 * Math.abs(Math.sin(time * 6)) : 1;
+if (st.type === 'pulsar') {
+var ba = time * 2.2, bl = Math.max(w, h) * 1.2;
+ctx.save(); ctx.globalCompositeOperation = 'lighter';
+[0, Math.PI].forEach(function (o2) { var a1 = ba + o2, gb = ctx.createLinearGradient(q.x, q.y, q.x + Math.cos(a1) * bl, q.y + Math.sin(a1) * bl * 0.35); gb.addColorStop(0, rgba(ST.c, 0.55)); gb.addColorStop(1, rgba(ST.c, 0)); ctx.fillStyle = gb; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + Math.cos(a1 - 0.05) * bl, q.y + Math.sin(a1 - 0.05) * bl * 0.35); ctx.lineTo(q.x + Math.cos(a1 + 0.05) * bl, q.y + Math.sin(a1 + 0.05) * bl * 0.35); ctx.fill(); });
+ctx.restore(); r = r * 0.3;
+}
 var g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, Math.max(8, r * 9));
 g.addColorStop(0, rgba('#fff8ee', 1)); g.addColorStop(0.08, rgba(ST.c, 0.95 * pul)); g.addColorStop(0.25, rgba(ST.c, 0.32 * pul)); g.addColorStop(0.6, rgba(AC, 0.08)); g.addColorStop(1, rgba(AC, 0));
 ctx.fillStyle = g; circle(q.x, q.y, Math.max(8, r * 9)); ctx.fill();
