@@ -130,7 +130,8 @@ var r = W.scanPlanet(S, p); if (!r) return;
 var Wt = W.WORLDS[p.type], res = Object.keys(p.res).map(function (k) { return W.RES[k].n; });
 SND.sfx('scan');
 toast(p.name + ': ' + Wt.n + (p.life ? ' · ' + p.life + ' Arten' : '') + (res.length ? ' · ' + res.join(', ') : '') + ' · +' + r.cr + ' Cr, +' + r.f + ' Forschung');
-save();
+if (p.ruin && !S.ruins[p.key]) toast('Auf ' + p.name + ' steht eine Ruine der Erbauer.');
+W.deliver(S).forEach(notifyMsg); save();
 }
 function land(p) {
 if (p.sol === 'erde') { startFade(startEnding, 1.4); return; }
@@ -156,12 +157,14 @@ var ev = P.events; P.events = [];
 ev.forEach(function (e) {
 if (e.k === 'species') toast((e.auto ? 'Rena hat erfasst: ' : 'Neue Art: ') + e.sp.name + (e.sp.rare ? ' (selten)' : '') + ' · +' + e.res.cr + ' Cr, +' + e.res.f + ' Forschung');
 if (e.k === 'wreck') letter({ from: 'Fundstück', t: 'Ein Wrack', b: e.text });
+if (e.k === 'ruin') { SND.sfx('scan'); letter({ from: 'Fundstück', t: 'Eine Ruine der Erbauer', b: e.text + '\n\nBruchstück geborgen (' + S.frags + '). Entschlüsseln kannst du es im Menü unter Forschung.' }); save(); }
 if (e.k === 'leave') leavePlanet(false);
 if (e.k === 'mined') SND.sfx('mine');
 if (e.k === 'drones') toast('Deine Drohnen haben abgebaut: ' + Object.keys(e.got).map(function (k) { return e.got[k] + ' t ' + W.RES[k].n; }).join(', '));
 if (e.k === 'build') { var nb = S.msgs.length, be = W.buildBase(S, P.p); if (be) toast(be); else { P.site.built = true; SND.sfx('dock'); toast('Basis auf ' + P.p.name + ' errichtet. Sie liefert bei jedem Sprung Nachschub.'); S.msgs.slice(nb).forEach(function (x) { notifyMsg(x.id); }); save(); } }
 if (e.k === 'o2out' && !fade) leavePlanet(true);
 });
+if (ev.length) W.deliver(S).forEach(notifyMsg);
 }
 function dock() {
 F.speed = 0; F.auto = false; SND.sfx('dock');
@@ -236,6 +239,22 @@ if (kind === 'system') ssel = F.target;
 sheet();
 }
 function closeMap(silent) { show('mapbar', false); show('sheet', false); if (!silent) { mode = 'space'; showPlay(); } }
+// star map preview (research): what waits in nearby systems
+function mapMarks(V) {
+var mr = W.mapRadius(S); if (!mr) return;
+var w = V.w, h = V.h, ox = w / 2, oy = V.oy;
+function sx(x) { return ox + (x - V.cx) * V.s; } function sy(y) { return oy + (y - V.cy) * V.s; }
+ctx.strokeStyle = 'rgba(159,180,201,0.22)'; ctx.lineWidth = 1; ctx.setLineDash([1, 4]); ctx.beginPath(); ctx.arc(ox, oy, mr * V.s, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+W.starsNear(S, V.cx, V.cy, mr).forEach(function (st) {
+var x = sx(st.x), y = sy(st.y); if (x < -10 || y < -10 || x > w + 10 || y > h + 10 || S.visited[st.id]) return;
+var v = W.preview(S, st); if (!v) return;
+if (v.ruin) { ctx.strokeStyle = '#bfe0ff'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x, y - 8); ctx.lineTo(x + 5, y - 3); ctx.lineTo(x, y + 2); ctx.lineTo(x - 5, y - 3); ctx.closePath(); ctx.stroke(); }
+if (v.station) { ctx.fillStyle = 'rgba(239,233,221,0.8)'; ctx.fillRect(x + 5, y + 3, 3, 3); }
+if (v.wreck) { ctx.fillStyle = 'rgba(255,122,47,0.85)'; ctx.beginPath(); ctx.moveTo(x - 7, y + 7); ctx.lineTo(x - 4, y + 2); ctx.lineTo(x - 1, y + 7); ctx.fill(); }
+});
+ctx.lineWidth = 1;
+}
+function prevTxt(st) { var v = W.preview(S, st); if (!v) return W.mapRadius(S) ? '' : '<p class="p">Mit Forschung kannst du die Sternkarte ausbauen und siehst vorher, was dich erwartet.</p>'; var a = [v.n + ' Planeten: ' + v.types.join(', ')]; if (v.station) a.push('Station'); if (v.wreck) a.push('Wrack'); if (v.ruin) a.push('<span style="color:#bfe0ff">Ruine der Erbauer</span>'); return '<p class="p">' + a.join(' · ') + '</p>'; }
 function sheet() {
 var h = '';
 if (mode === 'galaxy') {
@@ -246,7 +265,7 @@ var c = W.canJump(S, gsel), T = W.STARS[gsel.type], nd = Math.hypot(gsel.x, gsel
 h = (c.sling ? '<div class="lab ac">Schleudersprung am schwarzen Loch</div>' : '') + '<div class="lab ac">' + esc(T.n) + (S.visited[gsel.id] ? ' · besucht' : '') + '</div><h2>' + esc(gsel.name) + '</h2>' +
 '<div class="kv"><div><div class="lab">Distanz</div><b>' + num(c.d || 0) + '<small>LJ</small></b></div><div><div class="lab">Treibstoff</div><b>' + (c.fuel || W.fuelCost(S, c.d || 0)) + '<small>/ ' + Math.round(S.fuel) + '</small></b></div>' +
 '<div><div class="lab">Danach bis Sol</div><b>' + fmt(nd) + '<small>LJ</small></b></div><div><div class="lab">Auf der Erde</div><b>+' + num(c.years || W.yearsFor(c.d || 0), 1) + '<small>JAHRE</small></b></div></div>' +
-'<button type="button" class="go pri" data-a="jump" ' + (c.ok ? '' : 'disabled') + '>Springen</button>' + (c.ok ? '' : '<p class="why">' + esc(c.why) + (c.why === 'Zu wenig Treibstoff' ? ' – tanke am Stern auf oder kaufe an einer Station.' : '') + '</p>');
+prevTxt(gsel) + '<button type="button" class="go pri" data-a="jump" ' + (c.ok ? '' : 'disabled') + '>Springen</button>' + (c.ok ? '' : '<p class="why">' + esc(c.why) + (c.why === 'Zu wenig Treibstoff' ? ' – tanke am Stern auf oder kaufe an einer Station.' : '') + '</p>');
 }
 } else if (mode === 'system') {
 var o = ssel;
@@ -254,7 +273,7 @@ if (!o) h = '<div class="lab">Systemkarte</div><h2>' + esc(sys.star.name) + '</h
 else if (o.kind === 'planet') {
 var p = sys.planets[o.i], known = S.scanned[p.key] || S.mods.scanner > 0, Wt = W.WORLDS[p.type];
 h = '<div class="lab ac">' + (known ? esc(Wt.n) : 'Nicht gescannt') + '</div><h2>' + esc(p.name) + '</h2><div class="kv"><div><div class="lab">Schwerkraft</div><b>' + num(p.grav, 1) + '<small>G</small></b></div><div><div class="lab">Leben</div><b>' + (known ? p.life + '<small>ARTEN</small>' : '?') + '</b></div></div>' +
-'<p class="p">' + (known ? (Object.keys(p.res).length ? 'Rohstoffe: ' + Object.keys(p.res).map(function (k) { return W.RES[k].n; }).join(', ') + '.' : 'Keine nennenswerten Rohstoffe.') + (Wt.land ? '' : ' Man kann hier nicht landen.') : 'Fliege hin und scanne den Planeten.') + '</p>';
+'<p class="p">' + (known ? (Object.keys(p.res).length ? 'Rohstoffe: ' + Object.keys(p.res).map(function (k) { return W.RES[k].n; }).join(', ') + '.' : 'Keine nennenswerten Rohstoffe.') + (Wt.land ? '' : ' Man kann hier nicht landen.') + (p.ruin ? (S.ruins[p.key] ? ' Die Ruine ist untersucht.' : ' <span style="color:#bfe0ff">Hier steht eine Ruine der Erbauer.</span>') : '') : 'Fliege hin und scanne den Planeten.') + '</p>';
 h += '<button type="button" class="go pri" data-a="flyHere">Hinfliegen</button>';
 } else {
 h = '<div class="lab ac">' + (o.kind === 'star' ? esc(W.STARS[sys.star.type].n) : 'Station') + '</div><h2>' + esc(o.kind === 'star' ? sys.star.name : sys.station.name) + '</h2><p class="p">' + (o.kind === 'star' ? 'Im gestrichelten Ring kannst du auftanken. Halte die Aktion gedrückt, solange die Hitze es zulässt.' : 'Handel, Werft und neue Crew.') + '</p><button type="button" class="go pri" data-a="flyHere">Hinfliegen</button>';
@@ -264,11 +283,11 @@ $('sheet').innerHTML = h; show('sheet', !!h);
 }
 
 // ---------- panels ----------
-function openMenu() { if (mode === 'title' || mode === 'tunnel' || mode === 'ending') return; panelKind = 'menu'; panelTab = panelTab && ['schiff', 'crew', 'log'].indexOf(panelTab) >= 0 ? panelTab : 'schiff'; renderPanel(); show('panel', true); }
+function openMenu() { if (mode === 'title' || mode === 'tunnel' || mode === 'ending') return; panelKind = 'menu'; panelTab = panelTab && ['schiff', 'crew', 'forsch', 'log'].indexOf(panelTab) >= 0 ? panelTab : 'schiff'; renderPanel(); show('panel', true); }
 function openStation() { panelKind = 'station'; panelTab = 'handel'; renderPanel(); show('panel', true); }
 function closePanel() { show('panel', false); panelKind = null; save(); }
 function renderPanel() {
-var tabs = panelKind === 'station' ? [['handel', 'Handel'], ['werft', 'Werft'], ['crewst', 'Crew']] : (mode === 'planet' ? [] : [['karte', 'Karte']]).concat([['schiff', 'Schiff'], ['crew', 'Crew'], ['log', 'Logbuch' + (unread() ? ' ·' + unread() : '')]]);
+var tabs = panelKind === 'station' ? [['handel', 'Handel'], ['werft', 'Werft'], ['crewst', 'Crew']] : (mode === 'planet' ? [] : [['karte', 'Karte']]).concat([['schiff', 'Schiff'], ['crew', 'Crew'], ['forsch', 'Forschung' + (W.decodable(S) ? ' ·' : '')], ['log', 'Logbuch' + (unread() ? ' ·' + unread() : '')]]);
 $('tabs').innerHTML = tabs.map(function (t) { return '<button type="button" data-tab="' + t[0] + '" class="' + (panelTab === t[0] ? 'on' : '') + '">' + t[1] + '</button>'; }).join('');
 $('pbody').innerHTML = '<div class="wrap">' + (PANES[panelTab] ? PANES[panelTab]() : '') + '</div>';
 document.querySelector('#panel .x').textContent = panelKind === 'station' ? 'Ablegen' : '×';
@@ -291,6 +310,21 @@ var h = '<div class="lab">Quartiere · ' + S.crew.length + ' von ' + W.crewMax(S
 if (!S.crew.length) h += '<p class="p">Noch bist du allein an Bord. Auf Stationen triffst du Menschen, die mitfliegen wollen. Jedes Crewmitglied nimmt dir eine Aufgabe ab.</p>';
 S.crew.forEach(function (k) { var C = W.CREW[k]; h += '<div class="row"><div><div class="n">' + C.n + '</div><div class="d">' + C.role + ' · ' + C.auto + '</div></div></div>'; });
 if (S.recruitable.length) h += '<p class="p" style="margin-top:20px">Auf der nächsten Station wartet: ' + S.recruitable.map(function (k) { return W.CREW[k].n + ' (' + W.CREW[k].role + ')'; }).join(', ') + '.</p>';
+return h;
+},
+forsch: function () {
+var h = '<div class="lab">Forschung · ' + S.forschung + ' Punkte</div><h1>Forschung</h1><p class="p">Forschung bekommst du für Scans, neue Arten, vermessene Sterne und Ruinen. Du kannst sie hier und für die höchsten Ausbaustufen in der Werft einsetzen.</p>';
+var ml = S.mapLvl || 0;
+h += '<div class="lab" style="margin:22px 0 6px">Sternkarte</div><div class="row"><div><div class="n">Vorschau' + lv(ml) + '</div><div class="d">' + (W.mapRadius(S) ? 'Die Karte zeigt Planeten, Stationen, Wracks und Ruinen bis ' + W.mapRadius(S) + ' Lj voraus.' : 'Zeigt auf der Sternkarte, was in Systemen wartet, bevor du hinspringst.') + (ml < 3 ? ' Nächste Stufe: ' + W.MAP_R[ml + 1] + ' Lj.' : '') + '</div></div>' + (ml < 3 ? '<button type="button" class="go act" data-a="mapUp" ' + (S.forschung >= W.MAP_COST[ml] ? '' : 'disabled') + '>' + W.MAP_COST[ml] + ' Forschung</button>' : '') + '</div>';
+var open = (S.frags || 0) - S.techs.length;
+h += '<div class="lab" style="margin:22px 0 6px">Technik der Erbauer · ' + S.techs.length + ' von ' + W.TECH.length + '</div>';
+if (!S.frags) h += '<p class="p">Auf manchen Planeten stehen Ruinen einer verschwundenen Kultur. Wer sie gebaut hat, war auch einmal unterwegs nach Hause. Lande dort und birg ein Bruchstück. Ein Planetenscan zeigt, wo eine Ruine steht.</p>';
+W.TECH.forEach(function (T, i) {
+if (i < S.techs.length) h += '<div class="row"><div><div class="n">' + T.n + '</div><div class="d">' + T.d + '</div></div><span class="lab ac">Aktiv</span></div>';
+else if (i === S.techs.length && open > 0) h += '<div class="row"><div><div class="n">Bruchstück ' + (i + 1) + '</div><div class="d">Bereit zum Entschlüsseln.</div></div><button type="button" class="go act" data-a="decode" ' + (S.forschung >= T.f ? '' : 'disabled') + '>' + T.f + ' Forschung</button></div>';
+else if (i < S.frags) h += '<div class="row"><div><div class="n">Bruchstück ' + (i + 1) + '</div><div class="d">Geborgen. Erst das vorige entschlüsseln.</div></div></div>';
+else h += '<div class="row"><div><div class="n" style="color:var(--mu)">Unbekannt</div><div class="d">Noch nicht gefunden.</div></div></div>';
+});
 return h;
 },
 log: function () {
@@ -344,6 +378,8 @@ else if (act === 'sell') { var got = W.sell(S, v, S.res[v], sys.station); toast(
 else if (act === 'fuel') { var er = W.buyFuel(S, sys.station); if (er) toast(er); renderPanel(); save(); }
 else if (act === 'up') { var e2 = W.upgrade(S, v); if (e2) toast(e2); else toast(W.MODS[v].n + ' ausgebaut.'); renderPanel(); save(); }
 else if (act === 'recruit') { var before = S.msgs.length, e3 = W.recruit(S, v); if (e3) toast(e3); else { toast(W.CREW[v].n + ' ist an Bord.'); S.msgs.slice(before).forEach(function (x) { notifyMsg(x.id); }); } renderPanel(); save(); }
+else if (act === 'mapUp') { var e4 = W.mapUp(S); toast(e4 || 'Sternkarte verbessert: Vorschau bis ' + W.mapRadius(S) + ' Lj.'); renderPanel(); save(); }
+else if (act === 'decode') { var dr = W.decode(S); if (dr.err) toast(dr.err); else { SND.sfx('scan'); toast(dr.tech.n + ' entschlüsselt: ' + dr.tech.d); dr.msgs.forEach(notifyMsg); } renderPanel(); save(); }
 else if (act === 'endCont') endCont();
 else if (act === 'endNew') { store(''); S = null; END = null; show('modal', false); titleScreen(); }
 else if (act === 'music') { S.music = S.music === false; SND.setOn(S.music); renderPanel(); save(); }
@@ -357,12 +393,7 @@ else if (act === 'back') titleScreen();
 $('panel').addEventListener('pointerdown', function (e) { e.stopPropagation(); });
 
 // ---------- title ----------
-var SHIPSVG = {
-kranich: 'M30 60L200 60M30 56L200 56M8 48h22v20H8zM8 52L-2 46M8 64L-2 70M84 58a16 44 0 1 0 32 0a16 44 0 1 0-32 0M100 14V102M128 50h34v16h-34zM166 40h12v36h-12zM168 40l-4-16h12l2 16M168 76l-4 16h12l2-16M200 44h30v28h-30zM230 48l14-4v10h-14M230 62h14v10l-14-4',
-elster: 'M10 60L120 50L236 58L240 60L236 62L120 70ZM150 54L196 14L214 16L190 56M150 66L196 106L214 104L190 64M40 58Q60 50 84 54L84 60ZM120 50V70M236 56L250 54V66L236 64',
-schildkroete: 'M8 46L40 40V80L8 74ZM40 56H210M40 64H210M50 28h34v28H50zM88 34h30v22H88zM122 28h34v28h-34zM160 36h28v20h-28zM50 64h34v24H50zM88 64h34v30H88zM126 64h30v22h-30zM160 64h28v28h-28zM210 40h26v40h-26zM236 44l14-2v10h-14M236 58l14-2v8h-14M236 68h14v10l-14-2M24 40V26h6',
-falke: 'M12 60L70 44L150 40L214 52L230 60L214 68L150 80L70 76ZM70 44L100 60L70 76M150 40L130 60L150 80M100 60H130M110 42L140 10L162 12L150 41M110 78L140 110L162 108L150 79M30 56L-4 54M30 64L-4 66M214 54L238 52V58M214 66L238 68V62'
-};
+var SHIPSVG = W.SHIPSVG;
 function shipSvg(k, on) { return '<svg viewBox="-6 0 262 120" aria-hidden="true"><path d="' + SHIPSVG[k] + '" fill="none" stroke="' + (on ? '#ff7a2f' : '#efe9dd') + '" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></svg>'; }
 function titleScreen() {
 mode = 'title'; F = null; P = null; show('hud', false); show('ctl', false); show('mapbar', false); show('sheet', false); show('hint', false);
@@ -428,7 +459,7 @@ if (tunnel.t >= 2.4) { arrive(); showPlay(); }
 window.Ending.draw(ctx, END, CW, CH, time, dt);
 if (END.t > 7.8 && !END.theme) { END.theme = 1; SND.lena(6); }
 if (END.t > 13 && !END.shown) { END.shown = 1; epilogueModal(); }
-} else if (mode === 'galaxy') { gstars = SP.drawGalaxy(ctx, S, gview, gsel, time); }
+} else if (mode === 'galaxy') { gstars = SP.drawGalaxy(ctx, S, gview, gsel, time); mapMarks(gview); }
 else if (mode === 'system') { SP.drawSystem(ctx, S, F, SP.sysView(F, CW, CH), time); }
 else if (mode === 'space' && F) {
 if (!paused) {
@@ -451,6 +482,8 @@ if (S && mode !== 'title' && time - lastSave > 20 && mode !== 'tunnel' && mode !
 requestAnimationFrame(frame);
 }
 
+
+$('hud').style.textShadow = '0 1px 6px rgba(0,0,0,.6)';
 // ---------- boot ----------
 resize();
 titleScreen();

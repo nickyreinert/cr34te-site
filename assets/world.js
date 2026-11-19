@@ -189,7 +189,7 @@ function cargoUsed(S) { var n = 0; RKEYS.forEach(function (k) { n += S.res[k] ||
 function crewMax(S) { return modVal(S, 'quartiere'); }
 function o2Max(S) { return modVal(S, 'anzug'); }
 function hasCrew(S, k) { return S.crew.indexOf(k) >= 0; }
-function fuelCost(S, d) { return Math.ceil(d * 0.45 * (S.ship === 'elster' ? 0.9 : 1)); }
+function fuelCost(S, d) { return Math.ceil(d * 0.45 * (S.ship === 'elster' ? 0.9 : 1) * (S.techs && S.techs.indexOf('resonanz') >= 0 ? 0.8 : 1)); }
 function yearsFor(d) { return 1 + d / 60; }
 function dist(S) { var st = findStar(S, S.star); return Math.hypot(st.x, st.y); }
 function curSection(S) { return section(dist(S)); }
@@ -198,7 +198,7 @@ function curSection(S) { return section(dist(S)); }
 function newGame(seed, ship) {
 var S = {
 v: VERSION, seed: seed >>> 0, ship: ship || 'kranich', star: 'start', jumps: 0, year: START_YEAR, cr: 600, res: { eisen: 0, kristall: 0, sporen: 0 }, forschung: 0,
-fuel: 0, mods: {}, crew: [], recruitable: [], bases: [], msgs: [], scanned: {}, species: {}, mined: {}, wrecks: {}, visited: {}, flags: {}, music: true, stats: { ly: 0, planets: 0, species: 0 }
+fuel: 0, techs: [], ruins: {}, frags: 0, mapLvl: 0, mods: {}, crew: [], recruitable: [], bases: [], msgs: [], scanned: {}, species: {}, mined: {}, wrecks: {}, visited: {}, flags: {}, music: true, stats: { ly: 0, planets: 0, species: 0 }
 };
 MKEYS.forEach(function (k) { S.mods[k] = 0; });
 S.fuel = Math.round(tankMax(S) * 0.6);
@@ -278,14 +278,14 @@ if (S.scanned[p.key]) return null;
 S.scanned[p.key] = 1; S.stats.planets++;
 var f = Math.round((2 + p.life) * MODS.labor.val[S.mods.labor] * (S.ship === 'kranich' ? 1.25 : 1));
 var cr = 60 + Math.round(p.r * 4) + p.life * 25;
-S.cr += cr; S.forschung += f;
+S.cr += cr; S.forschung += f; S.flags.ftot = (S.flags.ftot || 0) + f;
 return { cr: cr, f: f };
 }
 function scanSpecies(S, key, rare) {
 if (S.species[key]) return null;
 S.species[key] = 1; S.stats.species++;
-var f = Math.round((rare ? 4 : 2) * MODS.labor.val[S.mods.labor] * (S.ship === 'kranich' ? 1.25 : 1)), cr = rare ? 120 : 45;
-S.cr += cr; S.forschung += f;
+var f = Math.round((rare ? 4 : 2) * MODS.labor.val[S.mods.labor] * (S.ship === 'kranich' ? 1.25 : 1) * (S.techs && S.techs.indexOf('licht') >= 0 ? 2 : 1)), cr = rare ? 120 : 45;
+S.cr += cr; S.forschung += f; S.flags.ftot = (S.flags.ftot || 0) + f;
 return { cr: cr, f: f };
 }
 
@@ -308,6 +308,7 @@ var got = [], sec = curSection(S);
 MSG.forEach(function (m) {
 if (S.msgs.some(function (x) { return x.id === m.id; })) return;
 var a = m.at, ok = (a.jumps != null && S.jumps >= a.jumps) || (a.section && sec >= a.section) || (a.crew && hasCrew(S, a.crew)) || (a.flag && (S.flags[a.flag] || 0) >= a.n) || (a.bases && (S.bases || []).length >= a.bases) || (a.dist && dist(S) <= a.dist) || (a.star && S.star === a.star);
+if (ok && a.near && dist(S) > a.near) ok = false;
 if (ok) { S.msgs.push({ id: m.id, year: Math.floor(S.year), read: false }); got.push(m.id); }
 });
 return got;
@@ -355,7 +356,7 @@ var st = findStar(S, S.star), hole = st.type === 'loch';
 S.flags.measured = S.flags.measured || {}; S.flags.measured[st.id] = 1;
 var key = hole ? 'holes' : 'pulsars'; S.flags[key] = (S.flags[key] || 0) + 1;
 var f = hole ? 30 : 20, ex = addRes(S, 'exotik', hole ? 4 : 2), cr = hole ? 900 : 600;
-S.forschung += f; S.cr += cr;
+S.forschung += f; S.flags.ftot = (S.flags.ftot || 0) + f; S.cr += cr;
 return { hole: hole, f: f, ex: ex, cr: cr, msgs: deliver(S) };
 }
 
@@ -363,7 +364,7 @@ function serialize(S) { return JSON.stringify(S); }
 function deserialize(s) {
 var o = JSON.parse(s); if (!o || o.v !== VERSION || !o.mods) return null;
 MKEYS.forEach(function (k) { if (o.mods[k] == null) o.mods[k] = 0; }); RKEYS.forEach(function (k) { if (o.res[k] == null) o.res[k] = 0; });
-o.bases = o.bases || []; o.flags = o.flags || {};
+o.bases = o.bases || []; o.flags = o.flags || {}; o.techs = o.techs || []; o.ruins = o.ruins || {}; o.frags = o.frags || 0; o.mapLvl = o.mapLvl || 0;
 return o;
 }
 
@@ -451,4 +452,92 @@ if (S.stats.species) out.push('Der Katalog deiner Reise umfasst ' + S.stats.spec
 out.push('Am Abend sitzt du in Lenas Küche. Im Flur brennt das Licht. Du bist zu Hause.');
 return out;
 };
+})(typeof window !== 'undefined' ? window : globalThis);
+(function (root) {
+'use strict';
+var W = root.World;
+
+// ---------- ship silhouettes (title, landing site) ----------
+W.SHIPSVG = {
+kranich: 'M30 60L200 60M30 56L200 56M8 48h22v20H8zM8 52L-2 46M8 64L-2 70M84 58a16 44 0 1 0 32 0a16 44 0 1 0-32 0M100 14V102M128 50h34v16h-34zM166 40h12v36h-12zM168 40l-4-16h12l2 16M168 76l-4 16h12l2-16M200 44h30v28h-30zM230 48l14-4v10h-14M230 62h14v10l-14-4',
+elster: 'M10 60L120 50L236 58L240 60L236 62L120 70ZM150 54L196 14L214 16L190 56M150 66L196 106L214 104L190 64M40 58Q60 50 84 54L84 60ZM120 50V70M236 56L250 54V66L236 64',
+schildkroete: 'M8 46L40 40V80L8 74ZM40 56H210M40 64H210M50 28h34v28H50zM88 34h30v22H88zM122 28h34v28h-34zM160 36h28v20h-28zM50 64h34v24H50zM88 64h34v30H88zM126 64h30v22h-30zM160 64h28v28h-28zM210 40h26v40h-26zM236 44l14-2v10h-14M236 58l14-2v8h-14M236 68h14v10l-14-2M24 40V26h6',
+falke: 'M12 60L70 44L150 40L214 52L230 60L214 68L150 80L70 76ZM70 44L100 60L70 76M150 40L130 60L150 80M100 60H130M110 42L140 10L162 12L150 41M110 78L140 110L162 108L150 79M30 56L-4 54M30 64L-4 66M214 54L238 52V58M214 66L238 68V62'
+};
+
+// ---------- alien technology of the Erbauer ----------
+W.TECH = [
+{ k: 'resonanz', n: 'Resonanzkern', d: 'Sprünge kosten 20 % weniger Treibstoff.', f: 15 },
+{ k: 'membran', n: 'Atemmembran', d: 'Der Sauerstoff im Anzug hält ein Viertel länger.', f: 25 },
+{ k: 'licht', n: 'Lichtsprache', d: 'Neue Arten geben doppelt so viel Forschung.', f: 35 },
+{ k: 'falt', n: 'Faltkarte', d: 'Die Sternkarte sieht 300 Lichtjahre weiter voraus.', f: 45 },
+{ k: 'gleit', n: 'Gleitfeld', d: 'Das Jetpack hält doppelt so lange.', f: 55 },
+{ k: 'echo', n: 'Echo-Sender', d: 'Ein Signal, das schneller ist als jedes Licht. Jemand zu Hause wird es hören.', f: 70 }
+];
+W.RUINS = [
+'Zwei Säulen aus einem Stein, den der Scanner nicht kennt, und dazwischen ein Ring, der knapp über dem Boden schwebt. In seiner Mitte liegt ein Bruchstück, warm wie eine Hand.\n\nRena sagt, die Zeichen darauf seien keine Schrift. Eher eine Melodie.',
+'Wieder die Säulen, wieder der schwebende Ring. Wer immer das gebaut hat, kam hier vorbei, so wie wir. Die Ruinen liegen auf einer Linie. Die Linie zeigt ungefähr in Richtung Sol.',
+'Unter dem Ring liegen Steine in einem Kreis, sorgfältig gelegt. Einer für jeden, der nicht weitergekommen ist, vermutet Ida. Es sind sehr viele.',
+'Diese Ruine ist jünger als die anderen. Die Zeichen sind hastiger, kleiner. Als hätte jemand gewusst, dass die Zeit knapp wird.',
+'In den Ring ist ein Muster geritzt, das wir kennen: die Takte der Pulsare, die Lena vermisst. Die Erbauer haben dieselben Uhren benutzt, um nach Hause zu finden.',
+'Die letzte Ruine auf der Linie. Kein Ring mehr, nur eine einzelne Säule und ein Bruchstück, das leise summt, wenn man es in der Hand hält.'
+];
+W.RUIN_MORE = 'Noch eine Ruine der Erbauer. Das Bruchstück ist ein Duplikat eines anderen, aber Rena nimmt es trotzdem mit. „Man lässt so etwas nicht allein liegen.“';
+W.MAP_COST = [10, 25, 50];
+W.MAP_R = [0, 200, 350, 550];
+W.hasTech = function (S, k) { return !!(S.techs && S.techs.indexOf(k) >= 0); };
+W.mapRadius = function (S) { return W.MAP_R[S.mapLvl || 0] + (W.hasTech(S, 'falt') ? 300 : 0); };
+W.mapUp = function (S) {
+var l = S.mapLvl || 0; if (l >= 3) return 'Die Sternkarte ist vollständig ausgebaut';
+if (S.forschung < W.MAP_COST[l]) return 'Dir fehlen ' + (W.MAP_COST[l] - S.forschung) + ' Forschung';
+S.forschung -= W.MAP_COST[l]; S.mapLvl = l + 1; return null;
+};
+W.decodable = function (S) { return (S.frags || 0) > S.techs.length && S.techs.length < W.TECH.length; };
+W.decode = function (S) {
+var i = S.techs.length, T = W.TECH[i]; if (!T) return { err: 'Alles entschlüsselt' };
+if ((S.frags || 0) <= i) return { err: 'Dir fehlt ein Bruchstück. Suche Ruinen der Erbauer.' };
+if (S.forschung < T.f) return { err: 'Dir fehlen ' + (T.f - S.forschung) + ' Forschung' };
+S.forschung -= T.f; S.techs.push(T.k); S.flags.tech = S.techs.length;
+return { tech: T, msgs: W.deliver(S) };
+};
+W.findRuin = function (S, p) { S.ruins[p.key] = 1; S.frags = (S.frags || 0) + 1; S.forschung += 10; S.flags.ftot = (S.flags.ftot || 0) + 10; return S.frags <= W.RUINS.length ? W.RUINS[S.frags - 1] : W.RUIN_MORE; };
+
+// ruins in systems (seeded, never at start or Sol)
+var sys0 = W.system;
+W.system = function (S, star) {
+var s = sys0(S, star);
+if (!s._ru) {
+s._ru = 1;
+if (star.id !== 'start' && star.id !== 'sol') {
+var r = W.rng(W.hash(S.seed, star.seed, 31)), lp = s.planets.filter(function (p) { return W.WORLDS[p.type].land; });
+if (lp.length && r() < 0.1) lp[Math.floor(r() * lp.length)].ruin = 1;
+}
+}
+return s;
+};
+// what the star map can tell about a star
+W.preview = function (S, st) {
+var cur = W.findStar(S, S.star), d = Math.hypot(st.x - cur.x, st.y - cur.y);
+if (!S.visited[st.id] && d > W.mapRadius(S)) return null;
+var s = W.system(S, st), ty = {}, o = { n: s.planets.length, types: [], station: !!s.station, ruin: false, wreck: false, life: 0 };
+s.planets.forEach(function (p) { ty[W.WORLDS[p.type].n] = 1; if (p.ruin && !S.ruins[p.key]) o.ruin = true; if (p.wreck && !S.wrecks[p.key]) o.wreck = true; o.life += p.life; });
+o.types = Object.keys(ty); return o;
+};
+
+// ---------- story: research and the Erbauer ----------
+[
+{ id: 'm26', at: { flag: 'ftot', n: 30 }, from: 'Raumfahrtzentrum', t: 'Ihre Daten', b: 'An Testflug 7: Ihre Scans kommen hier an, verrauscht und Jahre zu spät, aber sie kommen an. Wir haben einen Katalog angelegt. Er heißt „Funde von Testflug 7“.\n\nEine Schulklasse hat gefragt, ob sie Ihnen Fragen schicken darf. Wir haben ja gesagt.' },
+{ id: 'm27', at: { flag: 'ftot', n: 80 }, from: 'Lena', t: 'Dein Katalog', b: 'Ich habe deinen Katalog gelesen. Alles. Die Pflanzen, die nachts leuchten. Die Tiere mit den langen Hälsen.\n\nIch habe mir vorgestellt, wie du davorstehst und dich nicht traust, näher zu gehen. Du hattest früher auch Angst vor Gänsen. Ich weiß das noch.' },
+{ id: 'm28', at: { flag: 'ftot', n: 150 }, from: 'Lena', t: 'Für Mara', b: 'Mara hat ein Poster über dem Bett, mit allen Arten, die du gefunden hast. Sie kennt die Namen auswendig, auch die, die du dir ausgedacht hast, weil es keine gab.\n\nSie sagt, wenn du zurück bist, sollst du ihr zeigen, welches dein Lieblingstier ist.' },
+{ id: 'm29', at: { flag: 'ftot', n: 250 }, from: 'Raumfahrtzentrum', t: 'Ein neues Fach', b: 'An Testflug 7: Die Universität hat ein Institut nach Ihren Daten benannt. Ihre Tochter hält dort die erste Vorlesung.\n\nSie hat darum gebeten, dass wir Ihnen eines ausrichten: Der erste Satz der Vorlesung war „Mein Vater ist kein Beispiel. Er ist unterwegs.“' },
+{ id: 'm30', at: { flag: 'tech', n: 1 }, from: 'Die Erbauer', t: 'Erstes Bruchstück', b: 'Die Übersetzung ist unsicher. Rena hat drei Nächte daran gesessen.\n\n„Wir sind vom Weg abgekommen. Unser Zuhause ist ein Licht unter vielen, und wir wissen nicht mehr, welches. Wir bauen diese Zeichen, damit die nach uns es leichter haben.“' },
+{ id: 'm31', at: { flag: 'tech', n: 2 }, from: 'Die Erbauer', t: 'Zweites Bruchstück', b: '„Wir atmen die Luft fremder Welten, und sie schmeckt nach nichts, das wir kennen. Die Kinder fragen nach dem Geruch von Regen auf warmem Stein. Wir erzählen ihnen davon, bis sie es selbst zu riechen glauben.“' },
+{ id: 'm32', at: { flag: 'tech', n: 3 }, from: 'Die Erbauer', t: 'Drittes Bruchstück', b: '„Die Tiere dieser Welten sprechen in Licht. Wir haben gelernt, ihnen zu antworten. Es ist leichter, als mit den eigenen Leuten über das Heimweh zu reden.“' },
+{ id: 'm33', at: { flag: 'tech', n: 4 }, from: 'Die Erbauer', t: 'Viertes Bruchstück', b: '„Wir haben die Karte gefaltet, bis sie klein genug war, um sie in der Hand zu halten. Der Weg nach Hause ist darauf nur ein Strich. Er fühlt sich länger an.“' },
+{ id: 'm34', at: { flag: 'tech', n: 5 }, from: 'Die Erbauer', t: 'Fünftes Bruchstück', b: '„Viele von uns sind auf den Welten geblieben, an denen wir vorbeikamen. Nicht aus Müdigkeit. Sie haben dort etwas gefunden, das sie Zuhause nennen konnten. Vielleicht ist das auch ein Weg, anzukommen.“' },
+{ id: 'm35', at: { flag: 'tech', n: 6 }, from: 'Die Erbauer', t: 'Sechstes Bruchstück', b: '„Wir haben einen Ruf gebaut, der schneller ist als das Licht. Er reicht nur bis zu denen, die auf uns warten. Wir schicken ihn ab, jeden Abend. Wir wissen nicht, ob jemand antwortet.“\n\nIda hat den Echo-Sender ans Schiff angeschlossen. Er brummt. Dann wird es still.' },
+{ id: 'm37', at: { flag: 'tech', n: 6 }, from: 'Lena', t: 'Ein Echo', b: 'Papa? Heute Nacht war da etwas auf der Antenne. Kein Rauschen. Ein Ton, ganz kurz, und dann noch einmal, im selben Abstand, wie du früher an meine Tür geklopft hast. Zweimal lang, einmal kurz.\n\nDie anderen sagen, das kann nicht sein, so schnell kommt nichts an. Ich habe zurückgeklopft. Zweimal lang, einmal kurz. Ich weiß, dass du es warst.' },
+{ id: 'm36', at: { flag: 'tech', n: 6, near: 400 }, from: 'Die Erbauer', t: 'Die letzte Botschaft', b: 'Der Echo-Sender hat ein Signal aufgefangen, alt, sehr alt, das ganz in der Nähe unserer Sonne abgeschickt wurde.\n\n„Wir sind angekommen. Nicht alle, und nicht dort, wo wir losgeflogen sind. Unser Zuhause war längst ein anderes geworden. Aber jemand hat gewartet. Wer das hier findet: Es lohnt sich. Flieg weiter.“\n\nRena hat es zweimal vorgelesen. Dann sind wir alle eine Weile still gewesen.' },
+{ id: 'm38', at: { flag: 'wal', n: 1 }, from: 'Logbuch', t: 'Der Himmelswal', b: 'Heute stand etwas über dem Schiff, so groß wie eine Stadt, und hat sich nicht bewegt. Es hat geleuchtet, langsam, wie ein Atem. Dann ist es weitergezogen.\n\nIch habe die Aufnahme an Lena geschickt. Sie wird sie in vielen Jahren sehen. Ich hoffe, sie zeigt sie Mara.' }
+].forEach(function (m) { W.MSG.push(m); });
 })(typeof window !== 'undefined' ? window : globalThis);
