@@ -43,7 +43,9 @@ if (P.type === 'kristall') h += Math.max(0, Math.sin(x / 29 + q[3]) - 0.75) * 19
 if (lavaAt(P, x)) h -= 14;
 if (P.type === 'ozean') h -= 26;
 var flat = sm(((x < -400 ? -400 - x : x > 240 ? x - 240 : 0)) / 160);
-return h * flat + (1 - flat) * (P.type === 'ozean' ? 6 : 0);
+h = h * flat + (1 - flat) * (P.type === 'ozean' ? 6 : 0);
+if (P.feat) for (var i = 0; i < P.feat.length; i++) { var f = P.feat[i], e = f.k === 'spalte' ? 9 : 14, m = sm((x - f.x + f.w / 2) / e) * sm((f.x + f.w / 2 - x) / e); if (m > 0) h += (f.k === 'spalte' ? -f.h : f.h) * m; }
+return h;
 }
 function hill(P, x, k) { return P.amp * 2.2 * (0.6 * Math.sin(x / (420 * k) + P.ph[k]) + 0.4 * Math.sin(x / (170 * k) + P.ph[k + 1])) + 70 * k; }
 
@@ -91,7 +93,7 @@ body('M-56 -18 C -56 -76, 56 -80, 60 -18 Z'); body('M60 -26 C 76 -30, 84 -20, 78
 var cr = 'M-40 -30 l12 -14 l-4 -10 l14 -8 M20 -60 l8 12 l16 2 l4 14 M-20 -60 l-6 14', p = 0.55 + 0.45 * Math.sin(t * 1.8), cc = hex(c);
 line(cr, rgb(cc, 0.25 * p), 8); line(cr, rgb(cc, p), 2.2);
 } },
-qualle: { n: 'Segelqualle', w: 160, h: 380, spd: 8, face: 0, fly: 1, cols: ['#d8b0ff', '#ffb0d0', '#b0d0ff'], draw: function (t, st, c) {
+qualle: { n: 'Segelqualle', alt: 110, w: 160, h: 380, spd: 8, face: 0, fly: 1, cols: ['#d8b0ff', '#ffb0d0', '#b0d0ff'], draw: function (t, st, c) {
 ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, 0, 60, 5, 0, 0, Math.PI * 2); ctx.fill();
 ctx.save(); ctx.translate(0, Math.sin(t * 0.8) * 14); var cc = hex(c);
 for (var x = -50, i = 0; x < 60; x += 12, i++) { var sw = Math.sin(t * 1.2 + i) * 10; ctx.beginPath(); ctx.moveTo(x, -230); ctx.bezierCurveTo(x + 10 + sw, -180, x - 12 - sw, -120, x + sw, -50 - (i % 3) * 12); ctx.strokeStyle = rgb(cc, 0.45); ctx.lineWidth = 1.4 * LW; ctx.stroke(); }
@@ -99,12 +101,12 @@ body('M-70 -230 C -76 -320, 76 -320, 70 -230 C 40 -216, -40 -216, -70 -230Z', 'r
 body('M-24 -292 C 10 -380, 60 -370, 70 -296 C 50 -306, 10 -300, -24 -292Z', rgb(cc, 0.14), rgb(cc, 0.7));
 gl(0, -262, 6, c, 0.7 + 0.3 * Math.sin(t * 1.4)); for (x = -56; x < 60; x += 16) gl(x, -232, 2, c, 0.8); ctx.restore();
 } },
-rochen: { n: 'Lichtrochen', w: 340, h: 90, spd: 34, face: 0, fly: 1, cols: ['#7af0d0', '#9fd8ff', '#c8a0f0'], draw: function (t, st, c) {
+rochen: { n: 'Lichtrochen', alt: 14, w: 340, h: 90, spd: 34, face: 0, fly: 1, cols: ['#7af0d0', '#9fd8ff', '#c8a0f0'], draw: function (t, st, c) {
 ctx.save(); ctx.translate(0, Math.sin(t * 1.5) * 4); ctx.scale(1, 1 + 0.18 * Math.sin(t * 2.2));
 body('M-170 -40 C -120 -80, -40 -70, 0 -86 C 40 -70, 120 -80, 170 -40 C 120 -46, 60 -40, 20 -52 L 10 -30 C 30 -10, 50 0, 120 10 C 40 6, 0 -10, -10 -30 L -20 -52 C -60 -40, -120 -46, -170 -40Z', SIL, rgb(hex(c), 0.8));
 [[-150, -44], [-110, -60], [-60, -66], [60, -66], [110, -60], [150, -44]].forEach(function (q, i) { gl(q[0], q[1], 2.2, c, 0.6 + 0.4 * Math.sin(t * 2 + i)); }); gl(-8, -74, 3, '#e8fff8'); ctx.restore();
 } },
-falter: { n: 'Sporenfalter', w: 280, h: 260, spd: 20, face: 0, fly: 1, k: 0.5, cols: ['#d8f080', '#f0d070', '#80f0c0'], draw: function (t, st, c) {
+falter: { n: 'Sporenfalter', alt: 78, w: 280, h: 260, spd: 20, face: 0, fly: 1, k: 0.5, cols: ['#d8f080', '#f0d070', '#80f0c0'], draw: function (t, st, c) {
 ctx.save(); ctx.translate(0, -60 + Math.sin(t * 1.7) * 18); var f = 0.35 + 0.65 * Math.abs(Math.cos(t * 5));
 for (var i = 0; i < 14; i++) { var a = t * 0.5 + i * 0.9; gl(Math.sin(a * 1.3 + i) * 110, -150 + Math.cos(a + i * 2) * 90, 1.4, c, 0.35); }
 ctx.save(); ctx.scale(f, 1);
@@ -113,7 +115,7 @@ body('M0 -140 C -40 -110, -80 -60, -50 -50 C -30 -60, -10 -100, 0 -134Z'); body(
 [-80, 80].forEach(function (x) { ctx.beginPath(); ctx.arc(x, -178, 14, 0, Math.PI * 2); ctx.strokeStyle = c; ctx.lineWidth = 2 * LW; ctx.stroke(); gl(x, -178, 4, c); }); ctx.restore();
 body('M-4 -170 C -8 -140, -6 -100, 0 -90 C 6 -100, 8 -140, 4 -170 Z'); line('M-2 -170 q -14 -26 -30 -30 M2 -170 q 14 -26 30 -30', RIM, 1); ctx.restore();
 } },
-splitter: { n: 'Splitterschwarm', w: 240, h: 260, spd: 10, face: 0, fly: 1, cols: ['#bfe0ff', '#d8c8ff', '#c8fff0'], draw: function (t, st, c) {
+splitter: { n: 'Splitterschwarm', alt: 70, w: 240, h: 260, spd: 10, face: 0, fly: 1, cols: ['#bfe0ff', '#d8c8ff', '#c8fff0'], draw: function (t, st, c) {
 ctx.fillStyle = rgb(hex(c), 0.12); ctx.beginPath(); ctx.ellipse(0, 0, 50, 4, 0, 0, Math.PI * 2); ctx.fill();
 gl(0, -170, 7, c, 0.8 + 0.2 * Math.sin(t * 2));
 for (var i = 0; i < 14; i++) {
@@ -163,6 +165,13 @@ loot: { eisen: 0, kristall: 0, sporen: 0 }, cr: 0, nodes: [], species: [], fx: [
 weather: p.weather, wx: [], camY: 0, ice: type === 'eis'
 };
 P.y = terrain(P, P.x);
+// cliffs and chasms: reasons to use the jetpack
+var fr = W.rng(p.seed ^ 0xfea7); P.feat = [];
+for (var fx0 = -P.w + 120; fx0 < P.w - 120; fx0 += 380 + fr() * 420) {
+if (fx0 > -560 && fx0 < 420) continue;
+var chasm = type !== 'ozean' && fr() < 0.42;
+P.feat.push(chasm ? { k: 'spalte', x: fx0, w: 70 + fr() * 60, h: 120 + fr() * 40 } : { k: 'plateau', x: fx0, w: 160 + fr() * 160, h: 60 + fr() * 55 });
+}
 var kinds = Object.keys(p.res); if (!kinds.length) kinds = [type === 'eis' || type === 'kristall' ? 'kristall' : type === 'leben' || type === 'gift' ? 'sporen' : 'eisen'];
 var nn = 6 + Math.floor(r() * 5);
 for (var i = 0; i < nn; i++) {
@@ -173,6 +182,9 @@ for (i = 0; i < p.life; i++) P.species.push(makeSpecies(P, r, i));
 if (p.wreck) P.wreck = { x: (r() < 0.5 ? -1 : 1) * (P.w * 0.55 + r() * P.w * 0.3), done: !!S.wrecks[p.key] };
 for (i = 0; i < 90; i++) P.wx.push([r(), r(), r()]);
 if (W.curSection(S) >= 2) P.site = { x: -310, built: (S.bases || []).some(function (b) { return b.key === p.key; }) };
+// rich veins on top of some plateaus
+var rk = kinds.concat(type === 'eis' || type === 'kristall' || type === 'lava' ? ['kristall'] : []);
+P.feat.forEach(function (f, j) { if (f.k !== 'plateau' || (W.hash(p.seed, j, 3) % 10) > 5) return; var ni = P.nodes.length; P.nodes.push({ i: ni, x: f.x, k: rk[W.hash(p.seed, j, 4) % rk.length], amt: 6 + W.hash(p.seed, j, 5) % 4, rich: 1, done: !!S.mined[p.key + ':' + ni] }); });
 var dr = S.mods.drohnen || 0, dg = {};
 if (dr) P.nodes.filter(function (n) { return !n.done; }).sort(function (a, b) { return Math.abs(a.x) - Math.abs(b.x); }).slice(0, dr).forEach(function (n) { var g = W.addRes(S, n.k, n.amt); if (g) { n.done = true; S.mined[p.key + ':' + n.i] = 1; P.loot[n.k] += g; dg[n.k] = (dg[n.k] || 0) + g; } });
 if (Object.keys(dg).length) P.events.push({ k: 'drones', got: dg });
@@ -198,11 +210,12 @@ P.t += dt; P.o2 -= dt * (P.type === 'gift' ? 1.4 : 1) * (W.hasTech(S, 'membran')
 var spd = 150 * (P.inWater ? 0.6 : 1), acc = P.ice && P.ground ? 2.2 : 9;
 P.vx += (inp.ax * spd - P.vx) * Math.min(1, dt * acc);
 if (inp.ax) P.face = inp.ax > 0 ? 1 : -1;
-if (inp.jump && P.ground) { P.vy = 300; P.ground = false; }
 if (inp.jet && P.jet > 0 && !P.inWater) { P.vy += 1250 * dt; P.jet = Math.max(0, P.jet - dt * 0.38 * (W.hasTech(S, 'gleit') ? 0.5 : 1)); P.jetting = true; } else P.jetting = false;
 if (P.vy > 340) P.vy = 340;
 P.vy -= P.g * dt;
-P.x = Math.max(-P.w, Math.min(P.w, P.x + P.vx * dt));
+var nx = Math.max(-P.w, Math.min(P.w, P.x + P.vx * dt));
+if (terrain(P, nx) > P.y + 14 && terrain(P, nx) > terrain(P, P.x) + 6) { nx = P.x; P.vx = 0; }
+P.x = nx;
 P.y += P.vy * dt;
 var gy = terrain(P, P.x);
 P.inWater = P.type === 'ozean' && gy < 0 && P.y < 2;
@@ -219,24 +232,24 @@ if (Math.abs(a.x - P.x) < 60 && Math.random() < dt) a.dir = a.x > P.x ? 1 : -1; 
 });
 });
 // what is near
-var best = null, bd = 48;
+var best = null, bd = 48, hi = null;
 function cand(o, x, y, rad) { var d = Math.abs(x - P.x) - (rad || 0); if (d < bd && Math.abs(y - P.y) < 70) { bd = Math.max(0, d); best = o; } }
 P.nodes.forEach(function (n) { if (!n.done) cand({ k: 'node', n: n }, n.x, terrain(P, n.x)); });
 var night = isNight(P);
-P.species.forEach(function (sp) { if (S.species[sp.key] || (sp.rare && !night)) return; sp.inst.forEach(function (a) { cand({ k: 'species', sp: sp, a: a }, a.x, sp.fly ? P.y : terrain(P, a.x), sp.arch ? ARCH[sp.arch].w * archK(sp) * 0.3 : 0); }); });
+P.species.forEach(function (sp) { if (S.species[sp.key] || (sp.rare && !night)) return; sp.inst.forEach(function (a) { var A = sp.arch && ARCH[sp.arch], gy0 = Math.max(terrain(P, a.x), P.type === 'ozean' ? 0 : -999), ay = A && A.alt ? gy0 + A.alt * sp.size : sp.fly && !A ? P.y : terrain(P, a.x), rad = A ? A.w * archK(sp) * 0.3 : 0; cand({ k: 'species', sp: sp, a: a }, a.x, ay, rad); if (A && A.alt > 40 && Math.abs(a.x - P.x) - rad < 48 && ay - P.y >= 70) hi = sp; }); });
 if (P.ruin && !P.ruin.done) cand({ k: 'ruin' }, P.ruin.x, terrain(P, P.ruin.x), 30);
 if (P.wal) { P.wal.x += dt * 9; if (P.wal.x > P.w) P.wal.x = -P.w; if (!P.wal.done && Math.abs(P.wal.x - P.x * 0.5) < 220) cand({ k: 'wal' }, P.x, P.y, 40); }
 if (P.wreck && !P.wreck.done) cand({ k: 'wreck' }, P.wreck.x, terrain(P, P.wreck.x));
 if (P.site && Math.abs(P.x - P.site.x) < 40 && (!best || bd > 20)) { best = { k: 'site' }; bd = 20; }
 if (Math.abs(P.x) < 60) { if (!best || bd > 30) best = { k: 'ship' }; }
-P.near = best;
+P.near = best; P.hi = best ? null : hi;
 // hold-to-act
 if (inp.action && P.near && P.near.k !== 'ship' && P.near.k !== 'site') {
 var key = P.near.k + (P.near.n ? P.near.n.i : P.near.sp ? P.near.sp.key : '');
 if (P.actKey !== key) { P.actKey = key; P.prog = 0; }
 P.prog += dt / (P.near.k === 'node' ? 1.5 : P.near.k === 'ruin' ? 2.2 : P.near.k === 'wal' ? 2.5 : 1.0);
 if (P.prog >= 1) { finish(S, P, P.near); P.prog = 0; P.actKey = null; }
-} else { P.prog = Math.max(0, P.prog - dt * 2); }
+} else { P.prog = Math.max(0, P.prog - dt * (P.actKey && P.actKey.indexOf('species') === 0 ? 0.35 : 2)); }
 if (inp.actionPressed && P.near && P.near.k === 'ship') P.events.push({ k: 'leave' });
 if (inp.actionPressed && P.near && P.near.k === 'site' && !P.site.built) P.events.push({ k: 'build' });
 if (P.o2 <= 0) { P.o2 = 0; P.events.push({ k: 'o2out' }); }
@@ -301,6 +314,7 @@ ctx.strokeStyle = c2; ctx.lineWidth = 1; for (k = 0; k < 3; k++) { ctx.beginPath
 }
 }
 function drawNode(n, x, y, s, near, time) {
+if (n.rich) s *= 1.6;
 if (n.done) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(x, y, 10 * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill(); return; }
 if (n.k === 'kristall') { for (var k = 0; k < 3; k++) { ctx.fillStyle = k === 1 ? '#e8f4ff' : '#9fd8ff'; ctx.beginPath(); ctx.moveTo(x - 7 * s + k * 5 * s, y); ctx.lineTo(x - 4 * s + k * 5 * s + (k - 1) * 3 * s, y - (14 + k * 6) * s); ctx.lineTo(x - 1 * s + k * 5 * s, y); ctx.fill(); } }
 else if (n.k === 'eisen') { ctx.fillStyle = '#4a403a'; ctx.beginPath(); ctx.moveTo(x - 12 * s, y); ctx.lineTo(x - 8 * s, y - 10 * s); ctx.lineTo(x + 2 * s, y - 13 * s); ctx.lineTo(x + 11 * s, y - 5 * s); ctx.lineTo(x + 12 * s, y); ctx.fill(); ctx.fillStyle = AC; [[-5, -6], [3, -9], [6, -3]].forEach(function (p) { ctx.fillRect(x + p[0] * s, y + p[1] * s, 2 * s, 2 * s); }); }
@@ -514,10 +528,11 @@ else if (wt === 'sporen') { ctx.fillStyle = 'rgba(216,240,128,' + (0.3 + 0.4 * M
 // floating texts and progress
 ctx.font = '13px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center';
 P.fx.forEach(function (f) { ctx.fillStyle = f.c || IV; ctx.globalAlpha = 1 - f.t / 2.4; ctx.fillText(f.s, X(f.x), Y(f.y) - f.t * 24); ctx.globalAlpha = 1; });
+if (!P.near && P.hi) { var hs = P.hi, hx = hs.inst.reduce(function (b, a) { return Math.abs(a.x - P.x) < Math.abs(b.x - P.x) ? a : b; }).x, hl = (ARCH[hs.arch].n + ' · Jetpack, höher').toUpperCase(); ctx.fillStyle = 'rgba(0,0,0,0.45)'; var hw = ctx.measureText(hl).width; ctx.fillRect(X(hx) - hw / 2 - 6, Y(P.y) - 70 * s - 14, hw + 12, 20); ctx.fillStyle = '#bfe0ff'; ctx.fillText(hl, X(hx), Y(P.y) - 70 * s); }
 if (P.near) {
 var nk = P.near.k, nx = nk === 'node' ? P.near.n.x : nk === 'wreck' ? P.wreck.x : nk === 'ship' ? 0 : nk === 'site' ? P.site.x : nk === 'ruin' ? P.ruin.x : nk === 'species' && P.near.a ? P.near.a.x : P.x, ny = terrain(P, nx);
 var lh = nk === 'ship' ? 175 : nk === 'ruin' ? 160 : nk === 'site' ? 110 : nk === 'wreck' ? 95 : nk === 'species' && P.near.sp.arch ? Math.min(160, ARCH[P.near.sp.arch].h * archK(P.near.sp) + 22) + (P.near.sp.arch === 'falter' ? 30 : 0) : nk === 'wal' ? 120 : 62;
-var lab = nk === 'site' ? (P.site.built ? 'Deine Basis' : 'Bauplatz für eine Basis') : nk === 'node' ? W.RES[P.near.n.k].n + ' · ' + P.near.n.amt + ' t' : nk === 'species' ? (P.near.sp.rare ? 'Seltene Art' : P.near.sp.arch ? ARCH[P.near.sp.arch].n + ' · unbekannt' : 'Unbekannte Art') : nk === 'wreck' ? 'Wrack' : nk === 'ruin' ? 'Ruine der Erbauer' : nk === 'wal' ? 'Himmelswal' : 'Dein Schiff';
+var lab = nk === 'site' ? (P.site.built ? 'Deine Basis' : 'Bauplatz für eine Basis') : nk === 'node' ? (P.near.n.rich ? 'Reiche Ader · ' : '') + W.RES[P.near.n.k].n + ' · ' + P.near.n.amt + ' t' : nk === 'species' ? (P.near.sp.rare ? 'Seltene Art' : P.near.sp.arch ? ARCH[P.near.sp.arch].n + ' · unbekannt' : 'Unbekannte Art') : nk === 'wreck' ? 'Wrack' : nk === 'ruin' ? 'Ruine der Erbauer' : nk === 'wal' ? 'Himmelswal' : 'Dein Schiff';
 ctx.fillStyle = 'rgba(0,0,0,0.45)'; var tw = ctx.measureText(lab.toUpperCase()).width; ctx.fillRect(X(nx) - tw / 2 - 6, Y(ny) - lh * s - 14, tw + 12, 20);
 ctx.fillStyle = IV; ctx.fillText(lab.toUpperCase(), X(nx), Y(ny) - lh * s);
 if (P.prog > 0) { ctx.strokeStyle = AC; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X(P.x), Y(P.y) - 50 * s, 12, -Math.PI / 2, -Math.PI / 2 + P.prog * Math.PI * 2); ctx.stroke(); }

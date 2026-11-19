@@ -71,15 +71,21 @@ if (l > m) { dx *= m / l; dy *= m / l; }
 var py = joy.y; joy.x = dx / m; joy.y = dy / m; if (py > -0.6 && joy.y <= -0.6) jumpPressed = true;
 jz.firstChild.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
 }
+var drag = null, dragSteer = 0;
+cv.addEventListener('pointermove', function (e) { if (!drag || drag.id !== e.pointerId) return; var dx = e.clientX - drag.x0; if (Math.abs(dx) > 12) drag.moved = true; dragSteer = drag.moved ? Math.max(-1, Math.min(1, dx / 90)) : 0; });
+['pointerup', 'pointercancel'].forEach(function (t) { cv.addEventListener(t, function (e) {
+if (!drag || drag.id !== e.pointerId) return; var d = drag; drag = null; dragSteer = 0;
+if (t === 'pointerup' && !d.moved && mode === 'space' && F) { var o = SP.pickInView(F, CW, CH, d.mx, d.my); if (o) flyTo(o); }
+}); });
 cv.addEventListener('pointerdown', function (e) {
 var r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-if (mode === 'space' && F) { var o = SP.pickInView(F, CW, CH, mx, my); if (o) flyTo(o); }
+if (mode === 'space' && F) { drag = { id: e.pointerId, x0: e.clientX, mx: mx, my: my, moved: false }; try { cv.setPointerCapture(e.pointerId); } catch (er) { } }
 else if (mode === 'galaxy') { var st = SP.pickGalaxy(S, gview, gstars, mx, my); if (st) { gsel = st; sheet(); } }
 else if (mode === 'system') { var so = SP.pickSystem(F, SP.sysView(F, CW, CH), mx, my); if (so) { ssel = so; sheet(); } }
 });
 function input() {
 var k = keys, i = {
-sx: (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0) + joy.x,
+sx: (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0) + joy.x + dragSteer,
 sy: (k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0) + (mode === 'space' ? joy.y : 0),
 thrust: !!(k.KeyW || k.ShiftLeft || k.ShiftRight || bAltHeld), brake: !!k.KeyS,
 action: !!(k.Space || k.KeyE || bActHeld), actionPressed: actPressed,
@@ -87,7 +93,7 @@ ax: (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0) + (Math.a
 jump: jumpPressed, jet: !!(k.KeyW || k.ArrowUp || k.ShiftLeft || k.ShiftRight || bAltHeld || joy.y < -0.6)
 };
 i.ax = Math.max(-1, Math.min(1, i.ax)); i.sx = Math.max(-1, Math.min(1, i.sx)); i.sy = Math.max(-1, Math.min(1, i.sy));
-if (mode === 'space') i.sy = (k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0) + joy.y;
+if (mode === 'space') { i.sy = 0; if (k.ArrowUp) i.thrust = true; if (k.ArrowDown) i.brake = true; }
 actPressed = false; jumpPressed = false;
 return i;
 }
@@ -435,9 +441,9 @@ var sec = W.curSection(S);
 $('info').innerHTML = '<div><b>' + esc(mode === 'planet' && P ? P.p.name : sys ? sys.star.name : '') + '</b></div><div>Abschnitt ' + sec + ' · ' + W.SECTIONS[sec] + '</div><div>Sol <b>' + fmt(W.dist(S)) + ' Lj</b> · Erde <b>' + Math.floor(S.year) + '</b></div><div><b>' + fmt(S.cr) + '</b> Cr</div>';
 var c = ctxAction();
 if (c) { $('bAct').textContent = c.l; $('bAct').classList.toggle('idle', !!c.idle); }
-$('bAlt').textContent = mode === 'planet' ? 'Springen · Jetpack' : 'Schub';
+$('bAlt').textContent = mode === 'planet' ? 'Jetpack · halten' : 'Schub · halten';
 $('badge').hidden = !unread();
-$('hint').textContent = mode === 'planet' ? 'A/D LAUFEN · W SPRINGEN, HALTEN = JETPACK · LEERTASTE AKTION · TAB MENÜ' : 'WASD/PFEILE STEUERN · W SCHUB · C MARSCHFLUG · KLICK WÄHLT ZIEL · LEERTASTE AKTION · M KARTE · TAB MENÜ';
+$('hint').textContent = mode === 'planet' ? 'A/D LAUFEN · W HALTEN = JETPACK · LEERTASTE AKTION · TAB MENÜ' : 'ZIEL ANKLICKEN = KURS · A/D ODER ZIEHEN LENKT · W SCHUB · C MARSCHFLUG · LEERTASTE AKTION · M KARTE · TAB MENÜ';
 }
 
 // ---------- loop ----------
@@ -450,7 +456,7 @@ if (fade) { fade.t += dt; if (!fade.done && fade.t >= fade.d / 2) { fade.done = 
 if (mode === 'title') {
 if (!demo) { demo = { S: W.newGame(31337, 'kranich') }; demo.sys = W.system(demo.S, W.findStar(demo.S, 'start')); demo.F = SP.enter(demo.S, demo.sys); demo.F.pos = [520, 60, -700]; }
 demo.F.yaw = -0.62 + Math.sin(time * 0.05) * 0.1; demo.F.pitch = -0.08; demo.F.t = time * 6;
-SP.draw(ctx, demo.S, demo.F, CW, CH, time);
+SP.draw(ctx, demo.S, demo.F, CW, CH, time, { noShip: 1 });
 ctx.fillStyle = 'rgba(7,8,10,0.45)'; ctx.fillRect(0, 0, CW, CH);
 } else if (mode === 'tunnel' && tunnel) {
 tunnel.t += dt; SP.drawTunnel(ctx, CW, CH, tunnel.t / 2.4, time);
@@ -467,7 +473,7 @@ SP.update(S, F, dt, inp);
 var c = ctxAction(); if (c && c.fn && inp.actionPressed && !fade) c.fn();
 if (F.evade === 2) toast('Zu heiß – das Schiff weicht vom Stern zurück.');
 }
-SP.draw(ctx, S, F, CW, CH, time); hud();
+SP.draw(ctx, S, F, CW, CH, time, inp); hud();
 } else if (mode === 'planet' && P) {
 if (!paused && !fade) {
 PL.update(S, P, dt, inp);

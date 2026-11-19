@@ -77,7 +77,10 @@ F.speed += (want - F.speed) * Math.min(1, dt * 2.2);
 F.cruise = F.speed > maxV * 1.2;
 if (dist - sd < 4 && F.speed < 3) { F.auto = false; F.speed = 0; }
 } else {
-F.yaw += inp.sx * dt * 1.5; F.pitch = Math.max(-1.3, Math.min(1.3, F.pitch - inp.sy * dt * 1.2));
+F.yaw += inp.sx * dt * 1.3; F.turn = (F.turn || 0) + (inp.sx - (F.turn || 0)) * Math.min(1, dt * 4);
+// no up and down: the ship levels out towards its target, or the system plane
+var tq0 = F.target ? objPos(F, F.target) : null, dd0 = tq0 ? sub(tq0, F.pos) : null, wp0 = dd0 ? Math.atan2(dd0[1], Math.hypot(dd0[0], dd0[2])) : Math.atan2(-F.pos[1], 400);
+F.pitch += (Math.max(-0.5, Math.min(0.5, wp0)) - F.pitch) * Math.min(1, dt * 1.2);
 var tgt = inp.brake ? 0 : inp.thrust ? (F.cruise ? cruiseV : maxV) : F.speed * (F.cruise ? 1 : 0.995);
 if (F.cruise && !inp.thrust) tgt = cruiseV;
 if (inp.brake) F.cruise = false;
@@ -133,28 +136,88 @@ if (p.sol === 'erde' && r > 6) { var cr = W.rng(7); for (i = 0; i < 70; i++) { v
 ctx.restore();
 if (p.type !== 'gas' && p.type !== 'fels') { ctx.strokeStyle = rgba(p.type === 'wueste' ? '#ffd0a0' : '#c8e0ff', 0.25 * lit); ctx.lineWidth = Math.max(1, r * 0.06); circle(x, y, r * 1.02); ctx.stroke(); }
 }
-function draw(c, S, F, w, h, time) {
-ctx = c; if (!sky) initSky();
-var B = basis(F), st = F.sys.star, ST = W.STARS[st.type];
-ctx.fillStyle = BG; ctx.fillRect(0, 0, w, h);
-// sky
-var streak = F.speed > 200 ? Math.min(1, (F.speed - 200) / 300) : 0;
-sky.forEach(function (s) {
-var q = projectDir(B, s.v, w, h); if (!q || q.x < -4 || q.y < -4 || q.x > w + 4 || q.y > h + 4) return;
-ctx.fillStyle = rgba(s.c, 0.25 + s.m * 0.6);
-if (streak > 0) { var dx = q.x - w / 2, dy = q.y - h / 2, l = Math.hypot(dx, dy) || 1, k = streak * 14 * (l / h); ctx.strokeStyle = rgba(s.c, 0.2 + s.m * 0.5); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + dx / l * k, q.y + dy / l * k); ctx.stroke(); }
-else ctx.fillRect(q.x, q.y, s.m > 0.85 ? 2 : 1, s.m > 0.85 ? 2 : 1);
+// ---------- camera: beside and behind the ship, heading shown to the right ----------
+function basisYP(yaw, pitch) { var cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch); return { f: [cp * sy, sp, cp * cy], r: [cy, 0, -sy], u: [-sp * sy, cp, -sp * cy] }; }
+function cam(F, w, h) { var port = w < h * 0.9, a = port ? 0.3 : 0.5; return { B: basisYP(F.yaw - a, F.pitch * 0.6 - 0.06), fl: Math.min(h * 0.72, w * (port ? 0.7 : 0.6)), pos: [F.pos[0], F.pos[1] + 2, F.pos[2]], port: port }; }
+function proj(C, p, w, h) { var d = sub(p, C.pos), z = dot(d, C.B.f); if (z < 1) return null; return { x: w / 2 + dot(d, C.B.r) * C.fl / z, y: h / 2 - dot(d, C.B.u) * C.fl / z, z: z, s: C.fl / z }; }
+function projD(C, v, w, h) { var z = dot(v, C.B.f); if (z < 0.05) return null; return { x: w / 2 + dot(v, C.B.r) * C.fl / z, y: h / 2 - dot(v, C.B.u) * C.fl / z }; }
+var TINT = { rot: ['#2a1424', '#8a4a5a', '#c8705a'], gelb: ['#1c1420', '#7a5a4a', '#d8a070'], blau: ['#0c1424', '#3a5a7a', '#9fc0e0'], weiss: ['#10141c', '#4a5468', '#b8c4d4'], pulsar: ['#081418', '#2a5a5a', '#7af0d0'], loch: ['#140c08', '#5a2a1a', '#ff9a50'] };
+var DUST = null, PATH = {};
+function nebula(C, F, w, h, tint, time) {
+var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#05060a'); g.addColorStop(0.6, tint[0]); g.addColorStop(1, rgba(tint[1], 0.55)); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+// soft clouds fixed in the sky, so they turn with the view
+var r = W.rng(F.sys.star.seed);
+for (var i = 0; i < 7; i++) {
+var th = r() * 6.283, el = (r() - 0.6) * 0.5, q = projD(C, [Math.cos(el) * Math.sin(th), Math.sin(el), Math.cos(el) * Math.cos(th)], w, h), rad = h * (0.25 + r() * 0.35);
+if (!q || q.x < -rad || q.x > w + rad) continue;
+var cg = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, rad); cg.addColorStop(0, rgba(i % 2 ? tint[1] : tint[2], 0.16)); cg.addColorStop(1, rgba(tint[1], 0)); ctx.fillStyle = cg; ctx.fillRect(q.x - rad, q.y - rad, rad * 2, rad * 2);
+}
+}
+function nebulaBanks(C, F, w, h, tint) {
+// nebula banks below the horizon, layered like hills, parallax with the turn
+var hz = projD(C, [Math.sin(F.yaw), 0, Math.cos(F.yaw)], w, h), base = hz ? hz.y : h * 0.5, yaw = F.yaw - 0.5;
+for (var k = 0; k < 4; k++) {
+var off = yaw * w * (0.4 + k * 0.35), y0 = base + h * (0.08 + k * 0.1), amp = h * (0.05 - k * 0.006), col = k === 3 ? rgba(tint[0], 0.92) : rgba(k % 2 ? tint[2] : tint[1], 0.1 + k * 0.05);
+var g = ctx.createLinearGradient(0, y0 - amp * 2, 0, h); g.addColorStop(0, col); g.addColorStop(1, k === 3 ? rgba('#05060a', 0.98) : rgba(tint[0], 0.2));
+ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, h);
+for (var x = 0; x <= w + 10; x += 10) { var u = (x + off) / w; ctx.lineTo(x, y0 - amp * (Math.sin(u * 5.1 + k * 1.7) + 0.5 * Math.sin(u * 13.3 + k))); }
+ctx.lineTo(w, h); ctx.fill();
+}
+}
+function drawDust(F, w, h, time, dtv) {
+if (!DUST) { var r = W.rng(5); DUST = []; for (var i = 0; i < 70; i++) DUST.push([r(), r(), 0.3 + r() * 0.7]); }
+var v = Math.min(1, F.speed / 120), c = Math.min(1, Math.max(0, (F.speed - 150) / 300));
+DUST.forEach(function (d) {
+d[0] -= dtv * (0.02 + v * 0.35 + c * 1.2) * d[2]; d[1] += dtv * (F.turn || 0) * 0.02 * d[2]; if (d[0] < 0) { d[0] += 1; d[1] = Math.random(); } d[1] = (d[1] + 1) % 1;
+var x = d[0] * w, y = d[1] * h;
+if (c > 0.05) { ctx.strokeStyle = rgba(IV, 0.25 * d[2]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 40 * c * d[2], y); ctx.stroke(); }
+else { ctx.fillStyle = rgba('#ffd8a8', 0.15 + 0.4 * d[2] * (0.3 + v)); ctx.fillRect(x, y, d[2] > 0.8 ? 2 : 1, d[2] > 0.8 ? 2 : 1); }
 });
+}
+function drawShipSide(S, F, x, y, k, time, thrust) {
+var key = W.SHIPSVG && W.SHIPSVG[S.ship] ? S.ship : 'kranich', v = Math.min(1, F.speed / 110), fl = 0.25 + v * 0.75 + (F.cruise ? 0.6 : 0) + (thrust ? 0.3 : 0);
+ctx.save(); ctx.translate(x, y + Math.sin(time * 1.3) * 2); ctx.rotate(-(F.turn || 0) * 0.06);
+var ex = -123 * k, g = ctx.createRadialGradient(ex - 30 * k * fl, 0, 0, ex - 30 * k * fl, 0, 70 * k * fl + 4); g.addColorStop(0, 'rgba(255,190,130,0.45)'); g.addColorStop(1, 'rgba(255,122,47,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(ex - 30 * k * fl, 0, 70 * k * fl + 4, 10 * k + 2, 0, 0, Math.PI * 2); ctx.fill();
+ctx.fillStyle = 'rgba(255,242,220,0.85)'; ctx.beginPath(); ctx.ellipse(ex - 12 * k * fl, 0, 24 * k * fl + 2, 2.6 * k, 0, 0, Math.PI * 2); ctx.fill();
+ctx.translate(-123 * k, -60 * k); ctx.scale(k, k); var pth = PATH[key] || (PATH[key] = new Path2D(W.SHIPSVG[key]));
+ctx.fillStyle = '#121316'; ctx.fill(pth); ctx.strokeStyle = IV; ctx.lineWidth = 1.5 / k; ctx.lineJoin = 'round'; ctx.stroke(pth);
+[40, 110, 180].forEach(function (lx, i) { ctx.fillStyle = 'rgba(255,216,168,' + (0.6 + 0.4 * Math.sin(time * 2 + i)) + ')'; ctx.beginPath(); ctx.arc(lx, 60, 2.2 / k * 1.2, 0, Math.PI * 2); ctx.fill(); });
+ctx.restore();
+}
+function drawStation(x, y, rs, time) {
+ctx.save(); ctx.translate(x, y); ctx.rotate(time * 0.05); ctx.strokeStyle = rgba(IV, 0.9); ctx.lineWidth = Math.max(1, rs * 0.012);
+ctx.beginPath(); ctx.arc(0, 0, rs, 0, Math.PI * 2); ctx.stroke(); ctx.strokeStyle = rgba(IV, 0.25); ctx.lineWidth = Math.max(1, rs * 0.09); ctx.beginPath(); ctx.arc(0, 0, rs * 0.87, 0, Math.PI * 2); ctx.stroke();
+ctx.strokeStyle = rgba(IV, 0.55); ctx.lineWidth = Math.max(0.6, rs * 0.008); for (var i = 0; i < 4; i++) { var a = 0.3 + i * 1.57; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * rs * 0.87, Math.sin(a) * rs * 0.87); ctx.stroke(); }
+for (i = 0; i < 16; i++) { var b = i * 0.393; ctx.fillStyle = 'rgba(255,216,168,' + (0.5 + 0.5 * Math.sin(time * 2 + i)) + ')'; ctx.fillRect(Math.cos(b) * rs - 1, Math.sin(b) * rs - 1, Math.max(2, rs * 0.018), Math.max(2, rs * 0.018)); }
+ctx.restore(); ctx.save(); ctx.translate(x, y);
+ctx.fillStyle = '#121316'; ctx.strokeStyle = IV; ctx.lineWidth = Math.max(1, rs * 0.012);
+ctx.fillRect(-rs * 1.25, -rs * 0.05, rs * 2.5, rs * 0.1); ctx.strokeRect(-rs * 1.25, -rs * 0.05, rs * 2.5, rs * 0.1);
+[-1.9, -1.58, 1.25, 1.58].forEach(function (px) { ctx.fillStyle = '#1a2434'; ctx.fillRect(px * rs, -rs * 0.33, rs * 0.32, rs * 0.66); ctx.strokeStyle = rgba(CO, 0.8); ctx.strokeRect(px * rs, -rs * 0.33, rs * 0.32, rs * 0.66); });
+ctx.fillStyle = '#121316'; ctx.fillRect(-rs * 0.22, -rs * 0.22, rs * 0.44, rs * 0.44); ctx.strokeStyle = IV; ctx.strokeRect(-rs * 0.22, -rs * 0.22, rs * 0.44, rs * 0.44);
+ctx.fillStyle = (Math.floor(time * 2) % 2) ? AC : IV; ctx.fillRect(-2, -rs * 0.22 - 4, 4, 4);
+ctx.restore();
+}
+function draw(c, S, F, w, h, time, inp) {
+ctx = c; if (!sky) initSky();
+var C = cam(F, w, h), B = C.B, st = F.sys.star, ST = W.STARS[st.type], tint = TINT[st.type] || TINT.gelb, dtv = Math.min(0.05, time - (F._lt || time)); F._lt = time;
+nebula(C, F, w, h, tint, time);
+// sky
+sky.forEach(function (s) {
+var q = projD(C, s.v, w, h); if (!q || q.x < -4 || q.y < -4 || q.x > w + 4 || q.y > h + 4) return;
+ctx.fillStyle = rgba(s.c, 0.25 + s.m * 0.6); ctx.fillRect(q.x, q.y, s.m > 0.85 ? 2 : 1, s.m > 0.85 ? 2 : 1);
+});
+nebulaBanks(C, F, w, h, tint);
 // bodies, far to near
 var list = [{ kind: 'star', p: [0, 0, 0], r: ST.r }];
 F.sys.planets.forEach(function (p, i) { list.push({ kind: 'planet', i: i, p: W.planetPos(p, F.t), r: p.r, pl: p }); });
 if (F.sys.station) list.push({ kind: 'station', p: objPos(F, { kind: 'station' }), r: 6 });
-list.forEach(function (o) { o.q = project(F, B, o.p, w, h); });
+list.forEach(function (o) { o.q = proj(C, o.p, w, h); });
 list.sort(function (a, b) { return (b.q ? b.q.z : 0) - (a.q ? a.q.z : 0); });
-var sq = list.filter(function (o) { return o.kind === 'star'; })[0].q;
+var nearRing = null;
 list.forEach(function (o) {
 var q = o.q; if (!q) return;
 var r = o.r * q.s;
+if (q.x < -r * 3 - 200 || q.x > w + r * 3 + 200 || q.y < -r * 3 - 200 || q.y > h + r * 3 + 200) return;
 if (o.kind === 'star') {
 if (st.type === 'loch') {
 var g0 = ctx.createRadialGradient(q.x, q.y, r * 0.8, q.x, q.y, r * 7); g0.addColorStop(0, rgba(AC, 0.7)); g0.addColorStop(0.3, rgba('#ffb37a', 0.25)); g0.addColorStop(1, rgba(AC, 0)); ctx.fillStyle = g0; circle(q.x, q.y, r * 7); ctx.fill();
@@ -169,53 +232,70 @@ ctx.save(); ctx.globalCompositeOperation = 'lighter';
 [0, Math.PI].forEach(function (o2) { var a1 = ba + o2, gb = ctx.createLinearGradient(q.x, q.y, q.x + Math.cos(a1) * bl, q.y + Math.sin(a1) * bl * 0.35); gb.addColorStop(0, rgba(ST.c, 0.55)); gb.addColorStop(1, rgba(ST.c, 0)); ctx.fillStyle = gb; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + Math.cos(a1 - 0.05) * bl, q.y + Math.sin(a1 - 0.05) * bl * 0.35); ctx.lineTo(q.x + Math.cos(a1 + 0.05) * bl, q.y + Math.sin(a1 + 0.05) * bl * 0.35); ctx.fill(); });
 ctx.restore(); r = r * 0.3;
 }
-var g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, Math.max(8, r * 9));
+// light rays
+ctx.save(); ctx.globalAlpha = 0.05; ctx.fillStyle = ST.c; for (var i = 0; i < 9; i++) { var ra = i * 0.7 + time * 0.01, L = Math.max(w, h) * 1.3; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + Math.cos(ra) * L, q.y + Math.sin(ra) * L); ctx.lineTo(q.x + Math.cos(ra + 0.05) * L, q.y + Math.sin(ra + 0.05) * L); ctx.fill(); } ctx.restore();
+var R9 = Math.max(10, r * 9), g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, R9);
 g.addColorStop(0, rgba('#fff8ee', 1)); g.addColorStop(0.08, rgba(ST.c, 0.95 * pul)); g.addColorStop(0.25, rgba(ST.c, 0.32 * pul)); g.addColorStop(0.6, rgba(AC, 0.08)); g.addColorStop(1, rgba(AC, 0));
-ctx.fillStyle = g; circle(q.x, q.y, Math.max(8, r * 9)); ctx.fill();
-ctx.fillStyle = '#fffaf2'; circle(q.x, q.y, Math.max(2, r)); ctx.fill();
+ctx.fillStyle = g; circle(q.x, q.y, R9); ctx.fill();
+ctx.fillStyle = '#fffaf2'; circle(q.x, q.y, Math.max(2.5, r)); ctx.fill();
+if (r > 40) { // close to the surface: prominences
+ctx.save(); ctx.lineCap = 'round';
+for (i = 0; i < 6; i++) { var pa = i * 1.05 + 0.3, hh = r * (0.12 + 0.08 * Math.sin(time * 0.4 + i)), px = q.x + Math.cos(pa) * r, py = q.y + Math.sin(pa) * r, nx = Math.cos(pa), ny = Math.sin(pa), tx = -ny, ty = nx, wd = r * 0.08;
+ctx.strokeStyle = rgba('#ff9a50', 0.5); ctx.lineWidth = Math.max(3, r * 0.015); ctx.beginPath(); ctx.moveTo(px - tx * wd, py - ty * wd); ctx.bezierCurveTo(px - tx * wd + nx * hh * 2, py - ty * wd + ny * hh * 2, px + tx * wd + nx * hh * 2, py + ty * wd + ny * hh * 2, px + tx * wd, py + ty * wd); ctx.stroke();
+ctx.strokeStyle = rgba('#ffe0b0', 0.8); ctx.lineWidth = 1.2; ctx.stroke(); }
+ctx.restore();
+}
 return;
 }
-if (o.kind === 'station') {
-var rs = Math.max(2.5, r * 2.2); ctx.strokeStyle = rgba(IV, 0.85); ctx.lineWidth = Math.max(1, rs * 0.12);
-ctx.beginPath(); ctx.ellipse(q.x, q.y, rs, rs * 0.35, 0, 0, Math.PI * 2); ctx.stroke();
-ctx.beginPath(); ctx.moveTo(q.x, q.y - rs * 0.9); ctx.lineTo(q.x, q.y + rs * 0.9); ctx.stroke();
-ctx.fillStyle = (Math.floor(time * 2) % 2) ? AC : IV; ctx.fillRect(q.x - 1, q.y - rs * 0.9 - 1, 2, 2);
-return;
-}
+if (o.kind === 'station') { drawStation(q.x, q.y, Math.max(3, r * 2.4), time); o.sq = q; return; }
 var ld = sub([0, 0, 0], o.p), ll = len(ld) || 1; ld = [ld[0] / ll, ld[1] / ll, ld[2] / ll];
 var lx = dot(ld, B.r), ly = -dot(ld, B.u), lz = -dot(ld, B.f);
 var lxy = Math.hypot(lx, ly) || 1; lx /= lxy; ly /= lxy;
 var rings = o.pl.sol ? o.pl.sol === 'saturn' : o.pl.type === 'gas' && o.pl.hue > 0.45;
-if (rings) { ctx.strokeStyle = rgba('#d8c8a0', 0.5); ctx.lineWidth = Math.max(1, r * 0.12); ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.1, r * 0.42, -0.25, Math.PI, Math.PI * 2); ctx.stroke(); }
+// atmosphere glow
+if (r > 4 && o.pl.type !== 'fels') { var ag = ctx.createRadialGradient(q.x, q.y, r * 0.9, q.x, q.y, r * 1.35), ac = planetColors(o.pl).lit; ag.addColorStop(0, rgba(o.pl.type === 'gas' ? '#e8d8b8' : o.pl.type === 'wueste' ? '#ffd0a0' : '#bfe0ff', 0.28)); ag.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = ag; circle(q.x, q.y, r * 1.35); ctx.fill(); }
+function ringArc(a0, a1) { [[2.25, 0.16, 0.35], [1.95, 0.08, 0.5], [1.7, 0.05, 0.3]].forEach(function (rg) { ctx.strokeStyle = rgba('#e8dccb', rg[2]); ctx.lineWidth = Math.max(1, r * rg[1]); ctx.beginPath(); ctx.ellipse(q.x, q.y, r * rg[0], r * rg[0] * 0.2, -0.22, a0, a1); ctx.stroke(); }); }
+if (rings) ringArc(Math.PI, Math.PI * 2);
 drawPlanetDisc(q.x, q.y, Math.max(1.2, r), o.pl, lx, ly, lz);
-if (rings) { ctx.beginPath(); ctx.ellipse(q.x, q.y, r * 2.1, r * 0.42, -0.25, 0, Math.PI); ctx.stroke(); }
+if (rings) { ringArc(0, Math.PI); if (o.q.z < o.r * 7) nearRing = o; }
 });
-// heat haze near star
-if (F.inZone) { ctx.fillStyle = rgba(AC, Math.min(0.25, F.heat / 400)); ctx.fillRect(0, 0, w, h); }
+// ring debris in front when flying close to a ringed giant
+if (nearRing) { var rd = W.rng(3), sh = (time * Math.max(20, F.speed) * 0.6) % w; for (var j = 0; j < 22; j++) { var dx = ((rd() * w * 1.6 - sh * (0.5 + rd())) % (w * 1.2) + w * 1.2) % (w * 1.2) - w * 0.1, dy = h * (0.78 + rd() * 0.2), ds = 6 + rd() * 26; ctx.fillStyle = '#2a2420'; ctx.strokeStyle = 'rgba(138,122,106,0.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx + ds * 1.4, dy - ds * 0.6); ctx.lineTo(dx + ds * 2, dy + ds * 0.5); ctx.lineTo(dx + ds * 0.4, dy + ds); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+drawDust(F, w, h, time, dtv);
+// heat near the star
+if (F.inZone) { var hg = ctx.createLinearGradient(0, h, 0, 0); hg.addColorStop(0, rgba(AC, Math.min(0.35, F.heat / 260))); hg.addColorStop(1, rgba(AC, 0)); ctx.fillStyle = hg; ctx.fillRect(0, 0, w, h); }
+// the ship, in profile
+var shx = C.port ? w * 0.42 : w * 0.3, shy = h * (C.port ? 0.66 : 0.62), sk = Math.min(1.5, Math.max(0.7, Math.min(w, h * 1.6) / 760));
+// docking light path to the station
+if (F.target && F.target.kind === 'station') { var stq = proj(C, objPos(F, F.target), w, h); if (stq) for (var t = 1; t < 10; t++) { var u = t / 10; ctx.fillStyle = rgba(AC, 0.9 - u * 0.6); circle(shx + (stq.x - shx) * u + 60 * sk, shy + (stq.y - shy) * u, 2.4); ctx.fill(); } }
+if (!(inp && inp.noShip)) drawShipSide(S, F, shx, shy, sk, time, inp && inp.thrust);
 // target marker
 if (F.target) {
-var tp = objPos(F, F.target), tq = project(F, B, tp, w, h), name = targetName(F, F.target), dd = Math.round(len(sub(tp, F.pos)) - objRadius(F, F.target));
-ctx.strokeStyle = IV; ctx.lineWidth = 1; ctx.fillStyle = IV; ctx.font = '12px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center';
-if (tq && tq.x > 20 && tq.x < w - 20 && tq.y > 20 && tq.y < h - 20) {
-var b = Math.max(14, objRadius(F, F.target) * tq.s * 1.3);
-[[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (s) { ctx.beginPath(); ctx.moveTo(tq.x + s[0] * b, tq.y + s[1] * (b - 8)); ctx.lineTo(tq.x + s[0] * b, tq.y + s[1] * b); ctx.lineTo(tq.x + s[0] * (b - 8), tq.y + s[1] * b); ctx.stroke(); });
-ctx.fillText(name.toUpperCase() + ' · ' + Math.max(0, dd) + ' km', tq.x, tq.y + b + 16);
+var tp = objPos(F, F.target), tq = proj(C, tp, w, h), name = targetName(F, F.target), dd = Math.max(0, Math.round(len(sub(tp, F.pos)) - objRadius(F, F.target))), eta = F.speed > 2 ? dd / F.speed : 0;
+ctx.font = '12px ui-monospace, Menlo, monospace'; ctx.textAlign = 'left';
+var sub2 = dd + ' KM' + (eta > 1 ? ' · ' + (eta < 60 ? Math.round(eta) + ' S' : Math.round(eta / 6) / 10 + ' MIN') : '');
+if (tq && tq.x > 30 && tq.x < w - 30 && tq.y > 30 && tq.y < h - 30) {
+var b = Math.max(16, objRadius(F, F.target) * tq.s * (F.target.kind === 'station' ? 2.8 : 1.25));
+ctx.strokeStyle = AC; ctx.lineWidth = 1.2; ctx.setLineDash([3, 5]); circle(tq.x, tq.y, b); ctx.stroke(); ctx.setLineDash([]);
+var lx2 = tq.x + b * 0.7, ly2 = tq.y - b * 0.7, flip = lx2 + 180 > w; ctx.beginPath(); ctx.moveTo(lx2, ly2); ctx.lineTo(lx2 + (flip ? -30 : 30), ly2 - 30); ctx.stroke();
+ctx.textAlign = flip ? 'right' : 'left'; var tx2 = lx2 + (flip ? -34 : 34);
+ctx.fillStyle = 'rgba(5,6,10,0.55)'; var tw = Math.max(ctx.measureText(name.toUpperCase()).width, ctx.measureText(sub2).width); ctx.fillRect(flip ? tx2 - tw - 6 : tx2 - 6, ly2 - 50, tw + 12, 36);
+ctx.fillStyle = IV; ctx.fillText(name.toUpperCase(), tx2, ly2 - 34); ctx.fillStyle = MU; ctx.fillText(sub2, tx2, ly2 - 19);
 } else {
-var d = sub(tp, F.pos), ax = dot(d, B.r), ay = -dot(d, B.u), al = Math.hypot(ax, ay) || 1, ex = w / 2 + ax / al * (Math.min(w, h) / 2 - 40), ey = h / 2 + ay / al * (Math.min(w, h) / 2 - 40);
+var d = sub(tp, C.pos), ax = dot(d, B.r), ay = -dot(d, B.u); if (dot(d, B.f) < 0) { ax = ax >= 0 ? 1e4 : -1e4; }
+var al = Math.hypot(ax, ay) || 1, ex = w / 2 + ax / al * (w / 2 - 50), ey = h / 2 + ay / al * (h / 2 - 60);
 ctx.save(); ctx.translate(ex, ey); ctx.rotate(Math.atan2(ay, ax)); ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fillStyle = AC; ctx.fill(); ctx.restore();
-ctx.fillStyle = AC; ctx.fillText(name.toUpperCase(), ex, ey + 22);
+ctx.fillStyle = AC; ctx.textAlign = 'center'; ctx.fillText(name.toUpperCase(), ex, ey + 22);
 }
 }
-// crosshair
-ctx.strokeStyle = rgba(IV, 0.5); ctx.lineWidth = 1; ctx.beginPath();
-ctx.moveTo(w / 2, h / 2 - 14); ctx.lineTo(w / 2, h / 2 - 6); ctx.moveTo(w / 2, h / 2 + 6); ctx.lineTo(w / 2, h / 2 + 14);
-ctx.moveTo(w / 2 - 14, h / 2); ctx.lineTo(w / 2 - 6, h / 2); ctx.moveTo(w / 2 + 6, h / 2); ctx.lineTo(w / 2 + 14, h / 2); ctx.stroke();
+// vignette
+var vg = ctx.createRadialGradient(w / 2, h * 0.5, Math.min(w, h) * 0.4, w / 2, h * 0.5, Math.max(w, h) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.4)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
 }
 function targetName(F, o) { return o.kind === 'star' ? F.sys.star.name : o.kind === 'planet' ? F.sys.planets[o.i].name : F.sys.station.name; }
 function pickInView(F, w, h, mx, my) {
-var B = basis(F), best = null, bd = 40;
+var C = cam(F, w, h), best = null, bd = 44;
 var objs = [{ kind: 'star' }].concat(F.sys.planets.map(function (p, i) { return { kind: 'planet', i: i }; }), F.sys.station ? [{ kind: 'station' }] : []);
-objs.forEach(function (o) { var q = project(F, B, objPos(F, o), w, h); if (!q) return; var d = Math.hypot(q.x - mx, q.y - my) - objRadius(F, o) * q.s; if (d < bd) { bd = d; best = o; } });
+objs.forEach(function (o) { var q = proj(C, objPos(F, o), w, h); if (!q) return; var d = Math.hypot(q.x - mx, q.y - my) - objRadius(F, o) * q.s * (o.kind === 'station' ? 2.6 : 1); if (d < bd) { bd = d; best = o; } });
 return best;
 }
 
