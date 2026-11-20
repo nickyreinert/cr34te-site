@@ -236,15 +236,17 @@ show('modal', true); $('letter').scrollTop = 0;
 function endCont() { show('modal', false); mode = 'space'; END = null; showPlay(); sndScene(); toast('Du kannst weiterfliegen, so lange du willst. Die Galaxie bleibt offen.'); }
 
 // ---------- map ----------
+var camMove = null;
 function openMap(kind) {
 if (!F) return;
+if (kind === 'system' && mode === 'space') { camMove = { k: 0, dir: 1 }; mode = 'cam'; show('hud', false); show('ctl', false); show('hint', false); return; }
 mode = kind; show('mapbar', true); show('hud', false); show('ctl', false); show('hint', false);
 $('mapbar').children[0].classList.toggle('on', kind === 'galaxy'); $('mapbar').children[1].classList.toggle('on', kind === 'system');
 if (kind === 'galaxy') gview = SP.galaxyView(S, CW, CH);
 if (kind === 'system') ssel = F.target;
 sheet();
 }
-function closeMap(silent) { show('mapbar', false); show('sheet', false); if (!silent) { mode = 'space'; showPlay(); } }
+function closeMap(silent) { var fromSys = mode === 'system'; show('mapbar', false); show('sheet', false); if (!silent) { if (fromSys && F) { camMove = { k: 1, dir: -1 }; mode = 'cam'; } else { mode = 'space'; showPlay(); } } }
 // star map preview (research): what waits in nearby systems
 function mapMarks(V) {
 var mr = W.mapRadius(S); if (!mr) return;
@@ -289,7 +291,7 @@ $('sheet').innerHTML = h; show('sheet', !!h);
 }
 
 // ---------- panels ----------
-function openMenu() { if (mode === 'title' || mode === 'tunnel' || mode === 'ending') return; panelKind = 'menu'; panelTab = panelTab && ['schiff', 'crew', 'forsch', 'log'].indexOf(panelTab) >= 0 ? panelTab : 'schiff'; renderPanel(); show('panel', true); }
+function openMenu() { if (mode === 'title' || mode === 'tunnel' || mode === 'ending' || mode === 'cam') return; panelKind = 'menu'; panelTab = panelTab && ['schiff', 'crew', 'forsch', 'log'].indexOf(panelTab) >= 0 ? panelTab : 'schiff'; renderPanel(); show('panel', true); }
 function openStation() { panelKind = 'station'; panelTab = 'handel'; renderPanel(); show('panel', true); }
 function closePanel() { show('panel', false); panelKind = null; save(); }
 function renderPanel() {
@@ -467,6 +469,11 @@ if (END.t > 7.8 && !END.theme) { END.theme = 1; SND.lena(6); }
 if (END.t > 13 && !END.shown) { END.shown = 1; epilogueModal(); }
 } else if (mode === 'galaxy') { gstars = SP.drawGalaxy(ctx, S, gview, gsel, time); mapMarks(gview); }
 else if (mode === 'system') { SP.drawSystem(ctx, S, F, SP.sysView(F, CW, CH), time); }
+else if (mode === 'cam' && F && camMove) {
+camMove.k = Math.max(0, Math.min(1, camMove.k + camMove.dir * dt / 0.9)); SP.draw(ctx, S, F, CW, CH, time, { camK: camMove.k });
+if (camMove.dir > 0 && camMove.k >= 1) { camMove = null; mode = 'opening'; openMap('system'); }
+else if (camMove.dir < 0 && camMove.k <= 0) { camMove = null; mode = 'space'; showPlay(); }
+}
 else if (mode === 'space' && F) {
 if (!paused) {
 SP.update(S, F, dt, inp);
