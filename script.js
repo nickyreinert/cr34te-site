@@ -59,6 +59,11 @@ el.addEventListener('pointerdown', function (e) { e.preventDefault(); el.setPoin
 ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (t) { el.addEventListener(t, function () { on(false); el.classList.remove('on'); }); });
 }
 hold('bAct', function (v) { bActHeld = v; if (v) actPressed = true; });
+$('bRov').addEventListener('click', function () {
+if (mode !== 'space' || !F || !F.near || F.near.kind !== 'planet') return; var p = sys.planets[F.near.i];
+if (W.roverPickupHere(S, p)) { var got = W.roverPickup(S); toast('Rover abgeholt' + (Object.keys(got).length ? ' · ' + Object.keys(got).map(function (k) { return '+' + got[k] + ' t ' + W.RES[k].n; }).join(', ') : '')); save(); return; }
+if (W.roverCan(S, p)) { W.roverGo(S, p); SND.sfx('scan'); toast('Rover unterwegs nach ' + p.name + '.'); save(); }
+});
 hold('bAlt', function (v) { bAltHeld = v; if (v) jumpPressed = true; });
 $('bMenu').addEventListener('click', function () { if (panelKind === 'station') return; openMenu(); });
 var jz = $('joy');
@@ -107,6 +112,8 @@ if (n.k === 'node') return { l: 'Abbauen · halten', hold: 1 };
 if (n.k === 'species') return { l: 'Scannen · halten', hold: 1 };
 if (n.k === 'wreck') return { l: 'Untersuchen · halten', hold: 1 };
 if (n.k === 'site') return P.site.built ? { l: 'Deine Basis', idle: 1 } : { l: 'Basis bauen' };
+if (n.k === 'ruin' || n.k === 'signal') return { l: 'Untersuchen · halten', hold: 1 };
+if (n.k === 'wal') return { l: 'Scannen · halten', hold: 1 };
 return { l: 'Abheben', fn: leavePlanet };
 }
 if (mode !== 'space' || !F) return null;
@@ -118,6 +125,7 @@ if (!S.scanned[p.key]) return { l: 'Scannen', fn: function () { scan(p); } };
 if (W.WORLDS[p.type].land) return { l: 'Landen', fn: function () { land(p); } };
 }
 if (near && near.kind === 'star' && W.measurable(S)) return { l: sys.star.type === 'loch' ? 'Schwarzes Loch vermessen' : 'Pulsar vermessen', fn: measureStar };
+if (near && near.kind === 'star' && W.wormKnown(S, sys.star)) return { l: 'Wurmloch', fn: wormAsk };
 if (near && near.kind === 'star' && F.inZone && W.STARS[sys.star.type].fuel > 0) {
 if (S.fuel < W.tankMax(S) - 0.5) return { l: 'Auftanken · halten', hold: 1 };
 }
@@ -163,11 +171,12 @@ var ev = P.events; P.events = [];
 ev.forEach(function (e) {
 if (e.k === 'species') toast((e.auto ? 'Rena hat erfasst: ' : 'Neue Art: ') + e.sp.name + (e.sp.rare ? ' (selten)' : '') + ' · +' + e.res.cr + ' Cr, +' + e.res.f + ' Forschung');
 if (e.k === 'wreck') letter({ from: 'Fundstück', t: 'Ein Wrack', b: e.text });
+if (e.k === 'signal') { var sr = W.signalReward(S, P.p); SND.sfx('scan'); letter({ from: 'Signal', t: sr.t, b: sr.b }); save(); }
 if (e.k === 'ruin') { SND.sfx('scan'); letter({ from: 'Fundstück', t: 'Eine Ruine der Erbauer', b: e.text + '\n\nBruchstück geborgen (' + S.frags + '). Entschlüsseln kannst du es im Menü unter Forschung.' }); save(); }
 if (e.k === 'leave') leavePlanet(false);
 if (e.k === 'mined') SND.sfx('mine');
 if (e.k === 'drones') toast('Deine Drohnen haben abgebaut: ' + Object.keys(e.got).map(function (k) { return e.got[k] + ' t ' + W.RES[k].n; }).join(', '));
-if (e.k === 'build') { var nb = S.msgs.length, be = W.buildBase(S, P.p); if (be) toast(be); else { P.site.built = true; SND.sfx('dock'); toast('Basis auf ' + P.p.name + ' errichtet. Sie liefert bei jedem Sprung Nachschub.'); S.msgs.slice(nb).forEach(function (x) { notifyMsg(x.id); }); save(); } }
+if (e.k === 'build') { var nb = S.msgs.length, be = W.buildBase(S, P.p); if (be) { W.mark(S, S.star, 'bau', 'Bauplatz auf ' + P.p.name); toast(be + ' · Der Bauplatz ist auf der Sternkarte markiert.'); } else { P.site.built = true; SND.sfx('dock'); toast('Basis auf ' + P.p.name + ' errichtet. Sie liefert bei jedem Sprung Nachschub.'); S.msgs.slice(nb).forEach(function (x) { notifyMsg(x.id); }); save(); } }
 if (e.k === 'o2out' && !fade) leavePlanet(true);
 });
 if (ev.length) W.deliver(S).forEach(notifyMsg);
@@ -185,13 +194,33 @@ function measureStar() {
 var r = W.measure(S); if (!r) return; SND.sfx('scan');
 toast((r.hole ? 'Schwarzes Loch vermessen' : 'Pulsar vermessen') + ' · +' + r.f + ' Forschung, +' + r.ex + ' t Exotische Materie, +' + fmt(r.cr) + ' Cr');
 r.msgs.forEach(notifyMsg); save();
+if (W.isWorm(S, sys.star)) setTimeout(function () { toast('Die Messung zeigt: Dieses schwarze Loch ist ein Wurmloch.', 'Ansehen', wormAsk); }, 600);
 }
 function albatros() {
 var A2 = W.ALBATROS;
 $('letter').innerHTML = '<div class="lab ac">Funde · Der Schlund</div><h2>' + esc(A2.t) + '</h2>' + A2.b.split('\n\n').map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') + '<button type="button" class="go pri" data-a="alb" data-v="mit">' + esc(A2.a) + '</button><button type="button" class="go" data-a="alb" data-v="boje">' + esc(A2.bb) + '</button>';
 show('modal', true);
 }
-function doJump(st) {
+var pending = null;
+function roverWarn(go) {
+if (!W.roverOut(S)) { go(); return; }
+pending = go;
+$('letter').innerHTML = '<div class="lab ac">Rover</div><h2>Der Rover ist noch unterwegs</h2><p>Er ist noch auf ' + esc(S.rover.pn) + ', noch ' + Math.ceil(S.rover.t) + ' Sekunden.</p><p>Springst du ohne ihn, wartet er dort mit seiner Ladung. Das System wird markiert, und du kannst ihn später abholen.</p><button type="button" class="go pri" data-a="closeModal">Warten</button><button type="button" class="go" data-a="noRover">Ohne ihn springen</button>';
+show('modal', true);
+}
+function wormAsk() {
+var w = W.wormTarget(S); if (!w) { toast('Das Wurmloch führt nirgendwohin, das näher an der Erde liegt.'); return; }
+pending = function () { wormGo(w); };
+$('letter').innerHTML = '<div class="lab ac">Wurmloch · ' + esc(sys.star.name) + '</div><h2>Ziel unbekannt</h2><p>Die Messung zeigt einen Tunnel, der in Richtung Sol führt. Wohin genau, weiß niemand. Sicher ist nur: näher an der Erde.</p><p>Auf der Erde vergehen dabei etwa ' + w.years + ' Jahre. Lena wird älter, als du es bist.</p><button type="button" class="go pri" data-a="worm">Durchfliegen</button><button type="button" class="go" data-a="closeModal">Lieber nicht</button>';
+show('modal', true);
+}
+function wormGo(w) {
+var r = W.wormJump(S, w); if (!r.ok) { toast(r.why); return; }
+S.trail = S.trail || []; S.trail.push([w.st.x, w.st.y]); if (S.trail.length > 80) S.trail.shift();
+closeMap(true); mode = 'tunnel'; tunnel = { t: 0, star: w.st, res: r }; SND.sfx('jump'); show('hud', false); show('ctl', false);
+}
+function doJump(st, ok) {
+if (!ok && W.roverOut(S)) { roverWarn(function () { doJump(st, true); }); return; }
 var r = W.jump(S, st); if (!r.ok) { toast(r.why); return; }
 S.trail = S.trail || []; var cur = st; S.trail.push([cur.x, cur.y]); if (S.trail.length > 80) S.trail.shift();
 closeMap(true); mode = 'tunnel'; tunnel = { t: 0, star: st, res: r }; SND.sfx('jump');
@@ -200,6 +229,7 @@ show('hud', false); show('ctl', false);
 function arrive() {
 var r = tunnel.res; tunnel = null;
 sys = W.system(S, W.findStar(S, S.star)); F = SP.enter(S, sys); mode = 'space'; gsel = null; sndScene();
+if (r.worm) toast('Wurmloch: ' + fmt(r.d) + ' Lichtjahre in einem Atemzug. Auf der Erde sind ' + r.years + ' Jahre vergangen.');
 if (r.sling) toast('Schleudersprung: ' + fmt(r.d) + ' Lichtjahre. Nahe am Loch verging die Zeit langsamer, auf der Erde 8 Jahre mehr.');
 var st = sys.star, T = W.STARS[st.type];
 toast(st.name + ' · ' + T.n + ' · ' + sys.planets.length + ' Planeten' + (sys.station ? ' · Station' : '') + ' · auf der Erde ist es jetzt ' + Math.floor(S.year));
@@ -249,9 +279,18 @@ sheet();
 function closeMap(silent) { var fromSys = mode === 'system'; show('mapbar', false); show('sheet', false); if (!silent) { if (fromSys && F) { camMove = { k: 1, dir: -1 }; mode = 'cam'; } else { mode = 'space'; showPlay(); } } }
 // star map preview (research): what waits in nearby systems
 function mapMarks(V) {
-var mr = W.mapRadius(S); if (!mr) return;
 var w = V.w, h = V.h, ox = w / 2, oy = V.oy;
 function sx(x) { return ox + (x - V.cx) * V.s; } function sy(y) { return oy + (y - V.cy) * V.s; }
+ctx.font = '11px ui-monospace, Menlo, monospace';
+Object.keys(S.marks || {}).forEach(function (id) {
+var m = S.marks[id], st = W.findStar(S, id); if (!st) return; var col = m.k === 'ruin' ? '#bfe0ff' : m.k === 'rover' ? '#ff7a2f' : m.k === 'bau' ? '#8fa07a' : '#efe9dd';
+var x = sx(st.x), y = sy(st.y), inside = x > 20 && x < w - 20 && y > 20 && y < h - 20;
+ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(inside ? x : ox + (x - ox) * 0.9, inside ? y : oy + (y - oy) * 0.9); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+if (!inside) { var a = Math.atan2(y - oy, x - ox), r = Math.min(w, h) * 0.45, ex = ox + Math.cos(a) * r, ey = oy + Math.sin(a) * r; x = Math.max(30, Math.min(w - 30, ex)); y = Math.max(30, Math.min(h - 30, ey)); }
+ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 18); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y - 18); ctx.lineTo(x + 11, y - 14); ctx.lineTo(x, y - 10); ctx.fill();
+ctx.textAlign = 'left'; ctx.fillText(m.name.toUpperCase(), x + 14, y - 8);
+});
+var mr = W.mapRadius(S); if (!mr) return;
 ctx.strokeStyle = 'rgba(159,180,201,0.22)'; ctx.lineWidth = 1; ctx.setLineDash([1, 4]); ctx.beginPath(); ctx.arc(ox, oy, mr * V.s, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
 W.starsNear(S, V.cx, V.cy, mr).forEach(function (st) {
 var x = sx(st.x), y = sy(st.y); if (x < -10 || y < -10 || x > w + 10 || y > h + 10 || S.visited[st.id]) return;
@@ -262,22 +301,29 @@ if (v.wreck) { ctx.fillStyle = 'rgba(255,122,47,0.85)'; ctx.beginPath(); ctx.mov
 });
 ctx.lineWidth = 1;
 }
+function marksList() {
+var ids = Object.keys(S.marks || {}); if (!ids.length) return '';
+var cur = W.findStar(S, S.star);
+return '<div class="lab" style="margin-top:14px">Markierungen</div>' + ids.map(function (id) { var m = S.marks[id], st = W.findStar(S, id), d = st ? Math.round(Math.hypot(st.x - cur.x, st.y - cur.y)) : 0; return '<button type="button" class="msg" data-a="gotoMark" data-v="' + esc(id) + '"><div class="lab">' + esc(m.name) + ' · ' + d + ' Lj</div><div class="n">' + esc(m.n) + '</div></button>'; }).join('');
+}
 function prevTxt(st) { var v = W.preview(S, st); if (!v) return W.mapRadius(S) ? '' : '<p class="p">Mit Forschung kannst du die Sternkarte ausbauen und siehst vorher, was dich erwartet.</p>'; var a = [v.n + ' Planeten: ' + v.types.join(', ')]; if (v.station) a.push('Station'); if (v.wreck) a.push('Wrack'); if (v.ruin) a.push('<span style="color:#bfe0ff">Ruine der Erbauer</span>'); return '<p class="p">' + a.join(' · ') + '</p>'; }
 function sheet() {
 var h = '';
 if (mode === 'galaxy') {
 var d = W.dist(S);
 if (!gsel) h = '<div class="lab">Sternkarte</div><h2>Nach Hause</h2><p class="p">Tippe einen Stern im orangen Kreis an. Je näher er an Sol liegt, desto näher bist du der Erde.</p><div class="kv"><div><div class="lab">Bis Sol</div><b>' + fmt(d) + '<small>LJ</small></b></div><div><div class="lab">Tank</div><b>' + Math.round(S.fuel) + '<small>/ ' + W.tankMax(S) + '</small></b></div></div>';
+if (!gsel) h += marksList();
 else {
 var c = W.canJump(S, gsel), T = W.STARS[gsel.type], nd = Math.hypot(gsel.x, gsel.y);
 h = (c.sling ? '<div class="lab ac">Schleudersprung am schwarzen Loch</div>' : '') + '<div class="lab ac">' + esc(T.n) + (S.visited[gsel.id] ? ' · besucht' : '') + '</div><h2>' + esc(gsel.name) + '</h2>' +
 '<div class="kv"><div><div class="lab">Distanz</div><b>' + num(c.d || 0) + '<small>LJ</small></b></div><div><div class="lab">Treibstoff</div><b>' + (c.fuel || W.fuelCost(S, c.d || 0)) + '<small>/ ' + Math.round(S.fuel) + '</small></b></div>' +
 '<div><div class="lab">Danach bis Sol</div><b>' + fmt(nd) + '<small>LJ</small></b></div><div><div class="lab">Auf der Erde</div><b>+' + num(c.years || W.yearsFor(c.d || 0), 1) + '<small>JAHRE</small></b></div></div>' +
-prevTxt(gsel) + '<button type="button" class="go pri" data-a="jump" ' + (c.ok ? '' : 'disabled') + '>Springen</button>' + (c.ok ? '' : '<p class="why">' + esc(c.why) + (c.why === 'Zu wenig Treibstoff' ? ' – tanke am Stern auf oder kaufe an einer Station.' : '') + '</p>');
+prevTxt(gsel) + '<button type="button" class="go pri" data-a="jump" ' + (c.ok ? '' : 'disabled') + '>Springen</button>' + '<button type="button" class="go" data-a="markSel">' + (S.marks[gsel.id] ? 'Markierung entfernen' : 'Markieren') + '</button>' + (c.ok ? '' : '<p class="why">' + esc(c.why) + (c.why === 'Zu wenig Treibstoff' ? ' – tanke am Stern auf oder kaufe an einer Station.' : '') + '</p>');
 }
 } else if (mode === 'system') {
 var o = ssel;
 if (!o) h = '<div class="lab">Systemkarte</div><h2>' + esc(sys.star.name) + '</h2><p class="p">' + esc(W.STARS[sys.star.type].n) + ' · ' + sys.planets.length + ' Planeten' + (sys.station ? ' · Station ' + esc(sys.station.name) : '') + '. Tippe einen Planeten an.</p>';
+if (!o) h += '<button type="button" class="go" data-a="markHere">' + (S.marks[S.star] ? 'Markierung entfernen' : 'System markieren') + '</button>';
 else if (o.kind === 'planet') {
 var p = sys.planets[o.i], known = S.scanned[p.key] || S.mods.scanner > 0, Wt = W.WORLDS[p.type];
 h = '<div class="lab ac">' + (known ? esc(Wt.n) : 'Nicht gescannt') + '</div><h2>' + esc(p.name) + '</h2><div class="kv"><div><div class="lab">Schwerkraft</div><b>' + num(p.grav, 1) + '<small>G</small></b></div><div><div class="lab">Leben</div><b>' + (known ? p.life + '<small>ARTEN</small>' : '?') + '</b></div></div>' +
@@ -352,6 +398,7 @@ return h;
 },
 werft: function () {
 var h = '<div class="lab">Station · Werft</div><h1>Module</h1>' + money();
+if (S.rover && S.rover.st === 'left') h += '<div class="row"><div><div class="n">Neuer Rover</div><div class="d">Dein Rover wartet noch auf ' + esc(S.rover.pn) + '. Ein neuer kostet ' + fmt(W.ROVER_NEW.cr) + ' Cr und ' + W.ROVER_NEW.eisen + ' t Eisen.</div></div><button type="button" class="go act" data-a="roverNew">Bauen</button></div>';
 W.MKEYS.forEach(function (k) {
 var M = W.MODS[k], u = W.canUpgrade(S, k), c = W.modCost(S, k);
 h += '<div class="row"><div><div class="n">' + M.n + lv(S.mods[k]) + '</div><div class="d">' + M.d + ' · jetzt ' + fmtMod(k) + (c ? ' → ' + fmtMod(k, 1) + '<br>' + costTxt(c) : '') + (u.ok || !c ? '' : '<br><span class="ac">' + esc(u.why) + '</span>') + '</div></div>' +
@@ -366,7 +413,7 @@ S.recruitable.forEach(function (k) { var C = W.CREW[k], full = S.crew.length >= 
 return h;
 }
 };
-function fmtMod(k, next) { var M = W.MODS[k], l = S.mods[k] + (next || 0); var sv = S.mods[k]; S.mods[k] = l; var v = W.modVal(S, k); S.mods[k] = sv; if (k === 'scanner') return ['aus', 'Rohstoffe', 'Rohstoffe und Leben', 'alles'][l]; if (k === 'labor') return '×' + num(v, 1); if (k === 'anzug') return Math.floor(v / 60) + ':' + ('0' + v % 60).slice(-2) + ' min'; return v + ' ' + M.unit; }
+function fmtMod(k, next) { var M = W.MODS[k], l = S.mods[k] + (next || 0); if (k === 'rover') return l ? W.ROVER_T[l] + ' s Einsatz, ' + W.ROVER_M[l] + ' s Wartung' : 'keiner'; var sv = S.mods[k]; S.mods[k] = l; var v = W.modVal(S, k); S.mods[k] = sv; if (k === 'scanner') return ['aus', 'Rohstoffe', 'Rohstoffe und Leben', 'alles'][l]; if (k === 'labor') return '×' + num(v, 1); if (k === 'anzug') return Math.floor(v / 60) + ':' + ('0' + v % 60).slice(-2) + ' min'; return v + ' ' + M.unit; }
 
 // ---------- clicks ----------
 document.addEventListener('click', function (e) {
@@ -388,6 +435,12 @@ else if (act === 'up') { var e2 = W.upgrade(S, v); if (e2) toast(e2); else toast
 else if (act === 'recruit') { var before = S.msgs.length, e3 = W.recruit(S, v); if (e3) toast(e3); else { toast(W.CREW[v].n + ' ist an Bord.'); S.msgs.slice(before).forEach(function (x) { notifyMsg(x.id); }); } renderPanel(); save(); }
 else if (act === 'mapUp') { var e4 = W.mapUp(S); toast(e4 || 'Sternkarte verbessert: Vorschau bis ' + W.mapRadius(S) + ' Lj.'); renderPanel(); save(); }
 else if (act === 'decode') { var dr = W.decode(S); if (dr.err) toast(dr.err); else { SND.sfx('scan'); toast(dr.tech.n + ' entschlüsselt: ' + dr.tech.d); dr.msgs.forEach(notifyMsg); } renderPanel(); save(); }
+else if (act === 'noRover') { W.roverLeave(S); show('modal', false); var pg2 = pending; pending = null; if (pg2) pg2(); save(); }
+else if (act === 'worm') { show('modal', false); var pg3 = pending; pending = null; if (pg3) roverWarn(pg3); }
+else if (act === 'markSel') { if (gsel) { if (S.marks[gsel.id]) W.unmark(S, gsel.id); else W.mark(S, gsel.id, 'user', 'Markiert'); sheet(); save(); } }
+else if (act === 'markHere') { if (S.marks[S.star]) W.unmark(S, S.star); else W.mark(S, S.star, 'user', 'Markiert'); sheet(); save(); }
+else if (act === 'gotoMark') { gsel = W.findStar(S, v); gview = SP.galaxyView(S, CW, CH, Math.max(1.7, Math.hypot(gsel.x - gview.cur.x, gsel.y - gview.cur.y) / W.range(S) * 1.2)); sheet(); }
+else if (act === 'roverNew') { var e5 = W.roverReplace(S); toast(e5 || 'Neuer Rover gebaut.'); renderPanel(); save(); }
 else if (act === 'endCont') endCont();
 else if (act === 'endNew') { store(''); S = null; END = null; show('modal', false); titleScreen(); }
 else if (act === 'music') { S.music = S.music === false; SND.setOn(S.music); renderPanel(); save(); }
@@ -445,6 +498,11 @@ var c = ctxAction();
 if (c) { $('bAct').textContent = c.l; $('bAct').classList.toggle('idle', !!c.idle); }
 $('bAlt').textContent = mode === 'planet' ? 'Jetpack · halten' : 'Schub · halten';
 $('badge').hidden = !unread();
+var rp = mode === 'space' && F && F.near && F.near.kind === 'planet' ? sys.planets[F.near.i] : null, rb = $('bRov');
+if (rp && W.roverPickupHere(S, rp)) { rb.hidden = false; rb.textContent = 'Rover abholen'; } else if (rp && W.roverCan(S, rp)) { rb.hidden = false; rb.textContent = 'Rover absetzen'; } else rb.hidden = true;
+var R = S.rover || {}, ri = R.st === 'out' ? (R.star === S.star ? 'Rover · noch ' + Math.ceil(R.t) + ' s' : 'Rover · wartet im anderen System') : R.st === 'maint' ? 'Rover · Wartung ' + Math.ceil(R.t) + ' s' : R.st === 'left' ? 'Rover · wartet auf ' + R.pn : '';
+if (mode === 'planet' && P && P.sig && !P.sig.done) ri = (ri ? ri + '<br>' : '') + '<span style="color:#bfe0ff">Signal · ' + Math.round(P.sigD) + ' m</span>';
+if (ri) $('info').innerHTML += '<div>' + ri + '</div>';
 $('hint').textContent = mode === 'planet' ? 'A/D LAUFEN · W HALTEN = JETPACK · LEERTASTE AKTION · TAB MENÜ' : 'ZIEL ANKLICKEN = KURS · A/D ODER ZIEHEN LENKT · W SCHUB · C MARSCHFLUG · LEERTASTE AKTION · M KARTE · TAB MENÜ';
 }
 
@@ -454,6 +512,7 @@ function frame(ts) {
 var dt = Math.min(0.05, (ts - lastTs) / 1000 || 0); lastTs = ts; time += dt;
 var paused = !$('panel').hidden || !$('modal').hidden; SND.update();
 var inp = input();
+if (S && !paused && mode !== 'title' && mode !== 'ending' && W.roverTick) { var rv = W.roverTick(S, dt); if (rv && rv.k === 'back') { toast('Rover zurück von ' + rv.pn + (Object.keys(rv.got).length ? ' · ' + Object.keys(rv.got).map(function (k) { return '+' + rv.got[k] + ' t ' + W.RES[k].n; }).join(', ') : ' · Laderaum voll') + '. Jetzt Wartung.'); save(); } else if (rv && rv.k === 'ready') toast('Der Rover ist gewartet und bereit.'); }
 if (fade) { fade.t += dt; if (!fade.done && fade.t >= fade.d / 2) { fade.done = true; fade.mid(); } if (fade.t >= fade.d) fade = null; }
 if (mode === 'title') {
 if (!demo) { demo = { S: W.newGame(31337, 'kranich') }; demo.sys = W.system(demo.S, W.findStar(demo.S, 'start')); demo.F = SP.enter(demo.S, demo.sys); demo.F.pos = [520, 60, -700]; }
