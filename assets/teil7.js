@@ -39,7 +39,7 @@ if (R.st === 'maint') { R.t -= dt; if (R.t <= 0) { S.rover = { st: 'idle', t: 0 
 return null;
 };
 W.roverOut = function (S) { fill(S); return S.rover.st === 'out' && S.rover.star === S.star; };
-W.roverLeave = function (S) { var R = S.rover; R.st = 'left'; S.roverDone[R.pk] = 1; W.mark(S, R.star, 'rover', 'Rover wartet auf ' + R.pn); };
+W.roverLeave = function (S) { var R = S.rover; R.st = 'left'; S.flags.roverLeft = (S.flags.roverLeft || 0) + 1; S.roverDone[R.pk] = 1; W.mark(S, R.star, 'rover', 'Rover wartet auf ' + R.pn); };
 W.roverPickupHere = function (S, p) { fill(S); return S.rover.st === 'left' && S.rover.star === S.star && S.rover.pk === p.key; };
 W.roverPickup = function (S) { var got = unload(S, S.rover.load || {}); if (S.marks[S.rover.star] && S.marks[S.rover.star].k === 'rover') W.unmark(S, S.rover.star); S.rover = { st: 'idle', t: 0 }; return got; };
 W.ROVER_NEW = { cr: 1200, eisen: 10 };
@@ -61,7 +61,7 @@ return best ? { st: best, years: 15 + Math.round(Math.random() * 15) } : null;
 W.wormJump = function (S, w) {
 // reuse the normal jump for crew, production and messages, then add the real distance and time
 var cur = W.findStar(S, S.star), t = w.st, fake = { id: t.id, x: cur.x + 0.001, y: cur.y, type: t.type, name: t.name, seed: t.seed }, fuel = S.fuel;
-S.fuel = Math.max(S.fuel, 1);
+S.fuel = Math.max(S.fuel, 1); S.flags.worm = (S.flags.worm || 0) + 1;
 var r = W.jump(S, fake); if (!r.ok) { S.fuel = fuel; return r; }
 S.fuel = fuel; var d = Math.hypot(t.x - cur.x, t.y - cur.y); S.year += w.years; S.stats.ly += d; r.d = d; r.years = w.years; r.worm = true;
 r.news.msgs = r.news.msgs.concat(W.deliver(S));
@@ -107,4 +107,13 @@ return { ruin: best, t: 'Ein Peilstein der Erbauer', b: 'Das Signal kommt aus ei
 var cr = 150 + (W.hash(p.seed, 5, 5) % 4) * 50; S.cr += cr; S.forschung += 5; S.flags.ftot = (S.flags.ftot || 0) + 5;
 return { t: 'Ein Fundstück', b: W.SIGNAL_FINDS[W.hash(p.seed, 9, 9) % W.SIGNAL_FINDS.length] + '\n\n+' + cr + ' Cr, +5 Forschung.' };
 };
+// ---------- story: answers to your choices, and the first signs of the Stille ----------
+[
+{ id: 'm40', at: { flag: 'worm', n: 1 }, from: 'Lena', t: 'Ein Sprung durch die Zeit', b: 'Papa. Das Zentrum sagt, deine Signatur ist auf einmal Hunderte Lichtjahre näher. Einfach so, über Nacht. Und dass für dich nur Minuten vergangen sind.\n\nFür uns waren es Jahre. Mara hat in der Zeit Laufen gelernt, und Lesen, und wie man mit mir streitet. Ich bin nicht böse. Ich wünschte nur, du hättest es gesehen.' },
+{ id: 'm41', at: { flag: 'roverLeft', n: 1 }, from: 'Logbuch', t: 'Zurückgelassen', b: 'Der Rover sendet noch. Ein kleines Licht auf einem Planeten, den wir verlassen haben, und eine Ladung, die er für uns bewacht. Ida hat seinen Kanal nicht abgeschaltet. „Er wartet“, hat sie gesagt. „So wie sie zu Hause.“' },
+{ id: 'm42', at: { bases: 1 }, from: 'Raumfahrtzentrum', t: 'Ein Licht auf der Karte', b: 'An Testflug 7: Wir empfangen den Sender Ihrer ersten Basis. Es ist das erste von Menschen gebaute Bauwerk außerhalb des Sonnensystems, das wir kennen.\n\nIhre Tochter hat darum gebeten, dass wir es auf den Namen „Flurlicht“ eintragen. Wir haben zugestimmt.' },
+{ id: 'm43', at: { jumps: 10 }, from: 'Lena', t: 'Ein Stern weniger', b: 'Etwas Seltsames, Papa. Im Observatorium fehlt seit gestern ein Stern. Nicht verdunkelt, nicht verdeckt, einfach weg. Er war da, Tausende Jahre lang, und jetzt ist an seiner Stelle nichts.\n\nDie anderen sagen, das ist ein Messfehler. Ich habe dreimal nachgemessen. Er liegt ungefähr dort, wo du vor ein paar Jahren warst.' },
+{ id: 'm44', at: { jumps: 14 }, from: 'Raumfahrtzentrum', t: 'Keine Auskunft', b: 'An Testflug 7: Zu den Berichten über verschwundene Sterne können wir derzeit keine Auskunft geben. Bitte setzen Sie Ihren Kurs fort.\n\nWir halten den Kanal offen.' },
+{ id: 'm45', at: { flag: 'tech', n: 2 }, from: 'Logbuch', t: 'Die Lücke', b: 'Rena hat die Sternkarte von heute neben die von vor zehn Sprüngen gelegt. Hinter uns fehlt ein Stern. Keine Explosion, kein Nebel, nur eine Stelle, an der das Licht aufhört.\n\nIn den Bruchstücken der Erbauer steht ein Wort, das wir bisher für „Heimweh“ gehalten haben. Rena sagt, es könnte auch „Stille“ heißen.' }
+].forEach(function (m) { W.MSG.push(m); });
 })(window);

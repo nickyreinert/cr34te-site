@@ -147,10 +147,12 @@ toast(p.name + ': ' + Wt.n + (p.life ? ' · ' + p.life + ' Arten' : '') + (res.l
 if (p.ruin && !S.ruins[p.key]) toast('Auf ' + p.name + ' steht eine Ruine der Erbauer.');
 W.deliver(S).forEach(notifyMsg); save();
 }
-function land(p) {
+var desc = null;
+function land(p) { desc = { t: 0, p: p, from: F.pos.slice() }; mode = 'descent'; show('hud', false); show('ctl', false); show('hint', false); }
+function landNow(p) {
 if (p.sol === 'erde') { startFade(startEnding, 1.4); return; }
 startFade(function () {
-P = PL.enter(S, p, sys.star.type); mode = 'planet'; o2warn = false; S.lastPlanet = p.i; sndScene();
+P = PL.enter(S, p, sys.star.type); mode = 'planet'; o2warn = false; S.lastPlanet = p.i; sndScene(); showPlay();
 handlePlanetEvents();
 }, 0.9);
 }
@@ -217,7 +219,7 @@ show('modal', true);
 function wormGo(w) {
 var r = W.wormJump(S, w); if (!r.ok) { toast(r.why); return; }
 S.trail = S.trail || []; S.trail.push([w.st.x, w.st.y]); if (S.trail.length > 80) S.trail.shift();
-closeMap(true); mode = 'tunnel'; tunnel = { t: 0, star: w.st, res: r }; SND.sfx('worm'); show('hud', false); show('ctl', false);
+closeMap(true); mode = 'tunnel'; tunnel = { t: 0, d: 3.8, worm: true, star: w.st, res: r }; SND.sfx('worm'); show('hud', false); show('ctl', false);
 }
 function doJump(st, ok) {
 if (!ok && W.roverOut(S)) { roverWarn(function () { doJump(st, true); }); return; }
@@ -551,14 +553,21 @@ demo.F.yaw = -0.62 + Math.sin(time * 0.05) * 0.1; demo.F.pitch = -0.08; demo.F.t
 SP.draw(ctx, demo.S, demo.F, CW, CH, time, { noShip: 1 });
 ctx.fillStyle = 'rgba(7,8,10,0.45)'; ctx.fillRect(0, 0, CW, CH);
 } else if (mode === 'tunnel' && tunnel) {
-tunnel.t += dt; SP.drawTunnel(ctx, CW, CH, tunnel.t / 2.4, time);
-if (tunnel.t >= 2.4) { arrive(); showPlay(); }
+tunnel.t += dt; SP.drawTunnel(ctx, CW, CH, tunnel.t / (tunnel.d || 2.4), time, tunnel.worm);
+if (tunnel.t >= (tunnel.d || 2.4)) { arrive(); showPlay(); }
 } else if (mode === 'ending' && END) {
 window.Ending.draw(ctx, END, CW, CH, time, dt);
 if (END.t > 7.8 && !END.theme) { END.theme = 1; SND.lena(6); }
 if (END.t > 13 && !END.shown) { END.shown = 1; epilogueModal(); }
 } else if (mode === 'galaxy') { gstars = SP.drawGalaxy(ctx, S, gview, gsel, time); mapMarks(gview); }
 else if (mode === 'system') { SP.drawSystem(ctx, S, F, SP.sysView(F, CW, CH), time); }
+else if (mode === 'descent' && F && desc) {
+desc.t += dt / 1.8; var dk = Math.min(1, desc.t), de = dk * dk * (3 - 2 * dk), pc = SP.objPos(F, { kind: 'planet', i: desc.p.i }), dv = [desc.from[0] - pc[0], desc.from[1] - pc[1], desc.from[2] - pc[2]], dl = Math.hypot(dv[0], dv[1], dv[2]) || 1, er = desc.p.r * 1.15;
+F.pos = [desc.from[0] + (pc[0] + dv[0] / dl * er - desc.from[0]) * de, desc.from[1] + (pc[1] + dv[1] / dl * er - desc.from[1]) * de, desc.from[2] + (pc[2] + dv[2] / dl * er - desc.from[2]) * de];
+F.lookAt = pc; F.lookK = Math.min(1, de * 1.6);
+SP.draw(ctx, S, F, CW, CH, time, { desc: dk, descP: desc.p });
+if (dk >= 1 && !desc.done) { desc.done = 1; var lp = desc.p; landNow(lp); setTimeout(function () { if (F) { F.lookAt = null; F.lookK = 0; } desc = null; }, 800); }
+}
 else if (mode === 'cam' && F && camMove) {
 camMove.k = Math.max(0, Math.min(1, camMove.k + camMove.dir * dt / 0.9)); SP.draw(ctx, S, F, CW, CH, time, { camK: camMove.k });
 if (camMove.dir > 0 && camMove.k >= 1) { camMove = null; mode = 'opening'; openMap('system'); }

@@ -53,11 +53,13 @@ return null;
 }
 function objRadius(F, o) { return o.kind === 'star' ? W.STARS[F.sys.star.type].r : o.kind === 'planet' ? F.sys.planets[o.i].r : 6; }
 function stopDist(F, o) { return o.kind === 'star' ? objRadius(F, o) * 4.2 : o.kind === 'planet' ? objRadius(F, o) * 3.2 + 14 : 26; }
-function setTarget(F, o, auto) { F.target = o; F.auto = !!auto; }
+function setTarget(F, o, auto) { F.target = o; F.auto = !!auto; F.orbit = null; }
+function startOrbit(F, o) { var c = objPos(F, o), d = sub(F.pos, c); F.orbit = { o: o, ang: Math.atan2(d[2], d[0]), r: Math.hypot(d[0], d[2]) }; }
 function warpTo(F, o) {
 var p = objPos(F, o), sd = stopDist(F, o), back = sub(F.pos, p), l = len(back) || 1;
 F.pos = [p[0] + back[0] / l * sd, p[1] + back[1] / l * sd + 4, p[2] + back[2] / l * sd];
 var to = sub(p, F.pos); F.yaw = Math.atan2(to[0], to[2]); F.pitch = Math.atan2(to[1], Math.hypot(to[0], to[2])); F.speed = 0; F.auto = false; F.target = o;
+if (o.kind !== 'station') startOrbit(F, o);
 }
 function angDiff(a, b) { var d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; }
 
@@ -66,7 +68,17 @@ F.t += dt;
 var B = basis(F), maxV = S.ship === 'falke' ? 110 : 85, cruiseV = S.ship === 'falke' ? 640 : 520;
 var manual = Math.abs(inp.sx) > 0.05 || Math.abs(inp.sy) > 0.05 || inp.thrust || inp.brake;
 if (manual && F.auto) F.auto = false;
-if (F.auto && F.target) {
+if (F.orbit && manual) { F.orbit = null; F.speed = Math.max(F.speed, 12); }
+var orbiting = !!F.orbit;
+if (F.orbit) {
+// gliding around the planet (or at the edge of the star's refuel zone), planet on the right
+var O = F.orbit, oc = objPos(F, O.o), isStar = O.o.kind === 'star', SR = W.STARS[F.sys.star.type].r;
+var want = isStar ? SR * (inp.action ? 4.6 : 6.3) : stopDist(F, O.o), ov = isStar ? 14 : 10;
+O.r += (want - O.r) * Math.min(1, dt * 0.8); O.ang += dt * ov / Math.max(10, O.r);
+F.pos = [oc[0] + Math.cos(O.ang) * O.r, F.pos[1] + (oc[1] + 4 - F.pos[1]) * Math.min(1, dt * 2), oc[2] + Math.sin(O.ang) * O.r];
+F.yaw += angDiff(F.yaw, Math.atan2(-Math.sin(O.ang), Math.cos(O.ang))) * Math.min(1, dt * 3); F.pitch += (0 - F.pitch) * Math.min(1, dt * 2);
+F.speed = ov; F.cruise = false; F.turn = (F.turn || 0) * (1 - Math.min(1, dt * 3));
+} else if (F.auto && F.target) {
 var tp = objPos(F, F.target), d = sub(tp, F.pos), dist = len(d), sd = stopDist(F, F.target);
 var wy = Math.atan2(d[0], d[2]), wp = Math.atan2(d[1], Math.hypot(d[0], d[2]));
 F.yaw += angDiff(F.yaw, wy) * Math.min(1, dt * 2.6); F.pitch += (wp - F.pitch) * Math.min(1, dt * 2.6);
@@ -75,7 +87,7 @@ var want = dist - sd < 4 ? 0 : Math.min(dist - sd > 500 ? cruiseV : maxV * 1.4, 
 if (!aligned) want = Math.min(want, 30);
 F.speed += (want - F.speed) * Math.min(1, dt * 2.2);
 F.cruise = F.speed > maxV * 1.2;
-if (dist - sd < 4 && F.speed < 3) { F.auto = false; F.speed = 0; }
+if (dist - sd < 4 && F.speed < 3) { F.auto = false; F.speed = 0; if (F.target.kind !== 'station') startOrbit(F, F.target); }
 } else {
 F.yaw += inp.sx * dt * 1.3; F.turn = (F.turn || 0) + (inp.sx - (F.turn || 0)) * Math.min(1, dt * 4);
 // no up and down: the ship levels out towards its target, or the system plane
@@ -87,7 +99,8 @@ if (inp.brake) F.cruise = false;
 F.speed += (tgt - F.speed) * Math.min(1, dt * (inp.brake ? 3 : 1.4));
 }
 B = basis(F);
-F.pos = [F.pos[0] + B.f[0] * F.speed * dt, F.pos[1] + B.f[1] * F.speed * dt, F.pos[2] + B.f[2] * F.speed * dt];
+if (!orbiting) F.pos = [F.pos[0] + B.f[0] * F.speed * dt, F.pos[1] + B.f[1] * F.speed * dt, F.pos[2] + B.f[2] * F.speed * dt];
+F.orbK = (F.orbK || 0) + ((F.orbit ? 1 : 0) - (F.orbK || 0)) * Math.min(1, dt * 1.2);
 // keep out of bodies
 var objs = [{ kind: 'star' }].concat(F.sys.planets.map(function (p, i) { return { kind: 'planet', i: i }; }));
 objs.forEach(function (o) { var p = objPos(F, o), d = sub(F.pos, p), l = len(d), m = objRadius(F, o) * (o.kind === 'star' ? 2.6 : 1.6); if (l < m) { F.pos = [p[0] + d[0] / l * m, p[1] + d[1] / l * m, p[2] + d[2] / l * m]; F.speed = Math.min(F.speed, 20); } });
@@ -180,7 +193,8 @@ if (L.z === 22) [40, -20, -70].forEach(function (lx, i) { var s = P(lx, 0, 23); 
 // ---------- camera: beside and behind the ship, heading shown to the right ----------
 function basisYP(yaw, pitch) { var cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch); return { f: [cp * sy, sp, cp * cy], r: [cy, 0, -sy], u: [-sp * sy, cp, -sp * cy] }; }
 function cam(F, w, h, k) {
-var port = w < h * 0.9, a = port ? 0.3 : 0.5, fl = Math.min(h * 0.72, w * (port ? 0.7 : 0.6)), yaw = F.yaw - a, pit = F.pitch * 0.6 - 0.06, pos = [F.pos[0], F.pos[1] + 2, F.pos[2]], cy = h / 2;
+var port = w < h * 0.9, a0 = port ? 0.3 : 0.5, a = a0 + (F.orbK || 0) * (Math.PI / 2 - a0), fl = Math.min(h * 0.72, w * (port ? 0.7 : 0.6)), yaw = F.yaw - a, pit = F.pitch * 0.6 - 0.06, pos = [F.pos[0], F.pos[1] + 2, F.pos[2]], cy = h / 2;
+if (F.lookAt && F.lookK > 0) { var dl = sub(F.lookAt, pos), ly = Math.atan2(dl[0], dl[2]); yaw += angDiff(yaw, ly) * F.lookK; pit += (Math.atan2(dl[1], Math.hypot(dl[0], dl[2])) - pit) * F.lookK; }
 if (k > 0) { // camera rises above the system until it looks straight down, matching the system map
 var V = sysView(F, w, h), e = k * k * (3 - 2 * k), H = fl / V.s, dy = angDiff(yaw, 0);
 yaw = yaw + dy * e; pit = pit + (-Math.PI / 2 + 0.0005 - pit) * e; pos = [pos[0] * (1 - e), pos[1] + (H - pos[1]) * e, pos[2] * (1 - e)]; cy = h / 2 + (V.oy - h / 2) * e;
@@ -295,6 +309,11 @@ if (r > 4 && o.pl.type !== 'fels') { var ag = ctx.createRadialGradient(q.x, q.y,
 function ringArc(a0, a1) { [[2.25, 0.16, 0.35], [1.95, 0.08, 0.5], [1.7, 0.05, 0.3]].forEach(function (rg) { ctx.strokeStyle = rgba('#e8dccb', rg[2]); ctx.lineWidth = Math.max(1, r * rg[1]); ctx.beginPath(); ctx.ellipse(q.x, q.y, r * rg[0], r * rg[0] * 0.2, -0.22, a0, a1); ctx.stroke(); }); }
 if (rings) ringArc(Math.PI, Math.PI * 2);
 drawPlanetDisc(q.x, q.y, Math.max(1.2, r), o.pl, lx, ly, lz);
+var RV = S.rover; if (RV && RV.st === 'out' && RV.star === S.star && RV.pi === o.i && r > 3) {
+var pr = 1 - Math.max(0, RV.t) / (RV.T || 30); ctx.strokeStyle = rgba(AC, 0.25); ctx.lineWidth = 2; circle(q.x, q.y, r * 1.22 + 6); ctx.stroke();
+ctx.strokeStyle = AC; ctx.beginPath(); ctx.arc(q.x, q.y, r * 1.22 + 6, -Math.PI / 2, -Math.PI / 2 + pr * Math.PI * 2); ctx.stroke();
+var ra = time * 0.7, rx = q.x + Math.cos(ra) * r * 0.55, ry = q.y + Math.sin(ra) * r * 0.3; ctx.fillStyle = 'rgba(255,216,168,' + (0.6 + 0.4 * Math.sin(time * 6)) + ')'; circle(rx, ry, Math.max(1.5, r * 0.03)); ctx.fill();
+}
 if (rings) { ringArc(0, Math.PI); if (o.q.z < o.r * 7) nearRing = o; }
 });
 // ring debris in front when flying close to a ringed giant
@@ -305,12 +324,12 @@ if (F.inZone) { var hg = ctx.createLinearGradient(0, h, 0, 0); hg.addColorStop(0
 if (ck > 0.4) { var fo = (ck - 0.4) / 0.6; ctx.fillStyle = rgba(BG, fo * fo * (3 - 2 * fo)); ctx.fillRect(0, 0, w, h); }
 if (ck > 0) { ctx.strokeStyle = rgba(IV, 0.13 * ck); ctx.lineWidth = 1; F.sys.planets.forEach(function (p) { ctx.beginPath(); for (var a = 0, n = 0; a <= 6.3; a += 0.1) { var q = proj(C, [Math.cos(a) * p.orbit, 0, Math.sin(a) * p.orbit], w, h); if (!q) { n = 0; continue; } if (n++) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); } ctx.stroke(); }); }
 // the ship, in profile
-var shx = C.port ? w * 0.42 : w * 0.3, shy = h * (C.port ? 0.66 : 0.62), sk = Math.min(1.5, Math.max(0.7, Math.min(w, h * 1.6) / 760));
+var ok2 = F.orbK || 0, shx = (C.port ? w * 0.42 : w * 0.3) * (1 - ok2) + w * 0.5 * ok2, shy = h * (C.port ? 0.66 : 0.62) * (1 - ok2) + h * (C.port ? 0.7 : 0.76) * ok2, sk = Math.min(1.5, Math.max(0.7, Math.min(w, h * 1.6) / 760)) * (1 - 0.25 * ok2);
 // docking light path to the station
 if (ck === 0 && F.target && F.target.kind === 'station') { var stq = proj(C, objPos(F, F.target), w, h); if (stq) for (var t = 1; t < 10; t++) { var u = t / 10; ctx.fillStyle = rgba(AC, 0.9 - u * 0.6); circle(shx + (stq.x - shx) * u + 60 * sk, shy + (stq.y - shy) * u, 2.4); ctx.fill(); } }
-if (!(inp && inp.noShip)) {
+if (!(inp && (inp.noShip || inp.desc > 0.65))) {
 var key = SHIP3[S.ship] ? S.ship : 'kranich', vp = projD(C, [Math.sin(F.yaw) * Math.cos(F.pitch), Math.sin(F.pitch), Math.cos(F.yaw) * Math.cos(F.pitch)], w, h), af = vp ? Math.atan2((vp.y - shy) / 0.5, vp.x - shx) : -0.9;
-var ssx = shx, ssy = shy, til = 0.5, zst = 1, kk = sk * 0.95, aa = af - 0.45 + (F.turn || 0) * 0.18, bank = (F.turn || 0) * 0.35;
+var ssx = shx, ssy = shy, til = 0.5, zst = 1, kk = sk * 0.95, aa = (af - 0.45) * (1 - ok2) - 0.12 * ok2 + (F.turn || 0) * 0.18, bank = (F.turn || 0) * 0.35;
 if (ck > 0) { var e = ck * ck * (3 - 2 * ck), sp = proj(C, F.pos, w, h), at = Math.atan2(-Math.cos(F.yaw), Math.sin(F.yaw)); var V2 = sysView(F, w, h); ssx = shx + (w / 2 + F.pos[0] * V2.s - shx) * e; ssy = shy + (V2.oy - F.pos[2] * V2.s - shy) * e; til = 0.5 + 0.5 * e; zst = 1 - 0.85 * e; kk = kk + (0.13 - kk) * e; aa = af + angDiff(af, at) * e; bank *= 1 - e; }
 var thr = inp && inp.thrust, v = Math.min(1, F.speed / 110); drawStack(key, ssx, ssy + Math.sin(time * 1.3) * 2 * (1 - ck), kk, aa, til, zst, bank, time, (0.3 + v * 0.7 + (F.cruise ? 0.5 : 0) + (thr ? 0.3 : 0)) * (1 - ck * 0.7));
 }
@@ -318,7 +337,7 @@ var thr = inp && inp.thrust, v = Math.min(1, F.speed / 110); drawStack(key, ssx,
 if (F.target && ck === 0) {
 var tp = objPos(F, F.target), tq = proj(C, tp, w, h), name = targetName(F, F.target), dd = Math.max(0, Math.round(len(sub(tp, F.pos)) - objRadius(F, F.target))), eta = F.speed > 2 ? dd / F.speed : 0;
 ctx.font = '12px ui-monospace, Menlo, monospace'; ctx.textAlign = 'left';
-var sub2 = dd + ' KM' + (eta > 1 ? ' · ' + (eta < 60 ? Math.round(eta) + ' S' : Math.round(eta / 6) / 10 + ' MIN') : '');
+var sub2 = F.orbit ? (F.orbit.o.kind === 'star' ? 'UMLAUF AM TANKRING' : 'IM ORBIT') : dd + ' KM' + (eta > 1 ? ' · ' + (eta < 60 ? Math.round(eta) + ' S' : Math.round(eta / 6) / 10 + ' MIN') : '');
 if (tq && tq.x > 30 && tq.x < w - 30 && tq.y > 30 && tq.y < h - 30) {
 var b = Math.max(16, objRadius(F, F.target) * tq.s * (F.target.kind === 'station' ? 2.8 : 1.25));
 ctx.strokeStyle = AC; ctx.lineWidth = 1.2; ctx.setLineDash([3, 5]); circle(tq.x, tq.y, b); ctx.stroke(); ctx.setLineDash([]);
@@ -333,6 +352,15 @@ ctx.save(); ctx.translate(ex, ey); ctx.rotate(Math.atan2(ay, ax)); ctx.beginPath
 ctx.fillStyle = AC; ctx.textAlign = 'center'; ctx.fillText(name.toUpperCase(), ex, ey + 22);
 }
 }
+// descent into the atmosphere
+var dk = (inp && inp.desc) || 0;
+if (dk > 0 && inp.descP) {
+var col = planetColors(inp.descP).lit.replace(/[^0-9,.]/g, '').split(',').map(Number), ag = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8);
+ag.addColorStop(0, rgba(col, 0.15 + dk * 0.6)); ag.addColorStop(1, rgba(col, dk * 0.85)); ctx.fillStyle = ag; ctx.fillRect(0, 0, w, h);
+var sr = W.rng(9); ctx.lineWidth = 1.5;
+for (var si = 0; si < 40; si++) { var sx0 = sr() * w, sp0 = ((sr() + time * (1.2 + sr()) * (0.5 + dk)) % 1), sy0 = h - sp0 * h * 1.2; ctx.strokeStyle = 'rgba(255,255,255,' + (0.25 * dk * (0.4 + sr())) + ')'; ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.lineTo(sx0, sy0 - 40 - dk * 120); ctx.stroke(); }
+var rim = ctx.createLinearGradient(0, h, 0, h * 0.4); rim.addColorStop(0, 'rgba(255,170,110,' + (0.5 * Math.sin(dk * Math.PI)) + ')'); rim.addColorStop(1, 'rgba(255,170,110,0)'); ctx.fillStyle = rim; ctx.fillRect(0, 0, w, h);
+}
 // vignette
 var vg = ctx.createRadialGradient(w / 2, h * 0.5, Math.min(w, h) * 0.4, w / 2, h * 0.5, Math.max(w, h) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,' + (0.4 * (1 - ck)) + ')'); ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
 }
@@ -345,8 +373,18 @@ return best;
 }
 
 // ---------- jump tunnel ----------
-function drawTunnel(c, w, h, p, time) {
+function drawTunnel(c, w, h, p, time, worm) {
 ctx = c; ctx.fillStyle = BG; ctx.fillRect(0, 0, w, h);
+if (worm) { // slow swirl, orange and violet
+var rw = W.rng(11), kw = Math.sin(Math.min(1, p) * Math.PI), cxw = w / 2, cyw = h / 2, R = Math.hypot(w, h) * 0.6;
+for (var j = 0; j < 220; j++) {
+var a0 = rw() * Math.PI * 2, dd = ((rw() + time * (0.25 + rw() * 0.3)) % 1), a1 = a0 + dd * 4 + time * 0.6, r0 = dd * dd * R, r1 = r0 + 4 + kw * 60 * dd;
+ctx.strokeStyle = rgba(j % 3 ? '#c8a0f0' : j % 2 ? AC : '#ffd8a8', (0.12 + dd * 0.7) * kw); ctx.lineWidth = 1 + dd * 1.5;
+ctx.beginPath(); ctx.moveTo(cxw + Math.cos(a1) * r0, cyw + Math.sin(a1) * r0); ctx.lineTo(cxw + Math.cos(a1 + 0.12) * r1, cyw + Math.sin(a1 + 0.12) * r1); ctx.stroke();
+}
+var gw = ctx.createRadialGradient(cxw, cyw, 0, cxw, cyw, h * 0.35 * kw + 1); gw.addColorStop(0, rgba('#f0e0ff', 0.7 * kw)); gw.addColorStop(0.4, rgba('#c8a0f0', 0.3 * kw)); gw.addColorStop(1, rgba(AC, 0)); ctx.fillStyle = gw; ctx.fillRect(0, 0, w, h);
+return;
+}
 var r = W.rng(7), n = 160, cx = w / 2, cy = h / 2, k = Math.sin(Math.min(1, p) * Math.PI);
 for (var i = 0; i < n; i++) {
 var a = r() * Math.PI * 2, d0 = ((r() + time * (0.6 + r())) % 1), d = d0 * d0 * Math.hypot(w, h) * 0.6, l = 6 + k * 80 * d0;
