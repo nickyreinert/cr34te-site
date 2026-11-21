@@ -115,12 +115,14 @@ if (chapter >= 3) LENA.forEach(function (n, i) { if (i % 3 === 0) box(n[0] - 12,
 if (chapter >= 4) pad(64, t, 6 * slow, 0.4, 0.15);
 if (chapter >= 6) [[52, 55, 59], [48, 52, 55], [43, 47, 50], [50, 54, 57]].forEach(function (ch, i) { ch.forEach(function (m) { pad(m, t + i * 1.4 * slow, 2.6 * slow, 0.5, 0.12); }); pad(ch[0] - 12, t + i * 1.4 * slow, 2.6 * slow, 0.3, 0.16); });
 }
-function sfx(k) {
+function sfx(k, n) {
 if (!A || !on) return;
 var t = A.currentTime;
 if (k === 'scan') { box(88, t, 0.16); box(93, t + 0.12, 0.16); }
 else if (k === 'mine') { tick(t, 0.4, 900); tick(t + 0.09, 0.3, 1300); }
 else if (k === 'dock') { bell(72, t, 0.18); bell(79, t + 0.25, 0.15); }
+else if (k === 'ton') bell([79, 81, 83, 86, 88, 91, 93, 95, 98, 100, 103, 105][Math.min(11, n || 0)], t, 0.13);
+else if (k === 'boing') { box(55, t, 0.14); box(62, t + 0.07, 0.12); box(67, t + 0.14, 0.1); }
 else if (k === 'rover') { tick(t, 0.25, 600); tick(t + 0.12, 0.25, 800); box(76, t + 0.22, 0.12); }
 else if (k === 'roverback') { box(79, t, 0.13); box(83, t + 0.14, 0.13); box(86, t + 0.28, 0.15); }
 else if (k === 'signal') { [0, 0.5, 1.0].forEach(function (d, i) { bell(91 + i * 2, t + d, 0.09 + i * 0.03); }); }

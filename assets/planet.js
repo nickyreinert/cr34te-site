@@ -557,6 +557,7 @@ var fx = w / 2 + (f[0] - camX * 1.4) * s; if (fx < -80 * s || fx > w + 80 * s) r
 if (M.fg === 'gras') { for (var q = -3; q <= 3; q++) { ctx.beginPath(); ctx.moveTo(fx + q * 5 * s, fy); ctx.quadraticCurveTo(fx + q * 7 * s, fy - fh * 0.6, fx + q * 11 * s + Math.sin(time * 0.8 + f[2] * 6) * 4 * s, fy - fh * (1 - Math.abs(q) * 0.1)); ctx.stroke(); } }
 else { ctx.beginPath(); ctx.moveTo(fx - fh, fy); ctx.lineTo(fx - fh * 0.6, fy - fh * 0.7); ctx.lineTo(fx + fh * 0.1, fy - fh * 0.9); ctx.lineTo(fx + fh * 0.8, fy - fh * 0.4); ctx.lineTo(fx + fh * 1.1, fy); ctx.fill(); }
 });
+if (root.PlanetX) root.PlanetX(ctx, S, P, w, h, time, s, X, Y);
 // vignette
 var vg = ctx.createRadialGradient(w / 2, h * 0.55, Math.min(w, h) * 0.35, w / 2, h * 0.55, Math.max(w, h) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.38)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
 // weather
@@ -588,5 +589,5 @@ if (P.prog > 0) { ctx.strokeStyle = AC; ctx.lineWidth = 3; ctx.beginPath(); ctx.
 }
 }
 
-root.Planet = { enter: enter, update: update, draw: draw, abort: abort, isNight: isNight };
+root.Planet = { terrain: terrain, enter: enter, update: update, draw: draw, abort: abort, isNight: isNight };
 })(window);
