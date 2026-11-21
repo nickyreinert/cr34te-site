@@ -107,11 +107,12 @@ return i;
 function ctxAction() {
 if (mode === 'planet' && P) {
 var n = P.near;
-if (!n) return { l: 'Erkunden', idle: 1 };
+if (!n) return P.samNear ? { l: 'Zuhören' } : { l: 'Erkunden', idle: 1 };
 if (n.k === 'node') return { l: 'Abbauen · halten', hold: 1 };
 if (n.k === 'species') return { l: 'Scannen · halten', hold: 1 };
 if (n.k === 'wreck') return { l: 'Untersuchen · halten', hold: 1 };
 if (n.k === 'site') return P.site.built ? { l: 'Deine Basis', idle: 1 } : { l: 'Basis bauen' };
+if (P.samNear) return { l: 'Zuhören' };
 if (n.k === 'ruin' || n.k === 'signal') return { l: 'Untersuchen · halten', hold: 1 };
 if (n.k === 'wal') return { l: 'Scannen · halten', hold: 1 };
 return { l: 'Abheben', fn: leavePlanet };
@@ -124,6 +125,7 @@ var p = sys.planets[near.i];
 if (!S.scanned[p.key]) return { l: 'Scannen', fn: function () { scan(p); } };
 if (W.WORLDS[p.type].land) return { l: 'Landen', fn: function () { land(p); } };
 }
+if (F.edge && !(near && near.kind !== 'star')) return { l: 'Leerstaub sammeln · halten', hold: 1 };
 if (near && near.kind === 'star' && W.measurable(S)) return { l: sys.star.type === 'loch' ? 'Schwarzes Loch vermessen' : 'Pulsar vermessen', fn: measureStar };
 if (near && near.kind === 'star' && W.wormKnown(S, sys.star)) return { l: 'Wurmloch', fn: wormAsk };
 if (near && near.kind === 'star' && F.inZone && W.STARS[sys.star.type].fuel > 0) {
@@ -153,6 +155,7 @@ function landNow(p) {
 if (p.sol === 'erde') { startFade(startEnding, 1.4); return; }
 startFade(function () {
 P = PL.enter(S, p, sys.star.type); mode = 'planet'; o2warn = false; S.lastPlanet = p.i; sndScene(); showPlay();
+if (W.samChance(S, p)) { P.sam = { x: P.x + 320, y: 20, t: 0 }; setTimeout(function () { if (P && P.sam && !S.sam.met) toast('Da ist jemand. Ein Licht, das sich bewegt.'); }, 1500); }
 handlePlanetEvents();
 }, 0.9);
 }
@@ -382,6 +385,11 @@ h += '<div class="lab" style="margin:22px 0 6px">Sternkarte</div><div class="row
 var open = (S.frags || 0) - S.techs.length;
 h += '<div class="lab" style="margin:22px 0 6px">Technik der Erbauer · ' + S.techs.length + ' von ' + W.TECH.length + '</div>';
 if (!S.frags) h += '<p class="p">Auf manchen Planeten stehen Ruinen einer verschwundenen Kultur. Wer sie gebaut hat, war auch einmal unterwegs nach Hause. Lande dort und birg ein Bruchstück. Ein Planetenscan zeigt, wo eine Ruine steht.</p>';
+if (S.sam && S.sam.met) {
+h += '<div class="lab" style="margin:22px 0 6px">Sprache der Lichtgestalt · ' + S.sam.known.length + ' von ' + W.GLYPH_WORDS.length + ' Zeichen</div><div style="display:flex;flex-wrap:wrap;gap:8px">' + W.GLYPH_WORDS.map(function (wd, k) { var kn = S.sam.known.indexOf(k) >= 0; return '<div style="padding:6px 10px;border:1px solid var(--ln);font-family:var(--serif);font-style:italic;color:' + (kn ? 'var(--iv)' : 'var(--mu)') + '">' + gsv(k, kn ? '#9fe8ff' : '#4a4f58', 18) + ' ' + (kn ? esc(wd) : '?') + '</div>'; }).join('') + '</div>';
+if (S.sam.known.length < W.GLYPH_WORDS.length) h += '<div class="row"><div><div class="n">Zeichen entschlüsseln</div><div class="d">Ein weiteres Zeichen mit Forschung lernen.</div></div><button type="button" class="go act" data-a="samLearn" ' + (S.forschung >= W.samLearnCost(S) ? '' : 'disabled') + '>' + W.samLearnCost(S) + ' Forschung</button></div>';
+if (S.sam.name) h += '<p class="p">Ihr Name ist <i>' + esc(S.sam.name) + '</i>.</p>';
+}
 W.TECH.forEach(function (T, i) {
 if (i < S.techs.length) h += '<div class="row"><div><div class="n">' + T.n + '</div><div class="d">' + T.d + '</div></div><span class="lab ac">Aktiv</span></div>';
 else if (i === S.techs.length && open > 0) h += '<div class="row"><div><div class="n">Bruchstück ' + (i + 1) + '</div><div class="d">Bereit zum Entschlüsseln.</div></div><button type="button" class="go act" data-a="decode" ' + (S.forschung >= T.f ? '' : 'disabled') + '>' + T.f + ' Forschung</button></div>';
@@ -450,6 +458,9 @@ else if (act === 'markSel') { if (gsel) { if (S.marks[gsel.id]) W.unmark(S, gsel
 else if (act === 'markHere') { if (S.marks[S.star]) W.unmark(S, S.star); else W.mark(S, S.star, 'user', 'Markiert'); sheet(); save(); }
 else if (act === 'gotoMark') { gsel = W.findStar(S, v); gview = SP.galaxyView(S, CW, CH, Math.max(1.7, Math.hypot(gsel.x - gview.cur.x, gsel.y - gview.cur.y) / W.range(S) * 1.2)); sheet(); }
 else if (act === 'roverNew') { var e5 = W.roverReplace(S); toast(e5 || 'Neuer Rover gebaut.'); renderPanel(); save(); }
+else if (act === 'samGive') { var e6 = P && P.sam && W.samGive(S, P.sam.r.ask); if (e6) toast(e6); else { P.sam.done = true; SND.sfx('peil'); toast('Ein Bruchstück der Erbauer. Entschlüsseln kannst du es unter Forschung.'); W.deliver(S).forEach(notifyMsg); } show('modal', false); if (P && P.sam) P.sam.leave = true; save(); }
+else if (act === 'samNo') { show('modal', false); if (P && P.sam) P.sam.leave = true; }
+else if (act === 'samLearn') { var e7 = W.samLearn(S); toast(e7 || 'Ein neues Zeichen entschlüsselt.'); renderPanel(); save(); }
 else if (act === 'endCont') endCont();
 else if (act === 'endNew') { store(''); S = null; END = null; show('modal', false); titleScreen(); }
 else if (act === 'music') { S.music = S.music === false; SND.setOn(S.music); renderPanel(); save(); }
@@ -501,6 +512,7 @@ m = meter('Tank', S.fuel / W.tankMax(S), Math.round(S.fuel) + ' / ' + W.tankMax(
 m += F.heat > 1 ? meter('Hitze', F.heat / 100, Math.round(F.heat) + ' %', true) : meter('Laderaum', W.cargoUsed(S) / W.cargoMax(S), W.cargoUsed(S) + ' / ' + W.cargoMax(S) + ' t');
 m += meter('Tempo', Math.min(1, F.speed / 520), Math.round(F.speed) + ' km/s' + (F.cruise ? ' · Marsch' : ''));
 }
+if (mode === 'space' && F && F.edge) m = m.replace(/>(\d[^<]*)</g, function (x0, v) { return '>' + v.replace(/\d/g, function (dg) { return Math.random() < 0.3 ? '–' : dg; }) + '<'; });
 $('meters').innerHTML = m;
 var sec = W.curSection(S);
 $('info').innerHTML = '<div><b>' + esc(mode === 'planet' && P ? P.p.name : sys ? sys.star.name : '') + '</b></div><div>Abschnitt ' + sec + ' · ' + W.SECTIONS[sec] + '</div><div>Sol <b>' + fmt(W.dist(S)) + ' Lj</b> · Erde <b>' + Math.floor(S.year) + '</b></div><div><b>' + fmt(S.cr) + '</b> Cr</div>';
@@ -513,12 +525,71 @@ var rp = mode === 'space' && F && F.near && F.near.kind === 'planet' ? sys.plane
 if (rp && W.roverPickupHere(S, rp)) { rb.hidden = false; rb.textContent = 'Rover abholen'; } else if (rp && W.roverCan(S, rp)) { rb.hidden = false; rb.textContent = 'Rover absetzen'; } else rb.hidden = true;
 var R = S.rover || {}, ri = R.st === 'out' ? (R.star === S.star ? 'Rover · noch ' + Math.ceil(R.t) + ' s' : 'Rover · wartet im anderen System') : R.st === 'maint' ? 'Rover · Wartung ' + Math.ceil(R.t) + ' s' : R.st === 'left' ? 'Rover · wartet auf ' + R.pn : '';
 if (mode === 'planet' && P && P.sig && !P.sig.done) ri = (ri ? ri + '<br>' : '') + '<span style="color:#bfe0ff">Signal · ' + Math.round(P.sigD) + ' m</span>';
+if (mode === 'space' && F && F.edge) ri = (ri ? ri + '<br>' : '') + '<span style="color:#9fb4c9">Rand der Stille · Instrumente unsicher</span>';
 if (ri) $('info').innerHTML += '<div>' + ri + '</div>';
 $('hint').textContent = mode === 'planet' ? 'A/D LAUFEN · W HALTEN = JETPACK · LEERTASTE AKTION · TAB MENÜ' : 'ZIEL ANKLICKEN = KURS · A/D ODER ZIEHEN LENKT · W SCHUB · C MARSCHFLUG · LEERTASTE AKTION · M KARTE · TAB MENÜ';
 }
 
+// ---------- the collector, a figure of light ----------
+function gsv(k, col, sz) { return '<svg width="' + (sz || 22) + '" height="' + (sz || 22) + '" viewBox="-3 -3 18 18" style="vertical-align:middle;margin:0 2px"><path d="' + W.glyphPath(k) + '" fill="none" stroke="' + (col || '#bfe0ff') + '" stroke-width="1.5" stroke-linecap="round"/></svg>'; }
+function samLineHtml(line) {
+var M = S.sam, all = true, h = line.w.map(function (k) {
+if (k < 0) return M.name ? '<i>' + esc(M.name) + '</i>' : (all = false, gsv(40) + gsv(41) + gsv(42));
+if (M.known.indexOf(k) >= 0) return '<i>' + esc(W.GLYPH_WORDS[k]) + '</i>'; all = false; return gsv(k);
+}).join(' ');
+return { h: h, all: all };
+}
+function samTalk() {
+if (!P || !P.sam) return; var sm = P.sam;
+if (!sm.r) { sm.r = W.samMeet(S); save(); }
+var r = sm.r, L = samLineHtml(r.line), M = S.sam, h = '<div class="lab" style="color:#9fe8ff">' + (M.name ? esc(M.name) : 'Lichtgestalt') + ' · Begegnung ' + M.met + '</div>';
+h += '<p style="font-family:var(--serif);font-size:24px;line-height:1.6;margin:14px 0">' + L.h + '</p>';
+if (L.all) h += '<p style="font-style:italic;color:var(--mu)">„' + esc(r.line.de.replace('{name}', M.name || '?')) + '“</p>';
+if (r.learned.length) h += '<div class="lab" style="margin-top:10px">Neue Zeichen: ' + r.learned.map(function (k) { return gsv(k, '#9fe8ff', 18) + ' ' + esc(W.GLYPH_WORDS[k]); }).join(' · ') + '</div>';
+if (r.ask && !sm.done) {
+var have = S.res[r.ask.k] || 0;
+h += '<div style="margin-top:18px;padding:14px 16px;border-left:2px solid var(--ac);background:rgba(255,255,255,.03)"><div class="lab ac">Tausch</div><p style="margin:8px 0">' + gsv(50) + gsv(51) + ' ' + r.ask.n + ' t ' + esc(W.RES[r.ask.k].n) + ' → ein Bruchstück der Erbauer. Du hast ' + have + ' t an Bord.</p>' +
+'<button type="button" class="go pri" data-a="samGive" ' + (have >= r.ask.n ? '' : 'disabled') + '>Geben · ' + r.ask.n + ' t ' + esc(W.RES[r.ask.k].n) + '</button><button type="button" class="go" data-a="samNo">Nein, danke</button></div>';
+} else h += '<button type="button" class="go pri" data-a="samNo" style="max-width:260px;margin-top:14px">Weiter</button>';
+$('letter').innerHTML = h; show('modal', true);
+}
+function samUpdate(dt, inp) {
+var sm = P && P.sam; if (!sm) return;
+sm.t += dt; var dx = P.x - sm.x, d = Math.abs(dx), still = Math.abs(P.vx) < 5;
+if (sm.leave) { sm.fade = Math.max(0, (sm.fade == null ? 1 : sm.fade) - dt * 0.5); sm.x += dt * 30; if (sm.fade <= 0) { P.sam = null; return; } }
+else if (d > (still ? 70 : 130)) sm.x += Math.sign(dx) * Math.min(d - 60, dt * (still ? 30 : 45));
+sm.y += ((P.y + 16) - sm.y) * Math.min(1, dt * 0.8);
+P.samNear = !sm.leave && d < 100;
+if (P.samNear && inp.actionPressed) { inp.actionPressed = false; inp.action = false; samTalk(); }
+}
+function drawSam() {
+var sm = P && P.sam; if (!sm) return;
+var s = Math.max(0.85, Math.min(CH / 560, CW / 520)), baseY = CH * (CW < CH ? 0.62 : 0.68), x = CW / 2 + (sm.x - P.x) * s, y = baseY - (sm.y + Math.sin(sm.t * 1.2) * 4 - P.camY) * s, k = s * 0.5, a = sm.fade == null ? 1 : sm.fade, t = sm.t;
+ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.scale(k, k); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+var hg = ctx.createRadialGradient(0, -60, 0, 0, -60, 110); hg.addColorStop(0, 'rgba(159,232,255,0.16)'); hg.addColorStop(1, 'rgba(159,232,255,0)'); ctx.fillStyle = hg; ctx.fillRect(-110, -170, 220, 220);
+function gp(d, wd, al) { ctx.strokeStyle = 'rgba(159,232,255,' + 0.18 * al + ')'; ctx.lineWidth = wd * 5; ctx.stroke(d); ctx.strokeStyle = 'rgba(159,232,255,' + al + ')'; ctx.lineWidth = wd; ctx.stroke(d); ctx.strokeStyle = 'rgba(255,255,255,' + 0.8 * al + ')'; ctx.lineWidth = wd * 0.35; ctx.stroke(d); }
+var sw = Math.sin(t * 1.6) * 6, b = new Path2D('M0 -4 C -6 -30, -10 -60, -6 -84 M0 -4 C 6 -30, 10 -60, 6 -84'), ar = new Path2D('M-6 -80 C -22 -70, -30 -52, ' + (-34 + sw * 0.4) + ' -34 M6 -80 C 22 -72, 32 -60, ' + (40 + sw) + ' ' + (-48 + sw * 0.5));
+gp(b, 2, 1); gp(ar, 1.6, 1);
+ctx.fillStyle = 'rgba(159,232,255,0.25)'; ctx.beginPath(); ctx.arc(0, -98, 12, 0, 7); ctx.fill(); ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, -98, 8, 0, 7); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -98, 3, 0, 7); ctx.fill();
+for (var i = 0; i < 40; i++) { var ph = (t * 0.25 + i * 0.137) % 1, px = Math.sin(i * 12.9 + t) * 14 * (1 - ph * 0.3), py = -6 - ph * 100; ctx.fillStyle = (i % 3 ? 'rgba(159,232,255,' : 'rgba(255,255,255,') + (1 - ph) * 0.9 + ')'; ctx.fillRect(px - 1, py - 1, 2, 2); }
+var lx = 40 + sw, ly = -44 + sw * 0.5, lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 16); lg.addColorStop(0, 'rgba(255,242,220,1)'); lg.addColorStop(0.3, 'rgba(255,216,168,0.5)'); lg.addColorStop(1, 'rgba(255,216,168,0)'); ctx.fillStyle = lg; ctx.fillRect(lx - 16, ly - 16, 32, 32);
+ctx.restore();
+if (P.samNear && !sm.leave) { ctx.font = '13px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; var lb = (S.sam.name ? S.sam.name : 'Lichtgestalt').toUpperCase(); ctx.fillStyle = 'rgba(0,0,0,0.45)'; var tw = ctx.measureText(lb).width; ctx.fillRect(x - tw / 2 - 6, y - 140 * k - 14, tw + 12, 20); ctx.fillStyle = '#9fe8ff'; ctx.fillText(lb, x, y - 140 * k); }
+}
+function mapVoids(V) {
+var w = V.w, h = V.h, ox = w / 2, oy = V.oy;
+(S.voids || []).forEach(function (v) {
+var x = ox + (v.x - V.cx) * V.s, y = oy + (v.y - V.cy) * V.s, r = v.r * V.s; if (x < -r || y < -r || x > w + r || y > h + r) return;
+ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+ctx.strokeStyle = 'rgba(159,180,201,0.4)'; ctx.setLineDash([1, 5]); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+ctx.strokeStyle = 'rgba(159,180,201,0.07)'; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(x, y, r + 8, 0, 7); ctx.stroke(); ctx.lineWidth = 1;
+if (r > 30) { ctx.font = '10px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(159,180,201,0.8)'; ctx.fillText('STILLE · SEIT ' + v.year, x, y + 4); }
+});
+}
+
 // ---------- first steps: short hints, each shown once ----------
 var lastTut = -99;
+var leerT = 0;
 function tut() {
 if (!S || !$('modal').hidden || !$('panel').hidden) return; var T = S.flags.tut = S.flags.tut || {};
 if (time - lastTut < 9) return;
@@ -545,6 +616,7 @@ function frame(ts) {
 var dt = Math.min(0.05, (ts - lastTs) / 1000 || 0); lastTs = ts; time += dt;
 var paused = !$('panel').hidden || !$('modal').hidden; SND.update();
 var inp = input();
+if (S && SND.sam) { SND.sam(mode === 'planet' && P && P.sam && !P.sam.leave && Math.abs(P.sam.x - P.x) < 600); SND.thin(mode === 'space' && F && F.edge ? Math.max(0, 1 - F.edge.d / 70) : 0); }
 if (S && !paused && mode !== 'title' && mode !== 'ending' && W.roverTick) { var rv = W.roverTick(S, dt); if (rv && rv.k === 'back') { SND.sfx('roverback'); toast('Rover zurück von ' + rv.pn + (Object.keys(rv.got).length ? ' · ' + Object.keys(rv.got).map(function (k) { return '+' + rv.got[k] + ' t ' + W.RES[k].n; }).join(', ') : ' · Laderaum voll') + '. Jetzt Wartung.'); save(); } else if (rv && rv.k === 'ready') toast('Der Rover ist gewartet und bereit.'); }
 if (fade) { fade.t += dt; if (!fade.done && fade.t >= fade.d / 2) { fade.done = true; fade.mid(); } if (fade.t >= fade.d) fade = null; }
 if (mode === 'title') {
@@ -559,7 +631,7 @@ if (tunnel.t >= (tunnel.d || 2.4)) { arrive(); showPlay(); }
 window.Ending.draw(ctx, END, CW, CH, time, dt);
 if (END.t > 7.8 && !END.theme) { END.theme = 1; SND.lena(6); }
 if (END.t > 13 && !END.shown) { END.shown = 1; epilogueModal(); }
-} else if (mode === 'galaxy') { gstars = SP.drawGalaxy(ctx, S, gview, gsel, time); mapMarks(gview); }
+} else if (mode === 'galaxy') { gstars = SP.drawGalaxy(ctx, S, gview, gsel, time); mapVoids(gview); mapMarks(gview); }
 else if (mode === 'system') { SP.drawSystem(ctx, S, F, SP.sysView(F, CW, CH), time); }
 else if (mode === 'descent' && F && desc) {
 desc.t += dt / 1.8; var dk = Math.min(1, desc.t), de = dk * dk * (3 - 2 * dk), pc = SP.objPos(F, { kind: 'planet', i: desc.p.i }), dv = [desc.from[0] - pc[0], desc.from[1] - pc[1], desc.from[2] - pc[2]], dl = Math.hypot(dv[0], dv[1], dv[2]) || 1, er = desc.p.r * 1.15;
@@ -577,16 +649,18 @@ else if (mode === 'space' && F) {
 if (!paused) {
 SP.update(S, F, dt, inp);
 var c = ctxAction(); if (c && c.fn && inp.actionPressed && !fade) c.fn();
+if (F.edge && inp.action && !(F.near && (F.near.kind === 'station' || (F.near.kind === 'star' && F.inZone)))) { leerT += dt; if (leerT >= 1.5) { leerT = 0; var lg2 = W.addRes(S, 'leer', 1); if (!lg2) toast('Laderaum voll'); } } else leerT = 0;
+if (F.edge && !S.flags.edgeSeen) { S.flags.edgeSeen = 1; letter({ from: 'Logbuch', t: 'Der Rand der Stille', b: 'Hier hören die Sterne auf. Die Instrumente zeigen Unsinn, und es ist so still, dass man das eigene Herz hört.\n\nAm Rand treibt Staub, der nach oben fällt. Halte die Aktion, um Leerstaub zu sammeln.' }); }
 if (F.evade === 2) toast('Zu heiß – das Schiff weicht vom Stern zurück.');
 }
 SP.draw(ctx, S, F, CW, CH, time, inp); hud();
 } else if (mode === 'planet' && P) {
 if (!paused && !fade) {
-PL.update(S, P, dt, inp);
+samUpdate(dt, inp); PL.update(S, P, dt, inp);
 if (P.o2 < 30 && !o2warn) { o2warn = true; toast('Sauerstoff knapp – zurück zum Schiff.'); }
 handlePlanetEvents();
 }
-if (P) PL.draw(ctx, S, P, CW, CH, time);
+if (P) { PL.draw(ctx, S, P, CW, CH, time); drawSam(); }
 hud();
 }
 if (fade) { var k = 1 - Math.abs(fade.t / fade.d * 2 - 1); ctx.fillStyle = 'rgba(7,8,10,' + Math.min(1, k * 1.2) + ')'; ctx.fillRect(0, 0, CW, CH); }

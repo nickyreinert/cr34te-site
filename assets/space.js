@@ -14,16 +14,18 @@ function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, Math.max(0.5, r), 0, M
 // ---------- background stars ----------
 var sky = null;
 function initSky() {
-var r = W.rng(99), s = [];
-for (var i = 0; i < 700; i++) {
-var band = i < 380, u = r() * 2 - 1, th = r() * Math.PI * 2;
-if (band) u = (r() - 0.5) * 0.28;
-var c = Math.sqrt(1 - u * u), v = [c * Math.cos(th), u, c * Math.sin(th)];
-var tilt = 0.45, y = v[1] * Math.cos(tilt) - v[2] * Math.sin(tilt), z = v[1] * Math.sin(tilt) + v[2] * Math.cos(tilt);
-s.push({ v: [v[0], y, z], m: band ? r() * 0.55 : r(), c: r() < 0.12 ? CO : r() < 0.1 ? '#ffc9a0' : IV });
+var r = W.rng(99), s = [], tilt = 0.45;
+function rot(v) { return [v[0], v[1] * Math.cos(tilt) - v[2] * Math.sin(tilt), v[1] * Math.sin(tilt) + v[2] * Math.cos(tilt)]; }
+for (var i = 0; i < 1900; i++) {
+var band = i < 1150, u = r() * 2 - 1, th = r() * Math.PI * 2;
+if (band) u = (r() + r() + r() - 1.5) * 0.12;
+var c = Math.sqrt(1 - u * u), m = Math.pow(r(), band ? 3.2 : 2.4);
+s.push({ v: rot([c * Math.cos(th), u, c * Math.sin(th)]), m: m, c: r() < 0.1 ? CO : r() < 0.08 ? '#ffd8b0' : IV, tw: r() * 6 });
 }
-sky = s;
+sky = s; MILKY = [];
+for (i = 0; i < 70; i++) { var t2 = r() * Math.PI * 2, u2 = (r() - 0.5) * 0.08; MILKY.push({ v: rot([Math.cos(t2), u2, Math.sin(t2)]), a: 0.03 + r() * 0.05, s: 0.12 + r() * 0.16 }); }
 }
+var MILKY = [];
 
 // ---------- camera ----------
 function basis(F) {
@@ -206,25 +208,9 @@ function projD(C, v, w, h) { var z = dot(v, C.B.f); if (z < 0.05) return null; r
 var TINT = { rot: ['#2a1424', '#8a4a5a', '#c8705a'], gelb: ['#1c1420', '#7a5a4a', '#d8a070'], blau: ['#0c1424', '#3a5a7a', '#9fc0e0'], weiss: ['#10141c', '#4a5468', '#b8c4d4'], pulsar: ['#081418', '#2a5a5a', '#7af0d0'], loch: ['#140c08', '#5a2a1a', '#ff9a50'] };
 var DUST = null, PATH = {};
 function nebula(C, F, w, h, tint, time) {
-var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#05060a'); g.addColorStop(0.6, tint[0]); g.addColorStop(1, rgba(tint[1], 0.55)); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-// soft clouds fixed in the sky, so they turn with the view
-var r = W.rng(F.sys.star.seed);
-for (var i = 0; i < 7; i++) {
-var th = r() * 6.283, el = (r() - 0.6) * 0.5, q = projD(C, [Math.cos(el) * Math.sin(th), Math.sin(el), Math.cos(el) * Math.cos(th)], w, h), rad = h * (0.25 + r() * 0.35);
-if (!q || q.x < -rad || q.x > w + rad) continue;
-var cg = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, rad); cg.addColorStop(0, rgba(i % 2 ? tint[1] : tint[2], 0.16)); cg.addColorStop(1, rgba(tint[1], 0)); ctx.fillStyle = cg; ctx.fillRect(q.x - rad, q.y - rad, rad * 2, rad * 2);
-}
-}
-function nebulaBanks(C, F, w, h, tint) {
-// nebula banks below the horizon, layered like hills, parallax with the turn
-var hz = projD(C, [Math.sin(F.yaw), 0, Math.cos(F.yaw)], w, h), base = hz ? hz.y : h * 0.5, yaw = F.yaw - 0.5;
-for (var k = 0; k < 4; k++) {
-var off = yaw * w * (0.4 + k * 0.35), y0 = base + h * (0.08 + k * 0.1), amp = h * (0.05 - k * 0.006), col = k === 3 ? rgba(tint[0], 0.92) : rgba(k % 2 ? tint[2] : tint[1], 0.1 + k * 0.05);
-var g = ctx.createLinearGradient(0, y0 - amp * 2, 0, h); g.addColorStop(0, col); g.addColorStop(1, k === 3 ? rgba('#05060a', 0.98) : rgba(tint[0], 0.2));
-ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, h);
-for (var x = 0; x <= w + 10; x += 10) { var u = (x + off) / w; ctx.lineTo(x, y0 - amp * (Math.sin(u * 5.1 + k * 1.7) + 0.5 * Math.sin(u * 13.3 + k))); }
-ctx.lineTo(w, h); ctx.fill();
-}
+// almost black, only a breath of the star's colour; the Milky Way as a faint band
+var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#030407'); g.addColorStop(1, rgba(tint[0], 0.35)); ctx.fillStyle = '#030407'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+MILKY.forEach(function (m) { var q = projD(C, m.v, w, h); if (!q) return; var R = h * m.s * 2; if (q.x < -R || q.x > w + R || q.y < -R || q.y > h + R) return; var cg = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, R); cg.addColorStop(0, 'rgba(220,214,204,' + m.a + ')'); cg.addColorStop(1, 'rgba(220,214,204,0)'); ctx.fillStyle = cg; ctx.fillRect(q.x - R, q.y - R, R * 2, R * 2); });
 }
 function drawDust(F, w, h, time, dtv) {
 if (!DUST) { var r = W.rng(5); DUST = []; for (var i = 0; i < 70; i++) DUST.push([r(), r(), 0.3 + r() * 0.7]); }
@@ -233,7 +219,7 @@ DUST.forEach(function (d) {
 d[0] -= dtv * (0.02 + v * 0.35 + c * 1.2) * d[2]; d[1] += dtv * (F.turn || 0) * 0.02 * d[2]; if (d[0] < 0) { d[0] += 1; d[1] = Math.random(); } d[1] = (d[1] + 1) % 1;
 var x = d[0] * w, y = d[1] * h;
 if (c > 0.05) { ctx.strokeStyle = rgba(IV, 0.25 * d[2]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 40 * c * d[2], y); ctx.stroke(); }
-else { ctx.fillStyle = rgba('#ffd8a8', 0.15 + 0.4 * d[2] * (0.3 + v)); ctx.fillRect(x, y, d[2] > 0.8 ? 2 : 1, d[2] > 0.8 ? 2 : 1); }
+else { ctx.fillStyle = rgba(IV, 0.1 + 0.3 * d[2] * (0.3 + v)); ctx.fillRect(x, y, d[2] > 0.8 ? 2 : 1, d[2] > 0.8 ? 2 : 1); }
 });
 }
 function drawStation(x, y, rs, time) {
@@ -256,9 +242,24 @@ nebula(C, F, w, h, tint, time);
 // sky
 sky.forEach(function (s) {
 var q = projD(C, s.v, w, h); if (!q || q.x < -4 || q.y < -4 || q.x > w + 4 || q.y > h + 4) return;
-ctx.fillStyle = rgba(s.c, 0.25 + s.m * 0.6); ctx.fillRect(q.x, q.y, s.m > 0.85 ? 2 : 1, s.m > 0.85 ? 2 : 1);
+var a = 0.3 + s.m * 0.7 * (0.85 + 0.15 * Math.sin(time * 1.3 + s.tw)), z = s.m > 0.7 ? 2 : s.m > 0.3 ? 1.4 : 1;
+ctx.fillStyle = rgba(s.c, a); ctx.fillRect(q.x, q.y, z, z);
+if (s.m > 0.85) { ctx.fillStyle = rgba(s.c, 0.15); ctx.fillRect(q.x - 2, q.y + 0.5, 5, 1); ctx.fillRect(q.x + 0.5, q.y - 2, 1, 5); }
 });
-if (ck < 1) { ctx.globalAlpha = 1 - ck; nebulaBanks(C, F, w, h, tint); ctx.globalAlpha = 1; }
+// small signs of life: a comet and the blinking light of a distant freighter
+var lr = W.rng(F.sys.star.seed ^ 5), cth = lr() * 6.28, cel = 0.08 + lr() * 0.2, cq = projD(C, [Math.cos(cth + F.t * 0.0004), cel, Math.sin(cth + F.t * 0.0004)], w, h);
+if (cq) { var ca = lr() * 6.28, cl = 60 + lr() * 60; var tg = ctx.createLinearGradient(cq.x, cq.y, cq.x + Math.cos(ca) * cl, cq.y + Math.sin(ca) * cl); tg.addColorStop(0, 'rgba(230,240,255,0.5)'); tg.addColorStop(1, 'rgba(230,240,255,0)'); ctx.strokeStyle = tg; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cq.x, cq.y); ctx.lineTo(cq.x + Math.cos(ca) * cl, cq.y + Math.sin(ca) * cl); ctx.stroke(); ctx.fillStyle = '#f4f8ff'; circle(cq.x, cq.y, 1.8); ctx.fill(); }
+var fth = lr() * 6.28 + F.t * 0.004, fq = projD(C, [Math.cos(fth), -0.03 + lr() * 0.06, Math.sin(fth)], w, h);
+if (fq && Math.floor(time * 1.4) % 2) { ctx.fillStyle = 'rgba(255,170,110,0.9)'; circle(fq.x, fq.y, 1.4); ctx.fill(); ctx.fillStyle = 'rgba(239,233,221,0.6)'; circle(fq.x + 5, fq.y, 0.9); ctx.fill(); }
+// the Stille: where it is, the stars simply stop
+var ve = W.voidEdge ? W.voidEdge(S) : null; F.edge = ve && ve.d < 70 ? ve : null;
+if (ve && ve.d < 220) {
+var vd = Math.hypot(ve.dx, ve.dy) || 1, vq = projD(C, [ve.dx / vd, -0.05, ve.dy / vd], w, h);
+if (vq) { var ang = Math.atan(ve.v.r / Math.max(ve.v.r * 0.6, vd)), VR = Math.tan(Math.min(1.3, ang)) * C.fl * 1.4;
+var vg0 = ctx.createRadialGradient(vq.x, vq.y, VR * 0.75, vq.x, vq.y, VR * 1.08); vg0.addColorStop(0, 'rgba(0,0,0,1)'); vg0.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = vg0; circle(vq.x, vq.y, VR * 1.08); ctx.fill();
+ctx.fillStyle = '#000'; circle(vq.x, vq.y, VR * 0.76); ctx.fill();
+ctx.strokeStyle = 'rgba(159,180,201,' + (0.06 + 0.04 * Math.sin(time * 0.7)) + ')'; ctx.lineWidth = 14; circle(vq.x, vq.y, VR * 0.95); ctx.stroke(); }
+}
 // bodies, far to near
 var list = [{ kind: 'star', p: [0, 0, 0], r: ST.r }];
 F.sys.planets.forEach(function (p, i) { list.push({ kind: 'planet', i: i, p: W.planetPos(p, F.t), r: p.r, pl: p }); });
@@ -285,7 +286,7 @@ ctx.save(); ctx.globalCompositeOperation = 'lighter';
 ctx.restore(); r = r * 0.3;
 }
 // light rays
-ctx.save(); ctx.globalAlpha = 0.05; ctx.fillStyle = ST.c; for (var i = 0; i < 9; i++) { var ra = i * 0.7 + time * 0.01, L = Math.max(w, h) * 1.3; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + Math.cos(ra) * L, q.y + Math.sin(ra) * L); ctx.lineTo(q.x + Math.cos(ra + 0.05) * L, q.y + Math.sin(ra + 0.05) * L); ctx.fill(); } ctx.restore();
+ctx.save(); ctx.globalAlpha = 0.022; ctx.fillStyle = ST.c; for (var i = 0; i < 9; i++) { var ra = i * 0.7 + time * 0.01, L = Math.max(w, h) * 1.3; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + Math.cos(ra) * L, q.y + Math.sin(ra) * L); ctx.lineTo(q.x + Math.cos(ra + 0.05) * L, q.y + Math.sin(ra + 0.05) * L); ctx.fill(); } ctx.restore();
 var R9 = Math.max(10, r * 9), g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, R9);
 g.addColorStop(0, rgba('#fff8ee', 1)); g.addColorStop(0.08, rgba(ST.c, 0.95 * pul)); g.addColorStop(0.25, rgba(ST.c, 0.32 * pul)); g.addColorStop(0.6, rgba(AC, 0.08)); g.addColorStop(1, rgba(AC, 0));
 ctx.fillStyle = g; circle(q.x, q.y, R9); ctx.fill();
@@ -332,6 +333,7 @@ var key = SHIP3[S.ship] ? S.ship : 'kranich', vp = projD(C, [Math.sin(F.yaw) * M
 var ssx = shx, ssy = shy, til = 0.5, zst = 1, kk = sk * 0.95, aa = (af - 0.45) * (1 - ok2) - 0.12 * ok2 + (F.turn || 0) * 0.18, bank = (F.turn || 0) * 0.35;
 if (ck > 0) { var e = ck * ck * (3 - 2 * ck), sp = proj(C, F.pos, w, h), at = Math.atan2(-Math.cos(F.yaw), Math.sin(F.yaw)); var V2 = sysView(F, w, h); ssx = shx + (w / 2 + F.pos[0] * V2.s - shx) * e; ssy = shy + (V2.oy - F.pos[2] * V2.s - shy) * e; til = 0.5 + 0.5 * e; zst = 1 - 0.85 * e; kk = kk + (0.13 - kk) * e; aa = af + angDiff(af, at) * e; bank *= 1 - e; }
 var thr = inp && inp.thrust, v = Math.min(1, F.speed / 110); drawStack(key, ssx, ssy + Math.sin(time * 1.3) * 2 * (1 - ck), kk, aa, til, zst, bank, time, (0.3 + v * 0.7 + (F.cruise ? 0.5 : 0) + (thr ? 0.3 : 0)) * (1 - ck * 0.7));
+var cpx = ssx + Math.cos(aa) * 90 * kk, cpy = ssy + Math.sin(aa) * 90 * kk * til - 26 * kk * zst, cg2 = ctx.createRadialGradient(cpx, cpy, 0, cpx, cpy, 22 * kk); cg2.addColorStop(0, 'rgba(255,200,140,0.45)'); cg2.addColorStop(1, 'rgba(255,200,140,0)'); ctx.fillStyle = cg2; circle(cpx, cpy, 22 * kk); ctx.fill();
 }
 // target marker
 if (F.target && ck === 0) {

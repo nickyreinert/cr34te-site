@@ -81,16 +81,25 @@ stopNode(wind); wind = null; stopNode(drone); drone = null;
 if (sc.kind === 'planet') wind = startWind(sc.weather === 'sand' || sc.weather === 'asche' ? 0.4 : 0.22, sc.weather === 'regen' ? 1800 : 500);
 if (sc.star === 'loch') drone = startDrone(33, 0.5);
 }
+var samOn = false, nextPiz = 0, pizI = 0, thin = 0;
+var PIZ = [0, 4, 2, 4, 7, 4, 2, -1, 0, 2, 4, 2, 5, 4, 2, 0];
+function pluck(m, t, level) {
+var o = A.createOscillator(), f = A.createBiquadFilter(), g = A.createGain(); o.type = 'triangle'; o.frequency.value = hz(m); f.type = 'lowpass'; f.frequency.value = 2600;
+g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(level, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+o.connect(f); f.connect(g); out(g, 0.25); o.start(t); o.stop(t + 0.3);
+}
 function note(deg, oct) { var m = prog.mode, d = ((deg % 7) + 7) % 7, o = Math.floor(deg / 7); return prog.root + m[d] + 12 * (o + (oct || 0)); }
 function update() {
 if (!A || !on || !scene || !prog || A.state !== 'running') return;
 var t = A.currentTime;
 if (t >= nextChord) {
 var deg = prog.seq[chord % prog.seq.length], L = prog.len;
-[0, 2, 4].forEach(function (k, i) { pad(note(deg + k, 0), nextChord, L + 2, prog.bright, 0.3); });
-pad(note(deg, -1), nextChord, L + 2, prog.bright * 0.5, 0.34);
+var lv = 1 - thin * 0.75 - (samOn ? 0.4 : 0);
+[0, 2, 4].forEach(function (k, i) { if (!(thin > 0.5 && i === 1)) pad(note(deg + k, 0), nextChord, L + 2, prog.bright * (1 - thin * 0.6), 0.3 * lv); });
+pad(note(deg, -1), nextChord, L + 2, prog.bright * 0.5, 0.34 * lv);
 chord++; nextChord += L;
 }
+if (samOn) { if (t >= nextPiz) { var pd = PIZ[pizI % PIZ.length]; if (pd >= 0) pluck(note(pd, 1), nextPiz, 0.22); if (pizI % 4 === 0) pluck(note(0, 0), nextPiz, 0.16); pizI++; nextPiz = Math.max(nextPiz + 0.19, t); } } else nextPiz = t;
 if (t >= nextBell) { var r = Math.random(); bell(note([0, 2, 4, 6, 7][Math.floor(r * 5)], 2), nextBell, 0.12); nextBell += 4 + Math.random() * 7; }
 if (scene.star === 'pulsar' && scene.kind === 'space') { if (t >= nextTick) { tick(nextTick, 0.3, 1800); nextTick = Math.max(nextTick + 0.75, t); } }
 else nextTick = t;
@@ -128,5 +137,5 @@ s.connect(f); f.connect(g); out(g, 0.6); s.start(t);
 }
 }
 
-root.Sound = { resume: resume, setOn: setOn, scene: setScene, update: update, lena: lena, sfx: sfx, isOn: function () { return on; } };
+root.Sound = { sam: function (v) { samOn = !!v; }, thin: function (v) { thin = Math.max(0, Math.min(1, v)); }, resume: resume, setOn: setOn, scene: setScene, update: update, lena: lena, sfx: sfx, isOn: function () { return on; } };
 })(window);
