@@ -133,6 +133,7 @@ var Wt = W.WORLDS[p.type], c0 = hex(Wt.c[0]), c1 = hex(Wt.c[1]), j = (p.hue - 0.
 return { lit: 'rgb(' + Math.min(255, c0[0] + j) + ',' + Math.min(255, c0[1] + j * 0.5) + ',' + Math.min(255, c0[2] - j * 0.3) + ')', dark: 'rgb(' + c1[0] + ',' + c1[1] + ',' + c1[2] + ')' };
 }
 function drawPlanetDisc(x, y, r, p, lx, ly, lz) {
+if (root.Globe && r > 2.5 && root.Globe.draw(ctx, x, y, r, p, lx, ly, lz, planetColors(p))) return;
 var col = planetColors(p), lit = Math.max(0.08, 0.55 + lz * 0.45);
 ctx.save(); circle(x, y, r); ctx.clip();
 ctx.fillStyle = col.dark; ctx.fillRect(x - r, y - r, r * 2, r * 2);
@@ -465,7 +466,7 @@ F.sys.planets.forEach(function (p, i) {
 var sel = F.target && F.target.kind === 'planet' && F.target.i === i;
 ctx.strokeStyle = rgba(IV, sel ? 0.4 : 0.13); ctx.lineWidth = 1; circle(ox, oy, p.orbit * V.s); ctx.stroke();
 var pp = W.planetPos(p, F.t), x = ox + pp[0] * V.s, y = oy - pp[2] * V.s, r = Math.max(3, p.r * 0.32);
-ctx.fillStyle = planetColors(p).lit; circle(x, y, r); ctx.fill();
+var sd = Math.hypot(ox - x, oy - y) || 1; drawPlanetDisc(x, y, r, p, (ox - x) / sd, (oy - y) / sd, 0.15);
 if (sel) { ctx.strokeStyle = AC; circle(x, y, r + 6); ctx.stroke(); }
 ctx.fillStyle = sel ? IV : MU; ctx.fillText(p.name.toUpperCase() + (S.scanned[p.key] ? '' : ' ?'), x + r + 6, y + 4);
 });
