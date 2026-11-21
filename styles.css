@@ -37,7 +37,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #joy { position: absolute; left: 22px; bottom: 22px; width: 128px; height: 128px; border-radius: 50%; border: 1px solid var(--ln); pointer-events: auto; display: none; }
 #joy i { position: absolute; left: 39px; top: 39px; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--iv); background: rgba(239, 233, 221, .08); }
 .touch #joy { display: block; }
-.touch #bMenu { left: auto; right: 18px; transform: none; top: auto; bottom: auto; }
 #hint { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; color: var(--mu); text-align: center; pointer-events: none; white-space: nowrap; }
 
 /* ---------- map ---------- */
@@ -105,6 +104,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .foot { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--mu); margin-top: 10px; }
 
 @media (max-width: 720px) {
+.touch #bMenu { left: auto; right: 18px; transform: none; top: auto; bottom: auto; }
 #hud { padding: 10px 12px; flex-direction: column; gap: 8px; }
 #meters { gap: 12px; }
 .mt { width: 86px; }

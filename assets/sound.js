@@ -112,6 +112,15 @@ var t = A.currentTime;
 if (k === 'scan') { box(88, t, 0.16); box(93, t + 0.12, 0.16); }
 else if (k === 'mine') { tick(t, 0.4, 900); tick(t + 0.09, 0.3, 1300); }
 else if (k === 'dock') { bell(72, t, 0.18); bell(79, t + 0.25, 0.15); }
+else if (k === 'rover') { tick(t, 0.25, 600); tick(t + 0.12, 0.25, 800); box(76, t + 0.22, 0.12); }
+else if (k === 'roverback') { box(79, t, 0.13); box(83, t + 0.14, 0.13); box(86, t + 0.28, 0.15); }
+else if (k === 'signal') { [0, 0.5, 1.0].forEach(function (d, i) { bell(91 + i * 2, t + d, 0.09 + i * 0.03); }); }
+else if (k === 'peil') { bell(76, t, 0.18); bell(83, t + 0.3, 0.16); bell(88, t + 0.6, 0.14); bell(95, t + 1.0, 0.12); }
+else if (k === 'worm') {
+var s2 = A.createBufferSource(); s2.buffer = noiseBuf(4); var f2 = A.createBiquadFilter(); f2.type = 'lowpass'; f2.Q.value = 6; f2.frequency.setValueAtTime(3000, t); f2.frequency.exponentialRampToValueAtTime(90, t + 3.6);
+var g2 = A.createGain(); g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.7, t + 1.6); g2.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
+s2.connect(f2); f2.connect(g2); out(g2, 0.7); s2.start(t); bell(60, t + 2.6, 0.2); bell(67, t + 3.0, 0.16);
+}
 else if (k === 'jump') {
 var s = A.createBufferSource(); s.buffer = noiseBuf(2.6); var f = A.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(3000, t + 2.2);
 var g = A.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 1.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.5);

@@ -62,7 +62,7 @@ hold('bAct', function (v) { bActHeld = v; if (v) actPressed = true; });
 $('bRov').addEventListener('click', function () {
 if (mode !== 'space' || !F || !F.near || F.near.kind !== 'planet') return; var p = sys.planets[F.near.i];
 if (W.roverPickupHere(S, p)) { var got = W.roverPickup(S); toast('Rover abgeholt' + (Object.keys(got).length ? ' · ' + Object.keys(got).map(function (k) { return '+' + got[k] + ' t ' + W.RES[k].n; }).join(', ') : '')); save(); return; }
-if (W.roverCan(S, p)) { W.roverGo(S, p); SND.sfx('scan'); toast('Rover unterwegs nach ' + p.name + '.'); save(); }
+if (W.roverCan(S, p)) { W.roverGo(S, p); SND.sfx('rover'); toast('Rover unterwegs nach ' + p.name + '.'); save(); }
 });
 hold('bAlt', function (v) { bAltHeld = v; if (v) jumpPressed = true; });
 $('bMenu').addEventListener('click', function () { if (panelKind === 'station') return; openMenu(); });
@@ -171,7 +171,7 @@ var ev = P.events; P.events = [];
 ev.forEach(function (e) {
 if (e.k === 'species') toast((e.auto ? 'Rena hat erfasst: ' : 'Neue Art: ') + e.sp.name + (e.sp.rare ? ' (selten)' : '') + ' · +' + e.res.cr + ' Cr, +' + e.res.f + ' Forschung');
 if (e.k === 'wreck') letter({ from: 'Fundstück', t: 'Ein Wrack', b: e.text });
-if (e.k === 'signal') { var sr = W.signalReward(S, P.p); SND.sfx('scan'); letter({ from: 'Signal', t: sr.t, b: sr.b }); save(); }
+if (e.k === 'signal') { var sr = W.signalReward(S, P.p); SND.sfx(sr.ruin ? 'peil' : 'signal'); letter({ from: 'Signal', t: sr.t, b: sr.b }); save(); }
 if (e.k === 'ruin') { SND.sfx('scan'); letter({ from: 'Fundstück', t: 'Eine Ruine der Erbauer', b: e.text + '\n\nBruchstück geborgen (' + S.frags + '). Entschlüsseln kannst du es im Menü unter Forschung.' }); save(); }
 if (e.k === 'leave') leavePlanet(false);
 if (e.k === 'mined') SND.sfx('mine');
@@ -217,7 +217,7 @@ show('modal', true);
 function wormGo(w) {
 var r = W.wormJump(S, w); if (!r.ok) { toast(r.why); return; }
 S.trail = S.trail || []; S.trail.push([w.st.x, w.st.y]); if (S.trail.length > 80) S.trail.shift();
-closeMap(true); mode = 'tunnel'; tunnel = { t: 0, star: w.st, res: r }; SND.sfx('jump'); show('hud', false); show('ctl', false);
+closeMap(true); mode = 'tunnel'; tunnel = { t: 0, star: w.st, res: r }; SND.sfx('worm'); show('hud', false); show('ctl', false);
 }
 function doJump(st, ok) {
 if (!ok && W.roverOut(S)) { roverWarn(function () { doJump(st, true); }); return; }
@@ -278,6 +278,8 @@ sheet();
 }
 function closeMap(silent) { var fromSys = mode === 'system'; show('mapbar', false); show('sheet', false); if (!silent) { if (fromSys && F) { camMove = { k: 1, dir: -1 }; mode = 'cam'; } else { mode = 'space'; showPlay(); } } }
 // star map preview (research): what waits in nearby systems
+var routeC = null;
+function circle2(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
 function mapMarks(V) {
 var w = V.w, h = V.h, ox = w / 2, oy = V.oy;
 function sx(x) { return ox + (x - V.cx) * V.s; } function sy(y) { return oy + (y - V.cy) * V.s; }
@@ -290,6 +292,10 @@ if (!inside) { var a = Math.atan2(y - oy, x - ox), r = Math.min(w, h) * 0.45, ex
 ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 18); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y - 18); ctx.lineTo(x + 11, y - 14); ctx.lineTo(x, y - 10); ctx.fill();
 ctx.textAlign = 'left'; ctx.fillText(m.name.toUpperCase(), x + 14, y - 8);
 });
+if (gsel && !W.canJump(S, gsel).ok && W.canJump(S, gsel).d > W.range(S)) {
+var key = S.star + '>' + gsel.id; if (!routeC || routeC.k !== key) routeC = { k: key, r: W.route(S, gsel.id) };
+if (routeC.r) { ctx.strokeStyle = 'rgba(255,122,47,0.8)'; ctx.setLineDash([4, 5]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(ox, oy); routeC.r.forEach(function (st) { ctx.lineTo(sx(st.x), sy(st.y)); }); ctx.stroke(); ctx.setLineDash([]); routeC.r.forEach(function (st) { ctx.fillStyle = '#ff7a2f'; circle2(sx(st.x), sy(st.y), 3); }); }
+}
 var mr = W.mapRadius(S); if (!mr) return;
 ctx.strokeStyle = 'rgba(159,180,201,0.22)'; ctx.lineWidth = 1; ctx.setLineDash([1, 4]); ctx.beginPath(); ctx.arc(ox, oy, mr * V.s, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
 W.starsNear(S, V.cx, V.cy, mr).forEach(function (st) {
@@ -301,6 +307,7 @@ if (v.wreck) { ctx.fillStyle = 'rgba(255,122,47,0.85)'; ctx.beginPath(); ctx.mov
 });
 ctx.lineWidth = 1;
 }
+function routeTxt(st) { var r = W.route(S, st.id); return r ? ' Route: ' + r.length + ' Sprünge, auf der Karte orange.' : ' Keine Route mit der jetzigen Reichweite.'; }
 function marksList() {
 var ids = Object.keys(S.marks || {}); if (!ids.length) return '';
 var cur = W.findStar(S, S.star);
@@ -318,7 +325,7 @@ var c = W.canJump(S, gsel), T = W.STARS[gsel.type], nd = Math.hypot(gsel.x, gsel
 h = (c.sling ? '<div class="lab ac">Schleudersprung am schwarzen Loch</div>' : '') + '<div class="lab ac">' + esc(T.n) + (S.visited[gsel.id] ? ' · besucht' : '') + '</div><h2>' + esc(gsel.name) + '</h2>' +
 '<div class="kv"><div><div class="lab">Distanz</div><b>' + num(c.d || 0) + '<small>LJ</small></b></div><div><div class="lab">Treibstoff</div><b>' + (c.fuel || W.fuelCost(S, c.d || 0)) + '<small>/ ' + Math.round(S.fuel) + '</small></b></div>' +
 '<div><div class="lab">Danach bis Sol</div><b>' + fmt(nd) + '<small>LJ</small></b></div><div><div class="lab">Auf der Erde</div><b>+' + num(c.years || W.yearsFor(c.d || 0), 1) + '<small>JAHRE</small></b></div></div>' +
-prevTxt(gsel) + '<button type="button" class="go pri" data-a="jump" ' + (c.ok ? '' : 'disabled') + '>Springen</button>' + '<button type="button" class="go" data-a="markSel">' + (S.marks[gsel.id] ? 'Markierung entfernen' : 'Markieren') + '</button>' + (c.ok ? '' : '<p class="why">' + esc(c.why) + (c.why === 'Zu wenig Treibstoff' ? ' – tanke am Stern auf oder kaufe an einer Station.' : '') + '</p>');
+prevTxt(gsel) + '<button type="button" class="go pri" data-a="jump" ' + (c.ok ? '' : 'disabled') + '>Springen</button>' + '<button type="button" class="go" data-a="markSel">' + (S.marks[gsel.id] ? 'Markierung entfernen' : 'Markieren') + '</button>' + (c.ok ? '' : '<p class="why">' + esc(c.why) + (c.why === 'Zu wenig Treibstoff' ? ' – tanke am Stern auf oder kaufe an einer Station.' : '') + (c.d > W.range(S) ? routeTxt(gsel) : '') + '</p>');
 }
 } else if (mode === 'system') {
 var o = ssel;
@@ -470,6 +477,7 @@ W.SKEYS.map(function (k) { var s = W.SHIPS[k]; return '<button type="button" cla
 '</div><div class="menu"><button type="button" class="go pri" data-a="start">Mit der ' + W.SHIPS[shipPick].n + ' starten</button><button type="button" class="go" data-a="back">Zurück</button></div></div>';
 }
 function startGame() {
+if (S.jumps > 3 && !S.flags.tut) S.flags.tut = { ziel: 1, scan: 1, land: 1, tank: 1, karte: 1, station: 1, boden: 1, luft: 1 };
 show('title', false);
 sys = W.system(S, W.findStar(S, S.star)); F = SP.enter(S, sys); mode = 'space'; showPlay(); SND.setOn(S.music !== false); sndScene();
 autoQ = S.jumps === 0 ? S.msgs.filter(function (m) { return !m.read; }).map(function (m) { return m.id; }) : [];
@@ -498,6 +506,7 @@ var c = ctxAction();
 if (c) { $('bAct').textContent = c.l; $('bAct').classList.toggle('idle', !!c.idle); }
 $('bAlt').textContent = mode === 'planet' ? 'Jetpack · halten' : 'Schub · halten';
 $('badge').hidden = !unread();
+tut();
 var rp = mode === 'space' && F && F.near && F.near.kind === 'planet' ? sys.planets[F.near.i] : null, rb = $('bRov');
 if (rp && W.roverPickupHere(S, rp)) { rb.hidden = false; rb.textContent = 'Rover abholen'; } else if (rp && W.roverCan(S, rp)) { rb.hidden = false; rb.textContent = 'Rover absetzen'; } else rb.hidden = true;
 var R = S.rover || {}, ri = R.st === 'out' ? (R.star === S.star ? 'Rover · noch ' + Math.ceil(R.t) + ' s' : 'Rover · wartet im anderen System') : R.st === 'maint' ? 'Rover · Wartung ' + Math.ceil(R.t) + ' s' : R.st === 'left' ? 'Rover · wartet auf ' + R.pn : '';
@@ -506,13 +515,35 @@ if (ri) $('info').innerHTML += '<div>' + ri + '</div>';
 $('hint').textContent = mode === 'planet' ? 'A/D LAUFEN · W HALTEN = JETPACK · LEERTASTE AKTION · TAB MENÜ' : 'ZIEL ANKLICKEN = KURS · A/D ODER ZIEHEN LENKT · W SCHUB · C MARSCHFLUG · LEERTASTE AKTION · M KARTE · TAB MENÜ';
 }
 
+// ---------- first steps: short hints, each shown once ----------
+var lastTut = -99;
+function tut() {
+if (!S || !$('modal').hidden || !$('panel').hidden) return; var T = S.flags.tut = S.flags.tut || {};
+if (time - lastTut < 9) return;
+function once(k, txt) { if (T[k]) return false; T[k] = 1; lastTut = time; toast(txt, null, null, 9000); return true; }
+if (mode === 'space' && F) {
+if (S.jumps === 0 && !F.target && once('ziel', touch ? 'Tippe einen Planeten an, dann fliegt das Schiff hin. Ziehen lenkt, „Schub“ beschleunigt.' : 'Klicke einen Planeten an, dann fliegt das Schiff hin. A/D lenkt, W gibt Schub.')) return;
+var n = F.near;
+if (n && n.kind === 'planet' && !S.scanned[sys.planets[n.i].key] && once('scan', 'Scannen zeigt Rohstoffe, Leben und manchmal eine Ruine.')) return;
+if (n && n.kind === 'planet' && S.scanned[sys.planets[n.i].key] && W.WORLDS[sys.planets[n.i].type].land && once('land', 'Lande, um selbst zu erkunden. Später holt ein Rover aus der Werft die Rohstoffe für dich.')) return;
+if (S.fuel < W.tankMax(S) * 0.4 && once('tank', 'Der Tank wird leer. Fliege zur Sonne und halte im gestrichelten Ring „Auftanken“. Achte auf die Hitze.')) return;
+if (Object.keys(S.scanned).length >= 2 && once('karte', touch ? 'Über „Menü · Karte“ wählst du den nächsten Stern. Je näher an Sol, desto näher bist du zu Hause.' : 'Mit M öffnest du die Sternkarte. Je näher ein Stern an Sol liegt, desto näher bist du zu Hause.')) return;
+if (n && n.kind === 'station' && once('station', 'An Stationen verkaufst du Rohstoffe, tankst und baust in der Werft Module ein.')) return;
+}
+if (mode === 'planet' && P) {
+if (once('boden', touch ? 'Joystick zum Laufen, nach oben oder „Jetpack“ zum Fliegen. Aktion halten baut ab oder scannt.' : 'A/D laufen, W halten für das Jetpack, Leertaste halten baut ab oder scannt.')) return;
+if (P.o2 < P.o2max * 0.5 && once('luft', 'Behalte den Sauerstoff im Blick. Am Schiff kannst du jederzeit abheben.')) return;
+if (P.sig && !P.sig.done && once('signal', 'Ein Signal! Folge den blauen Pfeilen.')) return;
+}
+}
+
 // ---------- loop ----------
 var lastTs = 0;
 function frame(ts) {
 var dt = Math.min(0.05, (ts - lastTs) / 1000 || 0); lastTs = ts; time += dt;
 var paused = !$('panel').hidden || !$('modal').hidden; SND.update();
 var inp = input();
-if (S && !paused && mode !== 'title' && mode !== 'ending' && W.roverTick) { var rv = W.roverTick(S, dt); if (rv && rv.k === 'back') { toast('Rover zurück von ' + rv.pn + (Object.keys(rv.got).length ? ' · ' + Object.keys(rv.got).map(function (k) { return '+' + rv.got[k] + ' t ' + W.RES[k].n; }).join(', ') : ' · Laderaum voll') + '. Jetzt Wartung.'); save(); } else if (rv && rv.k === 'ready') toast('Der Rover ist gewartet und bereit.'); }
+if (S && !paused && mode !== 'title' && mode !== 'ending' && W.roverTick) { var rv = W.roverTick(S, dt); if (rv && rv.k === 'back') { SND.sfx('roverback'); toast('Rover zurück von ' + rv.pn + (Object.keys(rv.got).length ? ' · ' + Object.keys(rv.got).map(function (k) { return '+' + rv.got[k] + ' t ' + W.RES[k].n; }).join(', ') : ' · Laderaum voll') + '. Jetzt Wartung.'); save(); } else if (rv && rv.k === 'ready') toast('Der Rover ist gewartet und bereit.'); }
 if (fade) { fade.t += dt; if (!fade.done && fade.t >= fade.d / 2) { fade.done = true; fade.mid(); } if (fade.t >= fade.d) fade = null; }
 if (mode === 'title') {
 if (!demo) { demo = { S: W.newGame(31337, 'kranich') }; demo.sys = W.system(demo.S, W.findStar(demo.S, 'start')); demo.F = SP.enter(demo.S, demo.sys); demo.F.pos = [520, 60, -700]; }

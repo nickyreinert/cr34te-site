@@ -397,8 +397,8 @@ var pt = (time * 0.5 + n.i * 0.3) % 1; ctx.fillStyle = 'rgba(200,240,160,' + (0.
 ctx.restore();
 }
 function drawAstro(P, x, y, s, time, lamp) {
-var f = P.face, mv = P.ground && Math.abs(P.vx) > 10, ph = P.walk || 0, w = mv ? Math.sin(ph) : P.ground ? 0 : 0.35, lift = mv ? Math.max(0, Math.cos(ph)) * 3 : 0, k = 0.32 * s;
-if (lamp) { var hx = x + f * 4 * s, hy = y - 29 * s, g = ctx.createLinearGradient(hx, 0, hx + f * 170 * s, 0); g.addColorStop(0, 'rgba(255,242,220,0.32)'); g.addColorStop(1, 'rgba(255,242,220,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(hx, hy - 2 * s); ctx.lineTo(hx + f * 170 * s, hy - 40 * s); ctx.lineTo(hx + f * 170 * s, hy + 34 * s); ctx.closePath(); ctx.fill(); }
+var f = P.face, mv = P.ground && Math.abs(P.vx) > 10, ph = P.walk || 0, w = mv ? Math.sin(ph) : P.ground ? 0 : 0.35, lift = mv ? Math.max(0, Math.cos(ph)) * 3 : 0, k = 0.4 * s;
+if (lamp) { var hx = x + f * 5 * s, hy = y - 36 * s, g = ctx.createLinearGradient(hx, 0, hx + f * 170 * s, 0); g.addColorStop(0, 'rgba(255,242,220,0.32)'); g.addColorStop(1, 'rgba(255,242,220,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(hx, hy - 2 * s); ctx.lineTo(hx + f * 170 * s, hy - 40 * s); ctx.lineTo(hx + f * 170 * s, hy + 34 * s); ctx.closePath(); ctx.fill(); }
 if (P.dust > 0) { ctx.fillStyle = 'rgba(200,190,170,' + 0.35 * P.dust + ')'; [-1, 1].forEach(function (d) { ctx.beginPath(); ctx.ellipse(x + d * (1 - P.dust) * 26 * s, y - 2 * s, (6 + (1 - P.dust) * 10) * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill(); }); }
 ctx.save(); ctx.translate(x, y + (mv ? -Math.abs(Math.sin(ph)) * 1.2 * s : 0)); ctx.scale(f * k, k); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 if (P.jetting) { var fl = 26 + Math.random() * 14, jg = ctx.createLinearGradient(0, -46, 0, -46 + fl); jg.addColorStop(0, '#fff4e6'); jg.addColorStop(0.35, AC); jg.addColorStop(1, 'rgba(255,122,47,0)'); ctx.fillStyle = jg; ctx.beginPath(); ctx.moveTo(-20, -46); ctx.lineTo(-16 - 6, -46 + fl); ctx.lineTo(-10, -46); ctx.fill(); }
@@ -548,7 +548,7 @@ P.parts.forEach(function (q) { var e = q.t * q.t, px = q.x + (P.x - q.x) * e, py
 // night tint, then lights that cut through it
 if (L < 0.6) { ctx.fillStyle = 'rgba(6,8,16,' + ((0.6 - L) * 0.45) + ')'; ctx.fillRect(0, 0, w, h); }
 drawAstro(P, X(P.x), Y(P.y), s, time, L < 0.4);
-if (P.sig && !P.sig.done && P.sigD > 90) { var dir = P.sig.x > P.x ? 1 : -1, cx0 = X(P.x) + dir * 28 * s, cy0 = Y(P.y) - 22 * s, al = 0.5 + 0.5 * Math.sin(time * 4); ctx.strokeStyle = 'rgba(191,224,255,' + al + ')'; ctx.lineWidth = 2; for (var ci = 0; ci < 2; ci++) { var ox2 = cx0 + dir * ci * 9 * s; ctx.beginPath(); ctx.moveTo(ox2, cy0 - 6 * s); ctx.lineTo(ox2 + dir * 6 * s, cy0); ctx.lineTo(ox2, cy0 + 6 * s); ctx.stroke(); } }
+if (P.sig && !P.sig.done && P.sigD > 90) { var dir = P.sig.x > P.x ? 1 : -1, cx0 = X(P.x) + dir * 28 * s, cy0 = Y(P.y) - 28 * s, al = 0.5 + 0.5 * Math.sin(time * 4); ctx.strokeStyle = 'rgba(191,224,255,' + al + ')'; ctx.lineWidth = 2; for (var ci = 0; ci < 2; ci++) { var ox2 = cx0 + dir * ci * 9 * s; ctx.beginPath(); ctx.moveTo(ox2, cy0 - 6 * s); ctx.lineTo(ox2 + dir * 6 * s, cy0); ctx.lineTo(ox2, cy0 + 6 * s); ctx.stroke(); } }
 // foreground silhouettes
 var fcol = rgb(mix(gcol, [0, 0, 0], 0.65));
 ctx.fillStyle = fcol; ctx.strokeStyle = fcol; ctx.lineWidth = 2 * s;
@@ -584,7 +584,7 @@ var lh = nk === 'ship' ? 175 : nk === 'ruin' ? 160 : nk === 'signal' ? 70 : nk =
 var lab = nk === 'site' ? (P.site.built ? 'Deine Basis' : 'Bauplatz für eine Basis') : nk === 'node' ? (P.near.n.rich ? 'Reiche Ader · ' : '') + W.RES[P.near.n.k].n + ' · ' + P.near.n.amt + ' t' : nk === 'species' ? (P.near.sp.rare ? 'Seltene Art' : P.near.sp.arch ? ARCH[P.near.sp.arch].n + ' · unbekannt' : 'Unbekannte Art') : nk === 'wreck' ? 'Wrack' : nk === 'ruin' ? 'Ruine der Erbauer' : nk === 'signal' ? 'Signalquelle' : nk === 'wal' ? 'Himmelswal' : 'Dein Schiff';
 ctx.fillStyle = 'rgba(0,0,0,0.45)'; var tw = ctx.measureText(lab.toUpperCase()).width; ctx.fillRect(X(nx) - tw / 2 - 6, Y(ny) - lh * s - 14, tw + 12, 20);
 ctx.fillStyle = IV; ctx.fillText(lab.toUpperCase(), X(nx), Y(ny) - lh * s);
-if (P.prog > 0) { ctx.strokeStyle = AC; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X(P.x), Y(P.y) - 50 * s, 12, -Math.PI / 2, -Math.PI / 2 + P.prog * Math.PI * 2); ctx.stroke(); }
+if (P.prog > 0) { ctx.strokeStyle = AC; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X(P.x), Y(P.y) - 60 * s, 12, -Math.PI / 2, -Math.PI / 2 + P.prog * Math.PI * 2); ctx.stroke(); }
 }
 }
 

@@ -68,6 +68,22 @@ r.news.msgs = r.news.msgs.concat(W.deliver(S));
 return r;
 };
 
+// ---------- route over several jumps (fuel ignored, range as now) ----------
+W.route = function (S, goalId) {
+var R = W.baseRange(S), a = W.findStar(S, S.star), g = W.findStar(S, goalId); if (!g || g.id === a.id) return null;
+function d(p, q) { return Math.hypot(p.x - q.x, p.y - q.y); }
+if (d(a, g) <= R) return [g];
+var open = [{ st: a, g: 0, f: d(a, g) / R, prev: null }], seen = {}; seen[a.id] = 1;
+for (var n = 0; n < 500 && open.length; n++) {
+var bi = 0; for (var i = 1; i < open.length; i++) if (open[i].f < open[bi].f) bi = i;
+var cur = open.splice(bi, 1)[0];
+if (d(cur.st, g) <= R) { var path = [g]; for (var c = cur; c && c.prev; c = c.prev) path.unshift(c.st); return path; }
+var nb = W.starsNear(S, cur.st.x, cur.st.y, R); if (d(cur.st, W.solStar()) <= R) nb.push(W.solStar());
+nb.forEach(function (st) { if (seen[st.id]) return; seen[st.id] = 1; open.push({ st: st, g: cur.g + 1, f: cur.g + 1 + d(st, g) / R, prev: cur }); });
+}
+return null;
+};
+
 // ---------- signals on planets ----------
 W.SIGNAL_FINDS = [
 'Unter einem flachen Stein liegt eine Funkbake der Albatros, noch immer sendend, ganz leise. Daneben eine Dose mit Notizen: Wetterdaten, Sternpositionen, ein Kinderreim.',
